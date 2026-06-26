@@ -2390,7 +2390,7 @@
 
         /* aggiorna marker PG sulla mappa hub */
         if (hub.pgMarker) {
-          hub.pgMarker.setIcon(makePgIcon(color, name[0].toUpperCase(), hp, maxHp));
+          hub.pgMarker.setIcon(makePgIcon(color, name[0].toUpperCase(), hp, maxHp, name));
         }
 
         /* refresh pannello attivo */
@@ -2410,18 +2410,22 @@
         scr.onload=cb; document.head.appendChild(scr);
       }
 
-      function makePgIcon(color, initial, hp, maxHp) {
+      function makePgIcon(color, initial, hp, maxHp, name) {
         var pct = maxHp>0 ? clamp(Math.round(hp/maxHp*100),0,100) : 100;
         var bc = pct>50?"#5d9f45":pct>25?"#c89b3c":"#c9362b";
+        var label = name ? '<div style="margin-top:7px;max-width:108px;padding:1px 7px;border-radius:5px;background:rgba(9,7,6,.9);border:1px solid rgba(200,155,60,.55);color:#f0d472;font:700 10px/1.15 Georgia,serif;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 6px rgba(0,0,0,.6)">'+name+'</div>' : '';
         return window.L.divIcon({
-          html: '<div style="position:relative;width:36px">' +
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:110px">' +
+                '<div style="position:relative;width:36px">' +
                 '<div style="width:36px;height:36px;border-radius:50%;background:'+color+';'+
                 'border:2.5px solid rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;'+
                 'font-weight:700;font-size:16px;color:#fff;box-shadow:0 0 0 2px rgba(200,155,60,.7),0 2px 10px rgba(0,0,0,.6);'+
                 'font-family:Georgia,serif">'+initial+'</div>'+
                 '<div style="position:absolute;bottom:-5px;left:0;right:0;height:4px;background:#1a1510;border-radius:3px;overflow:hidden">'+
-                '<div style="height:100%;width:'+pct+'%;background:'+bc+'"></div></div></div>',
-          className:"", iconSize:[36,42], iconAnchor:[18,18]
+                '<div style="height:100%;width:'+pct+'%;background:'+bc+'"></div></div></div>'+
+                label +
+                '</div>',
+          className:"", iconSize:[110, name?60:42], iconAnchor:[55,18]
         });
       }
 
@@ -2448,7 +2452,7 @@
         setTimeout(function() { div.style.width=""; div.style.height=""; hub.map&&hub.map.invalidateSize({animate:false}); }, 250);
         hub.map.zoomControl.setPosition("bottomright");
         hub.pgMarker = window.L.marker(CAMP_CENTER, {
-          icon: makePgIcon(color, name[0]||"E", v.hp, v.maxHp),
+          icon: makePgIcon(color, name[0]||"E", v.hp, v.maxHp, name),
           interactive: false, zIndexOffset:1000
         }).addTo(hub.map);
         var POIS=[[43.7879,7.6059],[43.7877,7.6055],[43.7868,7.6074],[43.7861,7.6107],[43.7836,7.6052],[43.7842,7.6072],[43.7914,7.5990],[43.7888,7.6044]];
@@ -3031,15 +3035,17 @@
 
       /* ---- Creazione icona PG ---- */
       function makePgIcon() {
+        var extra = (window.partyData && window.partyData.length > 1) ? (" +" + (window.partyData.length - 1)) : "";
         return window.L.divIcon({
           html: '<div class="camp-pg-marker">' +
                 '<div class="camp-pg-dot" style="background:'+state.pgColor+'">'+state.pgName[0].toUpperCase()+'</div>' +
                 '<div class="camp-pg-hpbar"><div class="camp-pg-hpfill" style="width:'+
                 Math.max(0,Math.min(100,Math.round(state.pgHp/state.pgMaxHp*100)))+'%"></div></div>' +
+                '<div class="camp-pg-name">'+state.pgName+extra+'</div>' +
                 '</div>',
           className: "",
-          iconSize: [46, 53],
-          iconAnchor: [23, 23]
+          iconSize: [120, 78],
+          iconAnchor: [60, 23]
         });
       }
 
