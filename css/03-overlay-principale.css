@@ -1,0 +1,243 @@
+    /* ---- Overlay principale ---- */
+    #campOverlay {
+      position: fixed; inset: 0; z-index: 200;
+      display: none; flex-direction: column;
+      background: #0a0807;
+      font-family: Georgia, 'Times New Roman', serif;
+      user-select: none; -webkit-user-select: none;
+      /* NO touch-action:none qui — bloccherebbe Leaflet */
+    }
+    #campOverlay.camp-active { display: flex; }
+
+    /* ---- Mappa ---- */
+    #campMapDiv {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100%; height: 100%;
+      background: #111;
+      z-index: 0;
+    }
+    /* Leaflet container deve avere dimensioni esplicite */
+    #campMapDiv .leaflet-container {
+      width: 100% !important;
+      height: 100% !important;
+      background: #1a1510 !important;
+    }
+    /* Stile dark sul pane tile */
+    #campMapDiv .leaflet-tile-pane {
+      filter: brightness(.68) saturate(.7) contrast(1.2) sepia(.22) !important;
+    }
+    /* Nasconde UI Leaflet non utile */
+    #campMapDiv .leaflet-control-attribution { display:none; }
+
+    /* ---- HUD top ---- */
+    #campTopHud {
+      position: absolute; top: 0; left: 0; right: 0;
+      z-index: 10;
+      display: flex; align-items: center; gap: 10px;
+      padding: max(10px, env(safe-area-inset-top)) 12px 8px;
+      background: linear-gradient(180deg,rgba(9,7,6,.96) 60%,transparent);
+      pointer-events: none;
+    }
+    #campTopHud > * { pointer-events: auto; }
+    #campBackBtn {
+      flex: none; padding: 7px 14px; border-radius: 8px;
+      background: rgba(36,32,28,.9); border: 1px solid rgba(200,155,60,.5);
+      color: #d8c7a3; font-size: 13px; font-family: inherit; cursor: pointer;
+    }
+    #campPgCard {
+      flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+      background: rgba(9,7,6,.78); border: 1px solid rgba(200,155,60,.35);
+      border-radius: 10px; padding: 5px 10px;
+    }
+    #campPgDot {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.4); flex: none;
+    }
+    #campPgName {
+      font-size: 14px; font-weight: 700; color: #f0d472;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #campPgHpBar {
+      flex: 1; height: 6px; border-radius: 4px;
+      background: rgba(255,255,255,.12); overflow: hidden; min-width: 50px;
+    }
+    #campPgHpFill { height: 100%; background: linear-gradient(90deg,#7bd47b,#4aaa4a); transition: width .3s; }
+    #campPgHpTxt { font-size: 11px; color: #d8c7a3; white-space: nowrap; }
+    #campZoneChip {
+      flex: none; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; font-size: 11px; color: #c89b3c;
+      background: rgba(36,32,28,.85); border: 1px solid rgba(200,155,60,.35);
+      border-radius: 16px; padding: 4px 10px;
+    }
+
+    /* ---- Pannello DM (bottom, sopra joystick) ---- */
+    #campDmPanel {
+      position: absolute; left: 0; right: 0;
+      bottom: max(env(safe-area-inset-bottom),8px);
+      z-index: 10;
+      display: flex; flex-direction: column;
+      padding: 0 12px;
+    }
+    #campDmLog {
+      display: flex; flex-direction: column; gap: 6px;
+      max-height: 28vh; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y; /* permetti scroll verticale nel log */
+      padding: 10px 10px 6px;
+      background: rgba(9,7,6,.84);
+      border: 1px solid rgba(200,155,60,.3);
+      border-radius: 12px 12px 0 0;
+      pointer-events: auto;
+    }
+    #campDmLog::-webkit-scrollbar { width: 3px; }
+    #campDmLog::-webkit-scrollbar-thumb { background: rgba(200,155,60,.4); border-radius: 4px; }
+    .camp-dm-msg {
+      display: flex; gap: 8px; align-items: flex-start;
+      animation: campFadeIn .3s ease;
+    }
+    @keyframes campFadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+    .camp-dm-avatar {
+      width: 28px; height: 28px; border-radius: 8px; flex: none;
+      background: linear-gradient(135deg,#4a1810,#2a0c08);
+      border: 1px solid rgba(200,155,60,.45);
+      display: grid; place-items: center; font-size: 14px;
+    }
+    .camp-dm-bubble {
+      flex: 1; font-size: 12.5px; line-height: 1.55;
+      color: #d8c7a3; padding: 5px 8px;
+      background: rgba(36,32,28,.6); border-radius: 8px;
+    }
+    .camp-dm-bubble.pg { color: #a8d8f0; background: rgba(20,40,60,.5); }
+    .camp-dm-bubble.sys { color: #c89b3c; font-style: italic; font-size: 11.5px; }
+    #campInputRow {
+      display: flex; gap: 6px;
+      background: rgba(9,7,6,.9); border: 1px solid rgba(200,155,60,.3);
+      border-top: none; border-radius: 0 0 12px 12px;
+      padding: 7px 8px; pointer-events: auto;
+    }
+    #campDmInput {
+      flex: 1; background: rgba(36,32,28,.8); border: 1px solid rgba(200,155,60,.25);
+      border-radius: 8px; padding: 9px 12px; color: #d8c7a3;
+      font-size: 14px; font-family: Georgia, serif; outline: none;
+      -webkit-user-select: auto; user-select: auto; touch-action: auto;
+    }
+    #campDmInput:focus { border-color: rgba(200,155,60,.7); }
+    #campDmSend {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: linear-gradient(180deg,#4a3010,#241508);
+      border: 1px solid rgba(200,155,60,.6); color: #f0d472;
+      font-size: 18px; cursor: pointer; flex: none;
+    }
+
+    /* ---- Joystick ---- */
+    #campJoyWrap {
+      position: absolute;
+      left: 16px;
+      bottom: calc(max(env(safe-area-inset-bottom),8px) + 180px);
+      z-index: 11; pointer-events: auto;
+      touch-action: none; /* solo qui, non sull'overlay intero */
+    }
+    #campJoyBase {
+      position: relative;
+      width: 118px; height: 118px; border-radius: 50%;
+      background: rgba(9,7,6,.62);
+      border: 2px solid rgba(200,155,60,.4);
+      box-shadow: 0 0 20px rgba(0,0,0,.5), inset 0 0 20px rgba(0,0,0,.4);
+      touch-action: none;
+    }
+    #campJoyKnob {
+      position: absolute;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, rgba(200,155,60,.7), rgba(100,70,20,.8));
+      border: 2px solid rgba(200,155,60,.8);
+      box-shadow: 0 2px 12px rgba(0,0,0,.6), 0 0 8px rgba(200,155,60,.3);
+      top: 50%; left: 50%; transform: translate(-50%,-50%);
+      touch-action: none; cursor: grab;
+      transition: transform .08s;
+    }
+    #campJoyKnob::after {
+      content: '✦';
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      color: rgba(240,212,114,.7); font-size: 18px;
+    }
+
+    /* ---- Pulsanti azione (bottom-right) ---- */
+    #campActBtns {
+      position: absolute;
+      right: 14px;
+      bottom: calc(max(env(safe-area-inset-bottom),8px) + 180px);
+      z-index: 11;
+      display: flex; flex-direction: column; gap: 10px;
+      pointer-events: auto;
+    }
+    .camp-act-btn {
+      width: 54px; height: 54px; border-radius: 14px;
+      background: rgba(9,7,6,.8); border: 1px solid rgba(200,155,60,.45);
+      color: #d8c7a3; font-size: 22px; cursor: pointer;
+      display: grid; place-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,.5);
+    }
+    .camp-act-btn:active { transform: scale(.92); }
+    .camp-act-btn.fight { border-color: rgba(201,54,43,.6); color: #f0a090; }
+    .camp-act-btn.sprint { border-color: rgba(93,159,69,.6); color: #a0f090; font-size: 16px; }
+    .camp-act-btn.sprint.on { background: rgba(30,70,20,.7); border-color: rgba(93,159,69,.9); }
+
+    /* ---- Zoom VTT personalizzato ---- */
+    #campMapDiv .leaflet-control-zoom a {
+      background: rgba(9,7,6,.88) !important;
+      border-color: rgba(200,155,60,.5) !important;
+      color: #c89b3c !important;
+      font-size: 18px !important;
+    }
+
+    /* ---- Marker PG ---- */
+    .camp-pg-marker {
+      position: relative; width: 46px;
+    }
+    .camp-pg-dot {
+      width: 46px; height: 46px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 20px; color: #fff;
+      border: 3px solid rgba(255,255,255,.8);
+      box-shadow: 0 0 0 3px rgba(200,155,60,.7), 0 4px 16px rgba(0,0,0,.7);
+      font-family: Georgia, serif; cursor: default;
+      animation: pgPulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pgPulse {
+      0%,100% { box-shadow: 0 0 0 3px rgba(200,155,60,.7), 0 4px 16px rgba(0,0,0,.7); }
+      50%      { box-shadow: 0 0 0 6px rgba(200,155,60,.3), 0 4px 16px rgba(0,0,0,.7); }
+    }
+    .camp-pg-hpbar {
+      position: absolute; bottom: -7px; left: 0; right: 0;
+      height: 5px; background: #1a1510; border-radius: 3px; overflow: hidden;
+    }
+    .camp-pg-hpfill { height: 100%; background: #5d9f45; }
+
+    /* ---- Marker nemici ---- */
+    .camp-enemy-dot {
+      width: 38px; height: 38px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 18px; font-weight: 700; color: #fff;
+      border: 2px solid rgba(255,100,80,.7);
+      box-shadow: 0 0 0 2px rgba(201,54,43,.4), 0 2px 8px rgba(0,0,0,.6);
+      font-family: Georgia, serif; cursor: pointer;
+      background: rgba(120,25,15,.9);
+    }
+
+    /* ---- Segnale zona ---- */
+    #campZoneBanner {
+      position: absolute; left: 50%; top: 72px;
+      transform: translateX(-50%); z-index: 12;
+      background: rgba(9,7,6,.9); border: 1px solid rgba(200,155,60,.7);
+      border-radius: 10px; padding: 8px 20px;
+      color: #f0d472; font-size: 14px; text-align: center;
+      pointer-events: none; opacity: 0;
+      transition: opacity .3s, transform .3s;
+      max-width: 80vw;
+    }
+    #campZoneBanner.show {
+      opacity: 1; transform: translateX(-50%) translateY(4px);
+    }
+  

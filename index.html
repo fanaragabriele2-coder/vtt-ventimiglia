@@ -1,0 +1,926 @@
+<!-- --- INIZIO MODULO 1: ROOT HTML, VARIABILI CSS, LAYOUT BASE, AUTODIAGNOSI --- -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Ultimate VTT 5e - Dark Table</title>
+  <link rel="stylesheet" href="css/01-2-css-avanzato-modali-status.css">
+
+  <!-- ═══ LEAFLET STATICO — caricato subito, nessun problema di timing ═══ -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ============================================================
+       MOBILE HUB — CSS layout unificato: mappa + chat + scheda PG
+       ============================================================ -->
+  <link rel="stylesheet" href="css/02-indicatore-caricamento-mappa.css">
+  <!-- ============================================================ -->
+  <link rel="stylesheet" href="css/03-overlay-principale.css">
+  <!-- ============================================================ -->
+</head>
+<body>
+  <div id="app" data-vtt-root>
+    <header class="topbar" aria-label="Barra principale">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">V</div>
+        <div class="brand-title">Ultimate VTT 5e</div>
+      </div>
+      <div class="topbar-center" aria-label="Stato sessione">
+        <span class="pill" id="sessionModePill">Modalita: Tavolo Locale</span>
+        <span class="pill" id="rulesetPill">Regole: D&D 5e</span>
+        <span class="pill" id="diagnosticSummaryPill">Diagnostica: inizializzazione</span>
+      </div>
+      <div class="topbar-right" aria-label="Azioni rapide">
+        <span class="pill" id="activeTurnPill" style="background: linear-gradient(180deg, #5bb7c8, #187789); border: 1px solid #73d1e2; color: #fff; font-size: 15px; font-weight: bold; padding: 10px 16px; margin-right: 8px; box-shadow: 0 0 10px rgba(91,183,200,0.4);">TURNO: ...</span>
+        <select class="header-party-select" id="headerPartySelect" aria-label="Cambia giocatore attivo"></select>
+        <button class="hud-button scroll-shortcut-button" type="button" id="scrollMapButton" title="Vai alla mappa">MAPPA</button>
+        <button class="hud-button" type="button" id="ventimigliaToggleBtn" title="Apri mappa reale di Ventimiglia" style="min-width:128px;border-color:rgba(93,159,69,.72);background:linear-gradient(180deg,rgba(93,159,69,.18),rgba(25,55,21,.88));color:#e2ffd9;font-weight:700;">🏔 VENTIMIGLIA</button>
+        <button class="hud-button" type="button" id="campLaunchBtn" title="Entra in modalità campagna — esplora Ventimiglia con il tuo PG" style="min-width:110px;border-color:rgba(200,155,60,.8);background:linear-gradient(180deg,rgba(80,50,5,.7),rgba(30,18,2,.9));color:#f0d472;font-weight:700;">⚔️ CAMPAGNA</button>
+        <button class="hud-button scroll-shortcut-button" type="button" id="scrollChatButton" title="Vai alla chat del Master">CHAT</button>
+        <button class="hud-button scroll-shortcut-button" type="button" id="scrollDiceButton" title="Vai ai dadi">DADI</button>
+        <button class="hud-button local-model-button" type="button" id="localMasterModelButton" title="Cambia modello locale del Master">MODELLO: CLASSICO</button>
+        <button class="hud-button ollama-master-button" type="button" id="ollamaMasterButton" title="Usa Ollama locale come Master">OLLAMA: OFF</button>
+        <button class="hud-button groq-master-button" type="button" id="groqMasterButton" title="Usa Groq AI come Master (API key gratuita su console.groq.com)">GROQ: OFF</button>
+        <button class="hud-button" type="button" id="openSheetModalButton" title="Apri scheda estesa">SHEET</button>
+        <button class="hud-button" type="button" id="openStatusModalButton" title="Apri filtri status">STATI</button>
+        <button class="hud-button" type="button" id="openInventoryModalButton" title="Apri inventario">BAG</button>
+        <button class="hud-button" type="button" id="openSpellbookModalButton" title="Apri spellbook">SPELL</button>
+        <button class="hud-button" type="button" id="openCombatModalButton" title="Apri tracker combattimento">FIGHT</button>
+        <button class="hud-button" type="button" id="diagnosticRefreshButton" title="Esegui autodiagnosi">CHECK</button>
+        <button class="hud-button ally-toggle-button" type="button" id="rogAllyModeButton" aria-pressed="false" title="Attiva Modalita Console">MODALITA CONSOLE</button>
+        <button class="hud-button" type="button" id="fullscreenButton" title="Schermo intero">FULL</button>
+      </div>
+    </header>
+
+    <!-- --- PATCH: INITIATIVE STRIP (visibile solo durante il combattimento) --- -->
+    <div id="initiativeStrip" aria-live="polite" aria-label="Ordine iniziativa"></div>
+
+    <!-- --- PATCH: ATTACK PHASE HUD (due fasi: colpire → danni) --- -->
+    <div id="attackPhaseHud" aria-live="assertive">
+      <div class="aphud-header">
+        <span class="aphud-title" id="aphudTitle">Tiro per colpire</span>
+        <button class="aphud-close" type="button" id="aphudClose">✕</button>
+      </div>
+      <div class="aphud-die" id="aphudDie">–</div>
+      <div class="aphud-lines" id="aphudLines"></div>
+      <div class="aphud-actions" id="aphudActions"></div>
+    </div>
+
+    <!-- --- FINE PATCH --- -->
+    <main class="main-grid">
+      <aside class="side-panel left" aria-label="Scheda personaggio">
+        <div class="panel-header">
+          <h1 class="panel-title">Scheda PG</h1>
+          <span class="pill" id="characterIdentityPill">Eroe Locale</span>
+        </div>
+        <div class="panel-body">
+          <!-- --- INIZIO PATCH 1 HTML: PARTY HOTSEAT SWITCHER --- -->
+          <section class="party-switcher" aria-label="Party hotseat">
+            <div class="party-switcher-top">
+              <div class="party-field">
+                <label class="party-label" for="partyMemberSelect">PG attivo</label>
+                <select class="party-select" id="partyMemberSelect" aria-label="Seleziona PG attivo"></select>
+              </div>
+              <button class="party-add-button party-count-button" type="button" id="partyCountPill" aria-label="Numero membri party">1 PG</button>
+            </div>
+            <div class="party-add-row">
+              <input class="party-name-input" id="partyNameInput" type="text" maxlength="32" placeholder="Nome nuovo giocatore" aria-label="Nome nuovo giocatore">
+              <button class="party-add-button" type="button" id="partyAddPlayerButton">Aggiungi Giocatore</button>
+            </div>
+            <div class="party-turn-row" style="display: flex; gap: 8px; margin-top: 8px;">
+              <button class="party-add-button" type="button" id="passTurnButton" style="flex: 1; background: linear-gradient(180deg, #5bb7c8, #187789); color: white; font-weight: bold;">Passa Turno al Prossimo</button>
+            </div>
+            <div class="party-roster" id="partyRoster" aria-label="Membri party"></div>
+          </section>
+          <!-- --- FINE PATCH 1 HTML: PARTY HOTSEAT SWITCHER --- -->
+          <div class="stat-preview" aria-label="Statistiche principali">
+            <div class="stat-box">
+              <div class="stat-label">For</div>
+              <div class="stat-value" id="previewStr">10</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Des</div>
+              <div class="stat-value" id="previewDex">10</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Cos</div>
+              <div class="stat-value" id="previewCon">10</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Int</div>
+              <div class="stat-value" id="previewInt">10</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Sag</div>
+              <div class="stat-value" id="previewWis">10</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Car</div>
+              <div class="stat-value" id="previewCha">10</div>
+            </div>
+          </div>
+          <!-- --- INIZIO MODULO 2 HTML: UI SCHEDA AVANZATA --- -->
+          <div class="sheet-ui" id="characterSheetModuleTwo">
+            <div class="sheet-tabs" role="tablist" aria-label="Sezioni scheda">
+              <button class="sheet-tab active" type="button" role="tab" aria-selected="true" data-sheet-tab="core">Core</button>
+              <button class="sheet-tab" type="button" role="tab" aria-selected="false" data-sheet-tab="skills">Abilita</button>
+              <button class="sheet-tab" type="button" role="tab" aria-selected="false" data-sheet-tab="inventory">Inventario</button>
+              <button class="sheet-tab" type="button" role="tab" aria-selected="false" data-sheet-tab="spells">Spellbook</button>
+              <button class="sheet-tab" type="button" role="tab" aria-selected="false" data-sheet-tab="combat">Combat</button>
+              <button class="sheet-tab" type="button" role="tab" aria-selected="false" data-sheet-tab="notes">Note</button>
+            </div>
+
+            <div class="sheet-panel active" role="tabpanel" data-sheet-panel="core">
+              <!-- --- INIZIO MODULO 3 HTML: EDITOR STATISTICHE E RISORSE STATE --- -->
+              <section class="sheet-section" aria-label="Statistiche base">
+                <h2 class="sheet-section-title">Statistiche</h2>
+                <div class="ability-editor-grid" id="abilityEditorGrid"></div>
+              </section>
+
+              <section class="sheet-section" aria-label="Risorse combattimento">
+                <h2 class="sheet-section-title">Risorse</h2>
+                <div class="sheet-grid">
+                  <div class="sheet-field">
+                    <label for="moduleTwoHpInput">HP attuali</label>
+                    <input class="sheet-input" id="moduleTwoHpInput" type="number" value="10" min="0">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleThreeMaxHpInput">HP massimi</label>
+                    <input class="sheet-input" id="moduleThreeMaxHpInput" type="number" value="10" min="1">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleTwoAcInput">CA</label>
+                    <input class="sheet-input" id="moduleTwoAcInput" type="number" value="10" min="0">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleThreeProficiencyInput">Competenza</label>
+                    <input class="sheet-input" id="moduleThreeProficiencyInput" type="number" value="2" min="0">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleTwoHitDiceInput">Dadi Vita</label>
+                    <input class="sheet-input" id="moduleTwoHitDiceInput" type="text" value="1d8">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleThreeHitDiceRemainingInput">Dadi rimasti</label>
+                    <input class="sheet-input" id="moduleThreeHitDiceRemainingInput" type="number" value="1" min="0">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleTwoSpeedInput">Velocita</label>
+                    <input class="sheet-input" id="moduleTwoSpeedInput" type="number" value="9" min="0">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleThreeTempHpInput">HP temporanei</label>
+                    <input class="sheet-input" id="moduleThreeTempHpInput" type="number" value="0" min="0">
+                  </div>
+                </div>
+                <div class="sheet-meter" aria-label="Barra punti ferita">
+                  <div class="sheet-meter-fill" id="moduleTwoHpMeter" style="--meter-value: 50%;"></div>
+                </div>
+                <div class="resource-actions" aria-label="Azioni rapide HP">
+                  <button class="resource-action-button" type="button" id="moduleThreeDamageButton">-5 HP</button>
+                  <button class="resource-action-button" type="button" id="moduleThreeHealButton">+5 HP</button>
+                  <button class="resource-action-button" type="button" id="moduleThreeSpendHitDieButton">Dado Vita</button>
+                </div>
+              </section>
+              <!-- --- FINE MODULO 3 HTML: EDITOR STATISTICHE E RISORSE STATE --- -->
+            </div>
+
+            <div class="sheet-panel" role="tabpanel" data-sheet-panel="skills">
+              <section class="sheet-section" aria-label="Abilita preparate">
+                <h2 class="sheet-section-title">Abilita</h2>
+                <!-- --- INIZIO MODULO 3 HTML: LISTA 18 ABILITA --- -->
+                <div class="skill-list" id="skillListModuleThree"></div>
+                <!-- --- FINE MODULO 3 HTML: LISTA 18 ABILITA --- -->
+              </section>
+            </div>
+
+            <!-- --- INIZIO MODULO 4 HTML: ACTION ECONOMY, INVENTARIO, SPELLBOOK --- -->
+            <div class="sheet-panel" role="tabpanel" data-sheet-panel="inventory">
+              <section class="sheet-section" aria-label="Action economy">
+                <h2 class="sheet-section-title">Azioni</h2>
+                <div class="action-economy-grid" id="actionEconomyGrid"></div>
+                <div class="resource-actions" aria-label="Reset azioni">
+                  <button class="resource-action-button" type="button" id="moduleFourResetTurnButton">Reset Turno</button>
+                  <button class="resource-action-button" type="button" id="moduleFourShortRestButton">Riposo Breve</button>
+                  <button class="resource-action-button" type="button" id="moduleFourLongRestButton">Riposo Lungo</button>
+                </div>
+              </section>
+
+              <section class="sheet-section" aria-label="Equipaggiamento">
+                <h2 class="sheet-section-title">Equipaggiamento</h2>
+                <div class="equipment-grid" id="equipmentSlotGrid"></div>
+              </section>
+
+              <section class="sheet-section" aria-label="Inventario">
+                <h2 class="sheet-section-title">Inventario</h2>
+                <div class="inventory-toolbar">
+                  <select class="sheet-select" id="moduleFourItemSelect" aria-label="Aggiungi oggetto"></select>
+                  <button class="resource-action-button" type="button" id="moduleFourAddItemButton">Aggiungi</button>
+                </div>
+                <div class="sheet-meter" aria-label="Peso trasportato">
+                  <div class="weight-meter-fill" id="moduleFourWeightMeter" style="--weight-value: 0%;"></div>
+                </div>
+                <div class="inventory-list" id="inventoryListModuleFour"></div>
+              </section>
+            </div>
+
+            <div class="sheet-panel" role="tabpanel" data-sheet-panel="spells">
+              <section class="sheet-section" aria-label="Slot incantesimo">
+                <h2 class="sheet-section-title">Slot Incantesimo</h2>
+                <div class="spell-slots-grid" id="spellSlotsGrid"></div>
+              </section>
+
+              <section class="sheet-section" aria-label="Spellbook">
+                <h2 class="sheet-section-title">Spellbook</h2>
+                <div class="inventory-toolbar">
+                  <select class="sheet-select" id="moduleFourSpellSelect" aria-label="Aggiungi incantesimo"></select>
+                  <button class="resource-action-button" type="button" id="moduleFourAddSpellButton">Aggiungi</button>
+                </div>
+                <div class="spellbook-list" id="spellbookListModuleFour"></div>
+              </section>
+            </div>
+            <!-- --- FINE MODULO 4 HTML: ACTION ECONOMY, INVENTARIO, SPELLBOOK --- -->
+
+            <!-- --- INIZIO MODULO 5 HTML: COMBAT TRACKER, INIZIATIVA, DANNI --- -->
+            <div class="sheet-panel" role="tabpanel" data-sheet-panel="combat">
+              <section class="sheet-section" aria-label="Tracker combattimento">
+                <h2 class="sheet-section-title">Combat Tracker</h2>
+                <div class="combat-toolbar">
+                  <select class="sheet-select" id="moduleFiveNpcSelect" aria-label="Aggiungi PNG"></select>
+                  <button class="combat-control-button" type="button" id="moduleFiveAddNpcButton">Aggiungi PNG</button>
+                </div>
+                <div class="combat-control-grid">
+                  <button class="combat-control-button" type="button" id="moduleFiveRollInitiativeButton">Roll Iniziativa</button>
+                  <button class="combat-control-button" type="button" id="moduleFiveNextTurnButton">Turno Succ.</button>
+                  <button class="combat-control-button" type="button" id="moduleFiveStartCombatButton">Start</button>
+                  <button class="combat-control-button" type="button" id="moduleFiveEndCombatButton">End</button>
+                </div>
+                <div class="combat-tracker-list" id="combatTrackerList"></div>
+              </section>
+
+              <section class="sheet-section" aria-label="Tiri combattimento">
+                <h2 class="sheet-section-title">Tiri</h2>
+                <div class="roll-mode-grid" id="rollModeGrid">
+                  <button class="roll-mode-button active" type="button" data-roll-mode="normal">Normale</button>
+                  <button class="roll-mode-button" type="button" data-roll-mode="advantage">Vantaggio</button>
+                  <button class="roll-mode-button" type="button" data-roll-mode="disadvantage">Svantaggio</button>
+                </div>
+                <div class="combat-target-grid">
+                  <div class="sheet-field">
+                    <label for="moduleFiveAttackBonusInput">Bonus attacco</label>
+                    <input class="sheet-input" id="moduleFiveAttackBonusInput" type="number" value="4">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleFiveDamageFormulaInput">Danni</label>
+                    <input class="sheet-input" id="moduleFiveDamageFormulaInput" type="text" value="1d8+2">
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleFiveTargetSelect">Target</label>
+                    <select class="sheet-select" id="moduleFiveTargetSelect"></select>
+                  </div>
+                  <div class="sheet-field">
+                    <label for="moduleFiveTargetAcInput">CA Target</label>
+                    <input class="sheet-input" id="moduleFiveTargetAcInput" type="number" value="12">
+                  </div>
+                </div>
+                <div class="combat-control-grid">
+                  <button class="combat-control-button" type="button" id="moduleFiveAttackButton">Attacca</button>
+                  <button class="combat-control-button" type="button" id="moduleFiveCriticalDamageButton">Critico</button>
+                </div>
+                <div class="combat-result-box" id="combatResultBox">
+                  <div class="combat-result-title">Ultimo tiro</div>
+                  <div class="combat-result-value" id="combatResultValue">In attesa</div>
+                  <div class="combat-result-detail" id="combatResultDetail">Nessun tiro eseguito.</div>
+                </div>
+              </section>
+            </div>
+            <!-- --- FINE MODULO 5 HTML: COMBAT TRACKER, INIZIATIVA, DANNI --- -->
+
+            <div class="sheet-panel" role="tabpanel" data-sheet-panel="notes">
+              <section class="sheet-section" aria-label="Note personaggio">
+                <h2 class="sheet-section-title">Note</h2>
+                <textarea class="sheet-textarea" id="moduleTwoNotesInput" placeholder="Annotazioni del personaggio locale"></textarea>
+              </section>
+            </div>
+          </div>
+          <!-- --- FINE MODULO 2 HTML: UI SCHEDA AVANZATA --- -->
+        </div>
+      </aside>
+
+      <section class="stage" aria-label="Mappa tattica">
+        <!-- PATCH VENTIMIGLIA: mappa OSM reale, z-index 0, sotto i canvas -->
+        <div id="ventimigliaMapDiv" style="position:absolute;inset:0;z-index:0;display:none;"></div>
+        <!-- Pannello info selezione token (Ventimiglia) -->
+        <div id="vtTokenInfo" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:20;display:none;
+          background:rgba(9,7,6,.92);border:1px solid rgba(200,155,60,.7);border-radius:10px;
+          padding:8px 14px;font-size:12px;color:#d8c7a3;pointer-events:none;white-space:nowrap;
+          box-shadow:0 4px 18px rgba(0,0,0,.55);font-family:Georgia,serif;"></div>
+        <!-- FINE PATCH VENTIMIGLIA -->
+        <canvas id="vttCanvas" width="1280" height="720"></canvas>
+        <!-- --- INIZIO MODULO 8 HTML: CANVAS DADI 3D --- -->
+        <canvas id="diceCanvas" width="1280" height="720" aria-hidden="true"></canvas>
+        <!-- --- FINE MODULO 8 HTML: CANVAS DADI 3D --- -->
+        <div class="stage-overlay">
+          <div class="stage-label" id="stageStatusLabel">Canvas: griglia e nebbia in caricamento</div>
+          <!-- --- INIZIO MODULO 6 HTML: TOOLBAR CANVAS MAPPA --- -->
+          <div class="map-toolbar" aria-label="Controlli mappa">
+            <div class="map-toolbar-title">
+              <span>Mappa tattica</span>
+              <span id="mapRenderStatus">Init</span>
+            </div>
+            <div class="map-mode-grid" id="mapModeGrid">
+              <button class="map-mode-button active" type="button" data-map-mode="inspect">Inspect</button>
+              <button class="map-mode-button" type="button" data-map-mode="reveal">Rivela</button>
+              <button class="map-mode-button" type="button" data-map-mode="hide">Nascondi</button>
+            </div>
+            <div class="map-field-grid">
+              <div class="map-field">
+                <label for="mapGridSizeInput">Griglia</label>
+                <input class="map-input" id="mapGridSizeInput" type="number" min="32" max="96" value="48">
+              </div>
+              <div class="map-field">
+                <label for="mapBrushRadiusInput">Pennello</label>
+                <input class="map-input" id="mapBrushRadiusInput" type="number" min="0" max="8" value="2">
+              </div>
+              <div class="map-field">
+                <label for="mapTerrainSelect">Terreno</label>
+                <select class="map-select" id="mapTerrainSelect">
+                  <option value="dungeon">Dungeon</option>
+                  <option value="cavern">Caverna</option>
+                  <option value="forest">Foresta</option>
+                </select>
+              </div>
+            </div>
+            <div class="map-control-grid">
+              <button class="map-control-button" type="button" id="mapFogAllButton">Tutto Buio</button>
+              <button class="map-control-button" type="button" id="mapRevealAllButton">Rivela Tutto</button>
+              <button class="map-control-button" type="button" id="mapCenterRevealButton">Rivela Centro</button>
+              <button class="map-control-button" type="button" id="mapRegenerateButton">Rigenera</button>
+            </div>
+            <label class="map-checkbox-row" for="mapShowGridCheckbox">
+              <input id="mapShowGridCheckbox" type="checkbox" checked>
+              <span>Mostra griglia</span>
+            </label>
+            <!-- --- INIZIO MODULO 7 HTML: CONTROLLI TOKEN CANVAS --- -->
+            <div class="token-control-grid">
+              <div class="map-field">
+                <label for="tokenSelect">Token</label>
+                <select class="map-select" id="tokenSelect"></select>
+              </div>
+              <button class="token-control-button" type="button" id="tokenAddNpcButton">Add PNG</button>
+            </div>
+            <div class="map-control-grid">
+              <button class="map-control-button" type="button" id="tokenCenterButton">Centra</button>
+              <button class="map-control-button" type="button" id="tokenResetButton">Reset Token</button>
+            </div>
+            <label class="map-checkbox-row" for="tokenSnapCheckbox">
+              <input id="tokenSnapCheckbox" type="checkbox" checked>
+              <span>Snap token</span>
+            </label>
+            <!-- --- FINE MODULO 7 HTML: CONTROLLI TOKEN CANVAS --- -->
+            <!-- --- INIZIO MODULO 8 HTML: CONTROLLI DADI 3D --- -->
+            <div class="dice-physics-toolbar" aria-label="Controlli dadi fisici">
+              <div class="map-toolbar-title">
+                <span>Dadi fisici</span>
+                <span id="dicePhysicsStatus">Ready</span>
+              </div>
+              <div class="dice-physics-grid">
+                <button class="dice-physics-button" type="button" data-physics-die="4">D4</button>
+                <button class="dice-physics-button" type="button" data-physics-die="6">D6</button>
+                <button class="dice-physics-button" type="button" data-physics-die="8">D8</button>
+                <button class="dice-physics-button" type="button" data-physics-die="10">D10</button>
+                <button class="dice-physics-button" type="button" data-physics-die="12">D12</button>
+                <button class="dice-physics-button" type="button" data-physics-die="20">D20</button>
+              </div>
+              <div class="map-control-grid">
+                <button class="map-control-button" type="button" id="diceThrowSetButton">Set D20+D6</button>
+                <button class="map-control-button" type="button" id="diceClearButton">Pulisci Dadi</button>
+              </div>
+            </div>
+            <!-- --- FINE MODULO 8 HTML: CONTROLLI DADI 3D --- -->
+            <!-- --- INIZIO MODULO 9 HTML: CONTROLLI AUDIO E VOCE MASTER --- -->
+            <div class="audio-voice-toolbar" aria-label="Controlli audio e voce">
+              <div class="map-toolbar-title">
+                <span>Audio Master</span>
+                <span id="audioVoiceStatus">Silent</span>
+              </div>
+              <div class="map-field-grid">
+                <div class="map-field">
+                  <label for="audioVolumeSlider">Volume</label>
+                  <input class="audio-slider" id="audioVolumeSlider" type="range" min="0" max="100" value="55">
+                </div>
+                <label class="map-checkbox-row" for="audioMuteCheckbox">
+                  <input id="audioMuteCheckbox" type="checkbox">
+                  <span>Mute</span>
+                </label>
+                <label class="map-checkbox-row" for="audioAmbienceCheckbox">
+                  <input id="audioAmbienceCheckbox" type="checkbox">
+                  <span>Ambience</span>
+                </label>
+              </div>
+              <div class="audio-cue-grid">
+                <button class="audio-control-button" type="button" data-audio-cue="dice">Dice</button>
+                <button class="audio-control-button" type="button" data-audio-cue="hit">Hit</button>
+                <button class="audio-control-button" type="button" data-audio-cue="spell">Spell</button>
+                <button class="audio-control-button" type="button" data-audio-cue="doom">Doom</button>
+              </div>
+              <textarea class="voice-textarea" id="masterVoiceText" placeholder="Il Master descrive la scena...">Le torce tremano. Dal buio arriva un rumore di pietra trascinata.</textarea>
+              <div class="audio-control-grid">
+                <button class="audio-control-button" type="button" id="masterSpeakButton">Parla</button>
+                <button class="audio-control-button" type="button" id="masterStopVoiceButton">Stop Voce</button>
+              </div>
+            </div>
+            <!-- --- FINE MODULO 9 HTML: CONTROLLI AUDIO E VOCE MASTER --- -->
+            <!-- --- INIZIO MODULO 10 HTML: AI BRIDGE JSON E SAVE/LOAD --- -->
+            <div class="ai-bridge-toolbar" aria-label="AI bridge e salvataggi">
+              <div class="map-toolbar-title">
+                <span>AI Bridge</span>
+                <span id="aiBridgeStatus">Ready</span>
+              </div>
+              <textarea class="ai-command-textarea" id="aiCommandInput" spellcheck="false">{"command":"speak","text":"La porta si apre con un respiro di polvere antica."}</textarea>
+              <div class="ai-control-grid">
+                <button class="ai-control-button" type="button" id="aiExampleButton">Esempio</button>
+                <button class="ai-control-button" type="button" id="aiExecuteButton">Esegui JSON</button>
+                <button class="ai-control-button" type="button" id="aiExportButton">Export</button>
+              </div>
+              <div class="ai-save-grid">
+                <div class="map-field">
+                  <label for="saveSlotSelect">Slot</label>
+                  <select class="map-select" id="saveSlotSelect">
+                    <option value="slot1">Slot 1</option>
+                    <option value="slot2">Slot 2</option>
+                    <option value="slot3">Slot 3</option>
+                  </select>
+                </div>
+                <button class="ai-control-button" type="button" id="saveTableButton">Save</button>
+                <button class="ai-control-button" type="button" id="loadTableButton">Load</button>
+              </div>
+              <div class="ai-result-box" id="aiBridgeResult">Nessun comando eseguito.</div>
+            </div>
+            <!-- --- FINE MODULO 10 HTML: AI BRIDGE JSON E SAVE/LOAD --- -->
+            <div class="map-coordinate-readout" id="mapCoordinateReadout">Cella: -</div>
+          </div>
+          <!-- --- FINE MODULO 6 HTML: TOOLBAR CANVAS MAPPA --- -->
+        </div>
+      </section>
+
+      <aside class="side-panel right" aria-label="Sistema e diagnostica">
+        <div class="panel-header">
+          <h2 class="panel-title">Autodiagnosi</h2>
+          <span class="pill" id="moduleCountPill">0 / 10</span>
+        </div>
+        <div class="panel-body">
+          <!-- --- INIZIO MODULO 2 HTML: FILTRI STATUS --- -->
+          <div class="status-filter-bar" id="statusFilterBar" aria-label="Filtri status">
+            <button class="status-filter-button" type="button" data-status="blinded" aria-pressed="false">Accecato</button>
+            <button class="status-filter-button" type="button" data-status="charmed" aria-pressed="false">Affascinato</button>
+            <button class="status-filter-button" type="button" data-status="frightened" aria-pressed="false">Spaventato</button>
+            <button class="status-filter-button" type="button" data-status="poisoned" aria-pressed="false">Avvelenato</button>
+            <button class="status-filter-button" type="button" data-status="prone" aria-pressed="false">Prono</button>
+            <button class="status-filter-button" type="button" data-status="stunned" aria-pressed="false">Stordito</button>
+          </div>
+          <!-- --- FINE MODULO 2 HTML: FILTRI STATUS --- -->
+          <!-- --- INIZIO MODULO 3 HTML: RIEPILOGO STATE MANAGER --- -->
+          <section class="sheet-section" aria-label="Riepilogo stato personaggio">
+            <h2 class="sheet-section-title">State Manager PG</h2>
+            <div class="state-summary-grid">
+              <div class="state-summary-card">
+                <span class="state-summary-label">HP</span>
+                <span class="state-summary-value" id="stateSummaryHp">10 / 10</span>
+              </div>
+              <div class="state-summary-card">
+                <span class="state-summary-label">CA</span>
+                <span class="state-summary-value" id="stateSummaryAc">10</span>
+              </div>
+              <div class="state-summary-card">
+                <span class="state-summary-label">Dadi Vita</span>
+                <span class="state-summary-value" id="stateSummaryHitDice">1 / 1</span>
+              </div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 3 HTML: RIEPILOGO STATE MANAGER --- -->
+          <!-- --- INIZIO MODULO 4 HTML: RIEPILOGO INVENTARIO E SPELLBOOK --- -->
+          <section class="sheet-section" aria-label="Riepilogo inventario">
+            <h2 class="sheet-section-title">Inventario</h2>
+            <div class="module-four-summary">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Peso</span>
+                  <span class="state-summary-value" id="inventoryWeightSummary">0 kg</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">CA Eq.</span>
+                  <span class="state-summary-value" id="equipmentAcSummary">10</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Spell</span>
+                  <span class="state-summary-value" id="spellbookSummary">0</span>
+                </div>
+              </div>
+              <div class="weight-meter" aria-label="Riepilogo carico">
+                <div class="weight-meter-fill" id="inventoryWeightSummaryMeter" style="--weight-value: 0%;"></div>
+              </div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 4 HTML: RIEPILOGO INVENTARIO E SPELLBOOK --- -->
+          <!-- --- INIZIO MODULO 5 HTML: RIEPILOGO COMBAT ENGINE --- -->
+          <section class="sheet-section" aria-label="Riepilogo combattimento">
+            <h2 class="sheet-section-title">Combat Engine</h2>
+            <div class="combat-summary-stack">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Round</span>
+                  <span class="state-summary-value" id="combatRoundSummary">0</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Turno</span>
+                  <span class="state-summary-value" id="combatTurnSummary">-</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Nemici</span>
+                  <span class="state-summary-value" id="combatEnemySummary">0</span>
+                </div>
+              </div>
+              <div class="combat-result-box">
+                <div class="combat-result-title">Evento</div>
+                <div class="combat-result-detail" id="combatEventSummary">Combattimento non iniziato.</div>
+              </div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 5 HTML: RIEPILOGO COMBAT ENGINE --- -->
+          <!-- --- INIZIO MODULO 6 HTML: RIEPILOGO MAPPA CANVAS --- -->
+          <section class="sheet-section" aria-label="Riepilogo mappa canvas">
+            <h2 class="sheet-section-title">Canvas Map</h2>
+            <div class="map-summary-stack">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Griglia</span>
+                  <span class="state-summary-value" id="mapGridSummary">32 x 24</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Fog</span>
+                  <span class="state-summary-value" id="mapFogSummary">100%</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Scala</span>
+                  <span class="state-summary-value" id="mapScaleSummary">1.5 m</span>
+                </div>
+              </div>
+              <div class="map-legend" aria-label="Legenda terreno">
+                <div class="map-legend-item">
+                  <span class="map-legend-swatch stone"></span>
+                  <span>Pietra</span>
+                </div>
+                <div class="map-legend-item">
+                  <span class="map-legend-swatch earth"></span>
+                  <span>Terra</span>
+                </div>
+                <div class="map-legend-item">
+                  <span class="map-legend-swatch water"></span>
+                  <span>Acqua</span>
+                </div>
+                <div class="map-legend-item">
+                  <span class="map-legend-swatch wall"></span>
+                  <span>Muro</span>
+                </div>
+              </div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 6 HTML: RIEPILOGO MAPPA CANVAS --- -->
+          <!-- --- INIZIO MODULO 7 HTML: RIEPILOGO TOKEN PHYSICS --- -->
+          <section class="sheet-section" aria-label="Riepilogo token physics">
+            <h2 class="sheet-section-title">Token Physics</h2>
+            <div class="token-summary-stack">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Token</span>
+                  <span class="state-summary-value" id="tokenCountSummary">0</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Selezione</span>
+                  <span class="state-summary-value" id="tokenSelectedSummary">-</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Distanza</span>
+                  <span class="state-summary-value" id="tokenDistanceSummary">0 m</span>
+                </div>
+              </div>
+              <div class="combat-result-box">
+                <div class="combat-result-title">Movimento</div>
+                <div class="combat-result-detail" id="tokenMoveSummary">Nessun movimento.</div>
+              </div>
+              <div class="token-list" id="tokenListSummary"></div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 7 HTML: RIEPILOGO TOKEN PHYSICS --- -->
+          <!-- --- INIZIO MODULO 8 HTML: RIEPILOGO 3D DICE ENGINE --- -->
+          <section class="sheet-section" aria-label="Riepilogo dadi fisici">
+            <h2 class="sheet-section-title">3D Dice Engine</h2>
+            <div class="dice-summary-stack">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Dadi</span>
+                  <span class="state-summary-value" id="diceCountSummary">0</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Totale</span>
+                  <span class="state-summary-value" id="diceTotalSummary">0</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Fisica</span>
+                  <span class="state-summary-value" id="diceMotionSummary">idle</span>
+                </div>
+              </div>
+              <div class="dice-roll-list" id="diceRollListSummary"></div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 8 HTML: RIEPILOGO 3D DICE ENGINE --- -->
+          <!-- --- INIZIO MODULO 9 HTML: RIEPILOGO AUDIO E VOCE --- -->
+          <section class="sheet-section" aria-label="Riepilogo audio e voce">
+            <h2 class="sheet-section-title">Audio & Voice</h2>
+            <div class="audio-summary-stack">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Audio</span>
+                  <span class="state-summary-value" id="audioStatusSummary">standby</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Voce</span>
+                  <span class="state-summary-value" id="voiceStatusSummary">ready</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Volume</span>
+                  <span class="state-summary-value" id="audioVolumeSummary">55%</span>
+                </div>
+              </div>
+              <div class="audio-event-list" id="audioEventListSummary"></div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 9 HTML: RIEPILOGO AUDIO E VOCE --- -->
+          <!-- --- INIZIO MODULO 10 HTML: RIEPILOGO AI BRIDGE E SAVE SYSTEM --- -->
+          <section class="sheet-section" aria-label="Riepilogo AI bridge">
+            <h2 class="sheet-section-title">AI Bridge</h2>
+            <div class="ai-summary-stack">
+              <div class="state-summary-grid">
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Comandi</span>
+                  <span class="state-summary-value" id="aiCommandCountSummary">0</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Save</span>
+                  <span class="state-summary-value" id="saveStatusSummary">ready</span>
+                </div>
+                <div class="state-summary-card">
+                  <span class="state-summary-label">Storage</span>
+                  <span class="state-summary-value" id="storageStatusSummary">local</span>
+                </div>
+              </div>
+              <div class="ai-command-list" id="aiCommandListSummary"></div>
+            </div>
+          </section>
+          <!-- --- FINE MODULO 10 HTML: RIEPILOGO AI BRIDGE E SAVE SYSTEM --- -->
+          <!-- --- INIZIO CORE LOOP HTML: CHAT DEL MASTER --- -->
+          <section class="master-chat-panel" aria-label="Chat del Master">
+            <header class="master-chat-header">
+              <div>
+                <h2 class="master-chat-title">Master IA</h2>
+                <p class="master-chat-subtitle">Canale narrativo</p>
+              </div>
+              <span class="master-chat-status" id="masterChatStatus">Online</span>
+            </header>
+
+            <div class="master-chat-log" id="masterChatLog" aria-live="polite">
+              <div class="master-chat-message master">
+                <span class="master-chat-speaker">Master</span>
+                <p>Le ombre si muovono oltre la soglia. Cosa fai?</p>
+              </div>
+            </div>
+
+            <form class="master-chat-form" id="masterChatForm">
+              <button class="master-chat-tts" type="button" id="masterChatTtsBtn" title="Auto Lettura (On/Off)">🔊</button>
+              <input class="master-chat-input" id="masterChatInput" type="text" autocomplete="off" placeholder="Scrivi al Master o chiedi una prova...">
+              <button class="master-chat-mic" type="button" id="masterChatMicBtn" title="Parla (Speech-to-Text)">🎤</button>
+              <button class="master-chat-send" type="submit">Invia</button>
+            </form>
+          </section>
+          <!-- --- FINE CORE LOOP HTML: CHAT DEL MASTER --- -->
+          <div class="diagnostic-panel" id="diagnosticPanel" aria-live="polite"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="bottom-hud" aria-label="HUD dadi e log">
+      <div class="hud-cluster">
+        <div class="log-box" id="systemLog">Sistema base avviato. In attesa dei moduli successivi.</div>
+      </div>
+      <div class="hud-cluster center dice-tray" aria-label="Dadi rapidi">
+        <button class="hud-button dice-button" type="button" id="rollD4Button" data-die="4">D4</button>
+        <button class="hud-button dice-button" type="button" id="rollD6Button" data-die="6">D6</button>
+        <button class="hud-button dice-button" type="button" id="rollD8Button" data-die="8">D8</button>
+        <button class="hud-button dice-button" type="button" id="rollD10Button" data-die="10">D10</button>
+        <button class="hud-button dice-button" type="button" id="rollD12Button" data-die="12">D12</button>
+        <button class="hud-button dice-button" type="button" id="rollD20Button" data-die="20">D20</button>
+      </div>
+      <div class="hud-cluster right">
+        <span class="pill" id="activeActorPill">Turno: nessuno</span>
+        <span class="pill" id="actionEconomyPill">Azioni: pronte</span>
+        <span class="pill" id="combatModePill">Combat: off</span>
+        <span class="pill" id="mapModePill">Mappa: inspect</span>
+        <span class="pill" id="tokenModePill">Token: snap</span>
+        <span class="pill" id="diceModePill">Dadi: idle</span>
+        <span class="pill" id="audioModePill">Audio: standby</span>
+        <span class="pill" id="aiModePill">AI: ready</span>
+        <span class="pill" id="gridScalePill">Scala: 1 quadretto = 1,5 m</span>
+      </div>
+    </footer>
+
+    <!-- --- INIZIO MODULO 2 HTML: MODALI E HUD DADI --- -->
+    <div class="dice-hud" id="diceHud" aria-live="polite">
+      <div class="dice-hud-face" id="diceHudFace">D20</div>
+      <div class="dice-hud-text">
+        <div class="dice-hud-label" id="diceHudLabel">Tiro rapido</div>
+        <div class="dice-hud-result" id="diceHudResult">In attesa del lancio</div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modalBackdrop" aria-hidden="true">
+      <section class="modal-window" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <header class="modal-header">
+          <h2 class="modal-title" id="modalTitle">Pannello</h2>
+          <button class="modal-close-button" type="button" id="modalCloseButton" aria-label="Chiudi finestra">X</button>
+        </header>
+        <div class="modal-body" id="modalBody"></div>
+        <footer class="modal-footer">
+          <span class="pill" id="modalStatusPill">Modulo 2 UI</span>
+          <button class="hud-button" type="button" id="modalConfirmButton">OK</button>
+        </footer>
+      </section>
+    </div>
+    <!-- --- FINE MODULO 2 HTML: MODALI E HUD DADI --- -->
+  </div>
+
+  <script src="js/01-adattatore-party-legge-la-scheda.js"></script>
+
+  <script src="js/02-1-autodiagnosi-base.js"></script>
+  <script src="js/03-2-modali-filtri-status-scheda.js"></script>
+  <script src="js/04-3-state-manager-pg-statistiche.js"></script>
+  <script src="js/05-4-action-economy-inventario-equipaggiamento.js"></script>
+  <script src="js/06-patch-due-fasi-colpire-danni.js"></script>
+  <script src="js/07-6-canvas-rendering-griglie-mappa.js"></script>
+  <script src="js/08-7-token-physics-drag-drop.js"></script>
+  <script src="js/09-8-3d-dice-engine-fisica.js"></script>
+  <script src="js/10-9-audio-procedurale-web-audio.js"></script>
+  <script src="js/11-10-ai-bridge-json-parser.js"></script>
+  <script src="js/12-patch-touch-events-per-mobile.js"></script>
+  <!-- ============================================================
+       MOBILE HUB — Layout unificato: mappa + chat + scheda PG
+       ============================================================ -->
+  <div id="mobileHub">
+    <!-- Status Bar -->
+    <div id="hubStatus">
+      <button id="hubBackBtn" title="Torna al VTT completo">←</button>
+      <div id="hubPgPill">
+        <div id="hubPgColor">A</div>
+        <div style="flex:1;min-width:0">
+          <div id="hubPgNameTxt">Eroe</div>
+          <div id="hubPgHpRow">
+            <div id="hubPgHpBar"><div id="hubPgHpFill" style="width:100%"></div></div>
+            <span id="hubPgHpNum">—</span>
+          </div>
+        </div>
+      </div>
+      <div id="hubRoundPill">
+        <span id="hubRoundLabel">Round</span>
+        <span id="hubRoundNum">—</span>
+      </div>
+    </div>
+
+    <!-- Mappa (sempre visibile) -->
+    <div id="hubMapWrap">
+      <div id="hubMapDiv">
+        <div class="map-loading-overlay" id="hubMapLoading">
+          <div class="map-loading-spinner"></div>
+          <span>Caricamento mappa…</span>
+        </div>
+      </div>
+      <div id="hubMapOverlay"></div>
+      <div id="hubMapLabel">📍 <span id="hubZoneTxt">Ventimiglia</span></div>
+      <button id="hubCampLaunch">⚔️ Esplora</button>
+    </div>
+
+    <!-- Tab strip -->
+    <div id="hubTabs">
+      <button class="hub-tab is-active" data-panel="chat"><span class="t-icon">💬</span>Chat</button>
+      <button class="hub-tab" data-panel="pg"><span class="t-icon">👤</span>PG</button>
+      <button class="hub-tab" data-panel="combat"><span class="t-icon">⚔️</span>Combatti</button>
+    </div>
+
+    <!-- Pannelli contenuto -->
+    <div id="hubPanels">
+      <!-- Chat DM -->
+      <div class="hub-panel is-active" id="hubPanelChat">
+        <div id="hubChatLog"></div>
+        <div id="hubChatInput">
+          <button id="hubChatTtsBtn" type="button" title="Auto Lettura (On/Off)">🔊</button>
+          <input id="hubChatInputField" type="text" placeholder="Parla col DM o chiedi una prova..." autocomplete="off">
+          <button id="hubChatMicBtn" type="button" title="Parla (STT)">🎤</button>
+          <button id="hubChatSendBtn">▶</button>
+        </div>
+      </div>
+
+      <!-- Scheda PG -->
+      <div class="hub-panel" id="hubPanelPg">
+        <div id="hubPgPanel">
+          <div class="hub-pg-select" id="hubPgSelect"></div>
+          <div id="hubPgContent"></div>
+        </div>
+      </div>
+
+      <!-- Combat -->
+      <div class="hub-panel" id="hubPanelCombat">
+        <div id="hubCombatPanel">
+          <div id="hubCombatContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div id="hubBottomNav">
+      <button class="hub-nav-btn is-active" data-nav="chat"><span class="nb-ic">💬</span>Chat</button>
+      <button class="hub-nav-btn" data-nav="pg"><span class="nb-ic">👤</span>PG</button>
+      <button class="hub-nav-btn" data-nav="combat"><span class="nb-ic">⚔️</span>Combat</button>
+      <button class="hub-nav-btn" data-nav="map"><span class="nb-ic">🗺</span>Mappa</button>
+      <button class="hub-nav-btn" id="hubNavVTT"><span class="nb-ic">🖥</span>VTT</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       CAMPAGNA — Overlay fullscreen Ventimiglia
+       ============================================================ -->
+  <div id="campOverlay">
+    <div id="campMapDiv">
+      <div class="map-loading-overlay" id="campMapLoading">
+        <div class="map-loading-spinner"></div>
+        <span>Caricamento mappa Ventimiglia…</span>
+      </div>
+    </div>
+
+    <div id="campTopHud">
+      <button id="campBackBtn">← VTT</button>
+      <div id="campPgCard">
+        <div id="campPgDot"></div>
+        <div style="flex:1;min-width:0">
+          <div id="campPgName">Eroe</div>
+          <div id="campPgHpBar"><div id="campPgHpFill" style="width:100%"></div></div>
+        </div>
+        <div id="campPgHpTxt">28/28</div>
+      </div>
+      <div id="campZoneChip">📍 Ventimiglia</div>
+    </div>
+
+    <div id="campZoneBanner"></div>
+
+    <div id="campDmPanel">
+      <div id="campDmLog"></div>
+      <div id="campInputRow">
+        <input id="campDmInput" type="text" placeholder="Parla col DM, esamina qualcosa..." autocomplete="off">
+        <button id="campDmSend">▶</button>
+      </div>
+    </div>
+
+    <div id="campJoyWrap">
+      <div id="campJoyBase">
+        <div id="campJoyKnob"></div>
+      </div>
+    </div>
+
+    <div id="campActBtns">
+      <button class="camp-act-btn sprint" id="campSprintBtn" title="Corri / Cammina">🏃</button>
+      <button class="camp-act-btn" id="campExamBtn" title="Esamina zona">🔍</button>
+      <button class="camp-act-btn fight" id="campFightBtn" title="Combatti / Apri VTT combat">⚔️</button>
+    </div>
+  </div>
+  <!-- ============================================================ -->
+
+  <script src="js/13-integrazione-vocale-stt.js"></script>
+
+  <!-- ============================================================
+       MODULO START MENU + CREAZIONE PERSONAGGIO (Nuova Partita / Carica)
+       Razze, Classi, Equipaggiamento iniziale, Abilita + bonus razza
+       ============================================================ -->
+  <link rel="stylesheet" href="css/04-style.css">
+
+  <div id="vttStartOverlay">
+    <div class="vsm-card" id="vsmCard"></div>
+  </div>
+  <button id="vttMenuReopen" type="button" title="Apri menu / crea personaggio">☰ MENU</button>
+
+  <script src="js/14-start-menu-creazione-personaggio.js"></script>
+  <script src="js/15-xp-loot-system.js"></script>
+  <script src="js/16-enemy-spawn.js"></script>
+  <script src="js/17-per-pg-inventory.js"></script>
+
+</body>
+</html>
+<!-- --- FINE MODULO 1: ROOT HTML, VARIABILI CSS, LAYOUT BASE, AUTODIAGNOSI --- -->
