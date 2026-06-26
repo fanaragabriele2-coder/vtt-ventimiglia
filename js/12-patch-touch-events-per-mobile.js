@@ -546,7 +546,8 @@
           "{\"reply\":\"testo narrativo completo di 3-5 frasi\",\"roll\":null}",
           "oppure se serve un dado:",
           "{\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}",
-          "Aggiungi \"teleportCity\":\"nome_luogo\" al JSON se il PG viaggia in citta. Aggiungi \"moveToken\":\"flee\" se fugge in modo tattico.",
+          "SPOSTAMENTO SULLA MAPPA: quando il party si reca o arriva in un luogo preciso di Ventimiglia, aggiungi al JSON \"moveTo\":\"nome esatto del luogo\". Il token del PG si spostera' in QUEL punto della mappa reale. Usa SOLO questi luoghi: " + ((window.VTTCampagna && window.VTTCampagna.places) ? window.VTTCampagna.places().join(", ") : "Stazione FS, Citta Alta, Porto Turistico, Forte dell'Annunziata") + ".",
+          "Aggiungi \"moveToken\":\"flee\" se il PG fugge in modo tattico.",
           "QUANDO COMPAIONO NEMICI: aggiungi al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] elencando i nemici che appaiono nella scena. I nemici compariranno sulla mappa vicino al party e nel tracker di combattimento.",
           "Bestiario disponibile per spawn: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin.",
           "Stat valide: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco"
@@ -581,13 +582,14 @@
           const cleaned = stripThinkingBlocks(content);
           const parsed = extractJsonObject(cleaned);
           const fallbackReply = cleaned || createGuidedMasterReply(playerText, localSuggestion);
-          var reply, roll, teleportCity, moveToken, spawn;
+          var reply, roll, teleportCity, moveToken, spawn, moveTo;
           if (!parsed || typeof parsed.reply !== "string") {
             reply = fallbackReply;
             roll = localSuggestion || null;
           } else {
             reply = parsed.reply;
             teleportCity = parsed.teleportCity;
+            moveTo = parsed.moveTo || parsed.location || null;
             moveToken = parsed.moveToken;
             spawn = parsed.spawn || parsed.enemies || null;
             roll = parsed.roll && normalizeDie(parsed.roll.die)
@@ -596,7 +598,7 @@
           }
           groqChatHistory.push({ role: "user", content: playerText });
           groqChatHistory.push({ role: "assistant", content: reply });
-          return { reply: reply, roll: roll, teleportCity: teleportCity, moveToken: moveToken, spawn: spawn };
+          return { reply: reply, roll: roll, teleportCity: teleportCity, moveTo: moveTo, moveToken: moveToken, spawn: spawn };
         } finally {
           window.clearTimeout(timeoutId);
         }
@@ -896,13 +898,15 @@
 
       function handleAIMovement(reply) {
         if (!reply) return;
-        if (reply.teleportCity) {
-          if (window.VTTCampagna && window.VTTCampagna.activate) {
-             window.VTTCampagna.activate();
-             if (window.VentimigliaMap && window.VentimigliaMap.goTo) {
-                window.VentimigliaMap.goTo(reply.teleportCity);
-             }
+        var place = reply.moveTo || reply.teleportCity;
+        if (place) {
+          if (window.VTTCampagna && window.VTTCampagna.goToPlace) {
+            var moved = window.VTTCampagna.goToPlace(place);
+            if (!moved && window.VTTCampagna.activate) window.VTTCampagna.activate();
+          } else if (window.VTTCampagna && window.VTTCampagna.activate) {
+            window.VTTCampagna.activate();
           }
+          if (window.VentimigliaMap && window.VentimigliaMap.goTo) window.VentimigliaMap.goTo(place);
         }
         if (reply.moveToken === "flee") {
           if (window.UltimateVTTTokenPhysics && window.UltimateVTTTokenPhysics.moveTokenToCell) {
@@ -914,11 +918,38 @@
         }
       }
 
+      // Rileva un intento di movimento del giocatore verso un luogo noto (fallback
+      // affidabile se il Master non emette moveTo nel JSON).
+      function inferMoveFromText(text) {
+        if (!text || !window.VTTCampagna || !window.VTTCampagna.places) return null;
+        var t = String(text).toLowerCase();
+        var hasIntent = /(vai|andiamo|andate|andare|dirig|raggiung|rechiam|rechi|verso|fino a|entriam|entrate|arriv|spostiam|ci muoviam|portac|portatec|torniam|vado|vai a)/.test(t);
+        if (!hasIntent) return null;
+        var places = window.VTTCampagna.places();
+        var match = null, matchLen = 0;
+        places.forEach(function(name) {
+          var n = name.toLowerCase();
+          if (t.indexOf(n) >= 0 && n.length > matchLen) { match = name; matchLen = n.length; }
+        });
+        if (!match) {
+          places.forEach(function(name) {
+            if (match) return;
+            var words = name.toLowerCase().split(/[\s.]+/).filter(function(w) { return w.length > 4; });
+            if (words.some(function(w) { return t.indexOf(w) >= 0; })) match = name;
+          });
+        }
+        return match;
+      }
+
       async function handlePlayerPrompt(text, isAutoRoll) {
         const request = isAutoRoll ? null : inferMasterRollRequest(text);
 
         if (!isAutoRoll) {
           appendMasterChatMessage("player", text);
+          var movePlace = inferMoveFromText(text);
+          if (movePlace && window.VTTCampagna && window.VTTCampagna.goToPlace) {
+            try { window.VTTCampagna.goToPlace(movePlace); } catch (e) {}
+          }
         }
 
         if (groqMasterState.enabled) {
@@ -3416,11 +3447,52 @@
         return true;
       }
 
+      // Sposta il TOKEN del PG al luogo esatto nominato dal Master (match fuzzy sui POI)
+      function findPlace(name) {
+        if (!name) return null;
+        function norm(s) { return String(s).toLowerCase().replace(/['`’]/g, " ").replace(/\s+/g, " ").trim(); }
+        var nq = norm(name);
+        if (!nq) return null;
+        var best = null;
+        CAMP_POIS.forEach(function(p) {
+          if (best) return;
+          var np = norm(p.name);
+          if (nq.indexOf(np) >= 0 || np.indexOf(nq) >= 0) best = p;
+        });
+        if (!best) {
+          var qwords = nq.split(" ").filter(function(w) { return w.length > 3; });
+          CAMP_POIS.forEach(function(p) {
+            if (best) return;
+            var np = norm(p.name);
+            if (qwords.some(function(w) { return np.indexOf(w) >= 0; })) best = p;
+          });
+        }
+        return best;
+      }
+      function goToPlace(name) {
+        var best = findPlace(name);
+        if (!best) return null;
+        state.pgPos.lat = best.lat; state.pgPos.lng = best.lng;
+        var wasActive = state.active;
+        if (!wasActive && typeof activate === "function") activate();
+        window.setTimeout(function() {
+          if (state.pgMarker) state.pgMarker.setLatLng([best.lat, best.lng]);
+          if (state.cmap) state.cmap.panTo([best.lat, best.lng], { animate: true });
+          state.currentZone = { name: best.name, lat: best.lat, lng: best.lng };
+          if (el("campZoneChip")) el("campZoneChip").textContent = "📍 " + best.name;
+        }, wasActive ? 60 : 750);
+        try { showBanner("➜ " + best.name); } catch (e) {}
+        try { dmLog(NARRATIONS[best.name] || ("Il party si dirige verso " + best.name + "."), "sys"); } catch (e) {}
+        return best.name;
+      }
+
       window.VTTCampagna = {
         activate: activate,
         deactivate: deactivate,
         isActive: function() { return !!state.active; },
         spawnEnemyNearPg: spawnEnemyNearPg,
+        goToPlace: goToPlace,
+        places: function() { return CAMP_POIS.map(function(p) { return p.name; }); },
         teleport: function(lat, lng) { state.pgPos.lat=lat; state.pgPos.lng=lng; }
       };
 
