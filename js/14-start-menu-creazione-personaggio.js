@@ -278,7 +278,12 @@
       function closeOverlay(){ overlay.classList.add("hidden"); }
       function openOverlay(){ overlay.classList.remove("hidden"); renderHome(); }
 
-      if(reopenBtn) reopenBtn.onclick=openOverlay;
+      if(reopenBtn){
+        reopenBtn.onclick=openOverlay;
+        // Sposta il pulsante MENU nella topbar (niente elementi fluttuanti sovrapposti)
+        var tr=document.querySelector(".topbar-right");
+        if(tr) tr.insertBefore(reopenBtn, tr.firstChild);
+      }
       window.VTTStartMenu={ open:openOverlay, close:closeOverlay, applyKitFor:applyKit };
 
       renderHome();

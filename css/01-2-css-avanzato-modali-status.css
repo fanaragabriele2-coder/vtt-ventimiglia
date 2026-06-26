@@ -70,7 +70,7 @@
 
     #app {
       display: grid;
-      grid-template-rows: var(--layout-topbar-height) minmax(0, 1fr) var(--layout-bottombar-height);
+      grid-template-rows: auto minmax(0, 1fr) auto;
       width: 100vw;
       height: 100vh;
       background:
@@ -80,11 +80,12 @@
     }
 
     .topbar {
-      display: grid;
-      grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+      display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 16px;
-      padding: 0 18px;
+      gap: 8px 12px;
+      padding: 8px 18px;
+      min-height: var(--layout-topbar-height);
       border-bottom: var(--border-gold);
       background: rgba(9, 7, 6, 0.9);
       box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
@@ -126,27 +127,31 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-wrap: wrap;
       gap: 8px;
+      flex: 1 1 auto;
     }
 
     .topbar-right {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: flex-start;
+      flex-wrap: wrap;
       gap: 8px;
+      flex: 1 1 100%;
       min-width: 0;
     }
 
     .pill {
       display: inline-flex;
       align-items: center;
-      min-height: 30px;
-      padding: 5px 10px;
+      min-height: 26px;
+      padding: 4px 9px;
       border: var(--border-iron);
       border-radius: 999px;
       background: rgba(18, 16, 14, 0.72);
       color: rgba(216, 199, 163, 0.88);
-      font-size: 12px;
+      font-size: 11px;
       white-space: nowrap;
     }
 
@@ -315,7 +320,8 @@
     .hud-cluster {
       display: flex;
       align-items: center;
-      gap: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
       min-width: 0;
     }
 
@@ -328,9 +334,10 @@
     }
 
     .hud-button {
-      min-width: 42px;
-      height: 42px;
-      padding: 0 11px;
+      min-width: 38px;
+      height: 34px;
+      padding: 0 9px;
+      font-size: 12px;
       font-weight: 700;
     }
 
@@ -2153,9 +2160,10 @@
 
     /* --- INIZIO CORE LOOP CSS: CHAT, DICE LOCK, HOTSEAT --- */
     .header-party-select {
-      min-height: 42px;
-      max-width: 150px;
-      padding: 0 10px;
+      min-height: 34px;
+      max-width: 130px;
+      padding: 0 9px;
+      font-size: 12px;
       border: var(--border-gold);
       border-radius: var(--radius-small);
       background: rgba(9, 7, 6, 0.82);
@@ -2176,7 +2184,7 @@
     }
 
     .local-model-button {
-      min-width: 144px;
+      min-width: 118px;
       border-color: rgba(224, 121, 47, 0.58);
       background: linear-gradient(180deg, rgba(224, 121, 47, 0.18), rgba(63, 32, 16, 0.86));
       color: #ffe1bf;
@@ -2353,7 +2361,8 @@
 
     .master-chat-form {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      align-items: center;
       gap: 8px;
       padding-top: 8px;
       border-top: var(--border-iron);

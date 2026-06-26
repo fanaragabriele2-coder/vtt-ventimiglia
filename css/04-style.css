@@ -44,8 +44,8 @@
     .vsm-party .pc button{background:none;border:none;color:var(--color-crimson);cursor:pointer;font-size:15px;line-height:1;}
     .vsm-foot{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap;}
     .vsm-foot .vsm-btn{flex:1 1 160px;}
-    #vttMenuReopen{position:fixed;left:12px;bottom:12px;z-index:99998;cursor:pointer;border-radius:8px;padding:8px 12px;
+    #vttMenuReopen{cursor:pointer;border-radius:6px;padding:6px 12px;
       font-size:12px;font-weight:700;letter-spacing:.5px;border:1px solid rgba(200,155,60,.5);
-      background:linear-gradient(180deg,rgba(60,40,5,.8),rgba(20,12,2,.92));color:#f0d472;font-family:var(--font-ui);opacity:.85;}
-    #vttMenuReopen:hover{opacity:1;}
+      background:linear-gradient(180deg,rgba(60,40,5,.8),rgba(20,12,2,.92));color:#f0d472;font-family:var(--font-ui);white-space:nowrap;}
+    #vttMenuReopen:hover{filter:brightness(1.12);}
   

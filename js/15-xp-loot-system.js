@@ -148,10 +148,10 @@
     if (document.getElementById("vttXpLootStyle")) return;
     var s = document.createElement("style"); s.id = "vttXpLootStyle";
     s.textContent =
-      "#vttXpBar{position:fixed;left:12px;bottom:54px;z-index:99997;width:212px;font-family:Arial,Helvetica,sans-serif;" +
-        "background:linear-gradient(180deg,rgba(28,24,20,.96),rgba(12,10,9,.97));border:1px solid rgba(200,155,60,.5);" +
-        "border-radius:9px;padding:8px 10px;box-shadow:0 8px 24px rgba(0,0,0,.55);color:#d8c7a3;}" +
-      "#vttXpBar .xb-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:5px;}" +
+      "#vttXpBar{display:flex;flex-direction:column;justify-content:center;width:188px;font-family:Arial,Helvetica,sans-serif;" +
+        "background:rgba(18,16,14,.72);border:1px solid rgba(200,155,60,.4);" +
+        "border-radius:8px;padding:4px 9px;color:#d8c7a3;}" +
+      "#vttXpBar .xb-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:3px;}" +
       "#vttXpBar .xb-lvl{font-weight:700;color:#c89b3c;}" +
       "#vttXpBar .xb-name{font-size:11px;color:#b99f6b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:96px;}" +
       "#vttXpBar .xb-track{height:9px;background:rgba(0,0,0,.5);border-radius:5px;overflow:hidden;border:1px solid rgba(216,199,163,.16);}" +
@@ -177,7 +177,8 @@
     d.innerHTML = '<div class="xb-top"><span class="xb-lvl" id="xbLvl">Liv 1</span><span class="xb-name" id="xbName">Eroe</span></div>' +
       '<div class="xb-track"><div class="xb-fill" id="xbFill" style="width:0%"></div></div>' +
       '<div class="xb-bot"><span id="xbXp">0 / 300 XP</span><span id="xbGold">🪙 0</span></div>';
-    document.body.appendChild(d);
+    var host = document.querySelector(".topbar-center") || document.querySelector(".topbar") || document.body;
+    host.appendChild(d);
   }
   function renderXpBar(){
     ensureBar();
