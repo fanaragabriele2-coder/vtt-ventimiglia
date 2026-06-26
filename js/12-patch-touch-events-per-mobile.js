@@ -918,27 +918,101 @@
         }
       }
 
-      // Rileva un intento di movimento del giocatore verso un luogo noto (fallback
-      // affidabile se il Master non emette moveTo nel JSON).
+      // Rileva un intento di movimento del giocatore verso un luogo noto.
+      // Usa alias semantici, trigger intent ampi e il fuzzy-match di findPlace.
+      // Ritorna il nome canonico del POI, oppure null.
+      var PLACE_ALIASES = {
+        "stazione":    "Stazione FS",
+        "treni":       "Stazione FS",
+        "treno":       "Stazione FS",
+        "porto":       "Porto Turistico",
+        "banchina":    "Porto Turistico",
+        "molo":        "Porto Turistico",
+        "forte":       "Forte dell'Annunziata",
+        "fortezza":    "Forte dell'Annunziata",
+        "annunziata":  "Forte dell'Annunziata",
+        "giardini":    "Giardini Hanbury",
+        "hanbury":     "Giardini Hanbury",
+        "balzi":       "Balzi Rossi",
+        "grotte":      "Balzi Rossi",
+        "cattedrale":  "Cattedrale Assunta",
+        "duomo":       "Cattedrale Assunta",
+        "chiesa":      "Cattedrale Assunta",
+        "michiele":    "Cattedrale S.Michele",
+        "michele":     "Cattedrale S.Michele",
+        "teatro":      "Teatro Romano",
+        "romano":      "Teatro Romano",
+        "rovine":      "Teatro Romano",
+        "piazza":      "Piazza Repubblica",
+        "municipio":   "Municipio",
+        "comune":      "Municipio",
+        "biblioteca":  "Biblioteca",
+        "mercato":     "Mercato Settimanale",
+        "ospedale":    "Ospedale",
+        "orologio":    "Torre dell'Orologio",
+        "torre":       "Torre dell'Orologio",
+        "roya":        "Ponte sul Roya",
+        "ponte":       "Ponte sul Roya",
+        "lungomare":   "Lungomare",
+        "spiaggia":    "Lungomare",
+        "confine":     "Confine Italia-FR",
+        "frontiera":   "Confine Italia-FR",
+        "dogana":      "Confine Italia-FR",
+        "mortola":     "Capo Mortola",
+        "capo":        "Capo Mortola",
+        "foce":        "Foce del Roya",
+        "città alta":  "Città Alta",
+        "citta alta":  "Città Alta",
+        "borgo":       "Città Alta",
+        "collina":     "Città Alta",
+        "canarda":     "Porta Canarda",
+        "lamboglia":   "Porta Nino Lamboglia",
+        "battisti":    "Piazza C. Battisti"
+      };
+
+      var MOVE_INTENT_RE = /\b(andiamo|andate|andare|andiamo a|ci dirigiamo|dirigiamo|dirigetevi|dirigiti|raggiung|rechiam|rechiamoci|fino a|verso|entriam|entriamo|arriviamo|arrivate|spostiam|spostiamoci|ci muoviam|ci muoviamo|portac|portateci|torniam|torniamo|vado|vai a|vado a|usciamo|usciamo da|saliamo|scendiamo|camminiamo|attraversiam|attraversiamo|passiamo per|andiamo verso|ci rechiamo)\b/;
+
       function inferMoveFromText(text) {
         if (!text || !window.VTTCampagna || !window.VTTCampagna.places) return null;
-        var t = String(text).toLowerCase();
-        var hasIntent = /(vai|andiamo|andate|andare|dirig|raggiung|rechiam|rechi|verso|fino a|entriam|entrate|arriv|spostiam|ci muoviam|portac|portatec|torniam|vado|vai a)/.test(t);
-        if (!hasIntent) return null;
+        var t = String(text).toLowerCase().replace(/[''`]/g, " ");
+
+        if (!MOVE_INTENT_RE.test(t)) return null;
+
+        // 1. Alias semantici: controlla ogni alias contro il testo del giocatore
+        var aliasKeys = Object.keys(PLACE_ALIASES);
+        var aliasMatch = null, aliasMatchLen = 0;
+        for (var i = 0; i < aliasKeys.length; i++) {
+          var key = aliasKeys[i];
+          if (t.indexOf(key) >= 0 && key.length > aliasMatchLen) {
+            aliasMatch = PLACE_ALIASES[key];
+            aliasMatchLen = key.length;
+          }
+        }
+        if (aliasMatch) return aliasMatch;
+
+        // 2. Match diretto sul nome completo del POI (longest match wins)
         var places = window.VTTCampagna.places();
         var match = null, matchLen = 0;
         places.forEach(function(name) {
-          var n = name.toLowerCase();
+          var n = name.toLowerCase().replace(/[''`]/g, " ");
           if (t.indexOf(n) >= 0 && n.length > matchLen) { match = name; matchLen = n.length; }
         });
-        if (!match) {
-          places.forEach(function(name) {
-            if (match) return;
-            var words = name.toLowerCase().split(/[\s.]+/).filter(function(w) { return w.length > 4; });
-            if (words.some(function(w) { return t.indexOf(w) >= 0; })) match = name;
-          });
+        if (match) return match;
+
+        // 3. Match per parole chiave (>3 char) dei nomi POI, ordinato per lunghezza
+        var candidates = [];
+        places.forEach(function(name) {
+          var words = name.toLowerCase().split(/[\s.']+/).filter(function(w) { return w.length > 3; });
+          var score = 0;
+          words.forEach(function(w) { if (t.indexOf(w) >= 0) score += w.length; });
+          if (score > 0) candidates.push({ name: name, score: score });
+        });
+        if (candidates.length > 0) {
+          candidates.sort(function(a, b) { return b.score - a.score; });
+          return candidates[0].name;
         }
-        return match;
+
+        return null;
       }
 
       async function handlePlayerPrompt(text, isAutoRoll) {
@@ -948,7 +1022,13 @@
           appendMasterChatMessage("player", text);
           var movePlace = inferMoveFromText(text);
           if (movePlace && window.VTTCampagna && window.VTTCampagna.goToPlace) {
-            try { window.VTTCampagna.goToPlace(movePlace); } catch (e) {}
+            try {
+              window.VTTCampagna.goToPlace(movePlace);
+              // Feedback leggero in chat solo se siamo in modalità campagna attiva
+              if (window.VTTCampagna.isActive && window.VTTCampagna.isActive()) {
+                appendMasterChatMessage("system", "📍 Token spostato → " + movePlace);
+              }
+            } catch (e) {}
           }
         }
 
