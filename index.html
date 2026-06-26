@@ -39,14 +39,26 @@
         <button class="hud-button" type="button" id="campLaunchBtn" title="Entra in modalità campagna — esplora Ventimiglia con il tuo PG" style="min-width:110px;border-color:rgba(200,155,60,.8);background:linear-gradient(180deg,rgba(80,50,5,.7),rgba(30,18,2,.9));color:#f0d472;font-weight:700;">⚔️ CAMPAGNA</button>
         <button class="hud-button scroll-shortcut-button" type="button" id="scrollChatButton" title="Vai alla chat del Master">CHAT</button>
         <button class="hud-button scroll-shortcut-button" type="button" id="scrollDiceButton" title="Vai ai dadi">DADI</button>
-        <button class="hud-button local-model-button" type="button" id="localMasterModelButton" title="Cambia modello locale del Master">MODELLO: CLASSICO</button>
-        <button class="hud-button ollama-master-button" type="button" id="ollamaMasterButton" title="Usa Ollama locale come Master">OLLAMA: OFF</button>
-        <button class="hud-button groq-master-button" type="button" id="groqMasterButton" title="Usa Groq AI come Master (API key gratuita su console.groq.com)">GROQ: OFF</button>
-        <button class="hud-button" type="button" id="openSheetModalButton" title="Apri scheda estesa">SHEET</button>
-        <button class="hud-button" type="button" id="openStatusModalButton" title="Apri filtri status">STATI</button>
-        <button class="hud-button" type="button" id="openInventoryModalButton" title="Apri inventario">BAG</button>
-        <button class="hud-button" type="button" id="openSpellbookModalButton" title="Apri spellbook">SPELL</button>
-        <button class="hud-button" type="button" id="openCombatModalButton" title="Apri tracker combattimento">FIGHT</button>
+        <!-- ⚙ Master dropdown -->
+        <div class="topbar-dropdown" id="masterDropdownWrapper">
+          <button class="hud-button topbar-dropdown-trigger" type="button" id="masterDropdownTrigger" aria-haspopup="true" aria-expanded="false" title="Impostazioni Master AI">⚙ Master</button>
+          <div class="topbar-dropdown-menu" id="masterDropdownMenu" role="menu">
+            <button class="hud-button local-model-button topbar-dropdown-item" type="button" id="localMasterModelButton" title="Cambia modello locale del Master" role="menuitem">MODELLO: CLASSICO</button>
+            <button class="hud-button ollama-master-button topbar-dropdown-item" type="button" id="ollamaMasterButton" title="Usa Ollama locale come Master" role="menuitem">OLLAMA: OFF</button>
+            <button class="hud-button groq-master-button topbar-dropdown-item" type="button" id="groqMasterButton" title="Usa Groq AI come Master (API key gratuita su console.groq.com)" role="menuitem">GROQ: OFF</button>
+          </div>
+        </div>
+        <!-- 🎒 Azioni dropdown -->
+        <div class="topbar-dropdown" id="actionsDropdownWrapper">
+          <button class="hud-button topbar-dropdown-trigger" type="button" id="actionsDropdownTrigger" aria-haspopup="true" aria-expanded="false" title="Azioni scheda giocatore">🎒 Azioni</button>
+          <div class="topbar-dropdown-menu" id="actionsDropdownMenu" role="menu">
+            <button class="hud-button topbar-dropdown-item" type="button" id="openSheetModalButton" title="Apri scheda estesa" role="menuitem">📋 SHEET</button>
+            <button class="hud-button topbar-dropdown-item" type="button" id="openStatusModalButton" title="Apri filtri status" role="menuitem">✨ STATI</button>
+            <button class="hud-button topbar-dropdown-item" type="button" id="openInventoryModalButton" title="Apri inventario" role="menuitem">🎒 BAG</button>
+            <button class="hud-button topbar-dropdown-item" type="button" id="openSpellbookModalButton" title="Apri spellbook" role="menuitem">📖 SPELL</button>
+            <button class="hud-button topbar-dropdown-item" type="button" id="openCombatModalButton" title="Apri tracker combattimento" role="menuitem">⚔️ FIGHT</button>
+          </div>
+        </div>
         <button class="hud-button" type="button" id="diagnosticRefreshButton" title="Esegui autodiagnosi">CHECK</button>
         <button class="hud-button ally-toggle-button" type="button" id="rogAllyModeButton" aria-pressed="false" title="Attiva Modalita Console">MODALITA CONSOLE</button>
         <button class="hud-button" type="button" id="fullscreenButton" title="Schermo intero">FULL</button>

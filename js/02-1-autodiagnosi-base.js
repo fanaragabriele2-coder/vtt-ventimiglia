@@ -187,6 +187,55 @@
             }
           });
         }
+
+        bindTopbarDropdowns();
+      }
+
+      function bindTopbarDropdowns() {
+        var dropdownWrappers = document.querySelectorAll(".topbar-dropdown");
+
+        dropdownWrappers.forEach(function (wrapper) {
+          var trigger = wrapper.querySelector(".topbar-dropdown-trigger");
+          if (!trigger) { return; }
+
+          trigger.addEventListener("click", function (event) {
+            event.stopPropagation();
+            var isOpen = wrapper.classList.contains("is-open");
+
+            // Chiudi tutti i dropdown
+            dropdownWrappers.forEach(function (w) {
+              w.classList.remove("is-open");
+              var t = w.querySelector(".topbar-dropdown-trigger");
+              if (t) { t.setAttribute("aria-expanded", "false"); }
+            });
+
+            // Apri quello cliccato (se non era già aperto)
+            if (!isOpen) {
+              wrapper.classList.add("is-open");
+              trigger.setAttribute("aria-expanded", "true");
+            }
+          });
+        });
+
+        // Click fuori chiude tutto
+        document.addEventListener("click", function closeDropdowns() {
+          dropdownWrappers.forEach(function (w) {
+            w.classList.remove("is-open");
+            var t = w.querySelector(".topbar-dropdown-trigger");
+            if (t) { t.setAttribute("aria-expanded", "false"); }
+          });
+        });
+
+        // Chiudi anche dopo aver cliccato un item
+        document.querySelectorAll(".topbar-dropdown-item").forEach(function (item) {
+          item.addEventListener("click", function () {
+            dropdownWrappers.forEach(function (w) {
+              w.classList.remove("is-open");
+              var t = w.querySelector(".topbar-dropdown-trigger");
+              if (t) { t.setAttribute("aria-expanded", "false"); }
+            });
+          });
+        });
       }
 
       const allyModeStorageKey = "ultimate-vtt-rog-ally-mode";

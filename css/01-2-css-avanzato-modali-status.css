@@ -81,15 +81,16 @@
 
     .topbar {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
-      gap: 8px 12px;
-      padding: 8px 18px;
-      min-height: var(--layout-topbar-height);
+      gap: 6px 10px;
+      padding: 0 14px;
+      height: var(--layout-topbar-height);
       border-bottom: var(--border-gold);
       background: rgba(9, 7, 6, 0.9);
       box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
-      z-index: 5;
+      z-index: 200;
+      overflow: visible;
     }
 
     .brand {
@@ -127,20 +128,87 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-wrap: wrap;
-      gap: 8px;
+      flex-wrap: nowrap;
+      gap: 6px;
       flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .topbar-right {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      flex-wrap: wrap;
-      gap: 8px;
-      flex: 1 1 100%;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      gap: 6px;
+      flex: 0 0 auto;
       min-width: 0;
     }
+
+    /* ── Topbar Dropdown ─────────────────────────────────── */
+    .topbar-dropdown {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .topbar-dropdown-trigger {
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 700;
+      height: 30px;
+      padding: 0 10px;
+      gap: 4px;
+    }
+
+    .topbar-dropdown-trigger::after {
+      content: "▾";
+      margin-left: 3px;
+      font-size: 10px;
+      opacity: 0.72;
+    }
+
+    .topbar-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 180px;
+      padding: 8px;
+      border: var(--border-gold);
+      border-radius: var(--radius-panel);
+      background: rgba(12, 10, 9, 0.97);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.68), 0 0 18px rgba(200, 155, 60, 0.14);
+      z-index: 400;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    .topbar-dropdown.is-open .topbar-dropdown-menu {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .topbar-dropdown-item {
+      width: 100%;
+      height: 32px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .topbar-dropdown-item:hover {
+      border-color: rgba(224, 121, 47, 0.8);
+      background: linear-gradient(180deg, rgba(200, 155, 60, 0.22), rgba(60, 45, 24, 0.88));
+    }
+    /* ─────────────────────────────────────────────────────── */
 
     .pill {
       display: inline-flex;
