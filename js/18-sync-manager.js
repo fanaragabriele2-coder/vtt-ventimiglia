@@ -31,6 +31,9 @@
     TOKEN_MOSSO: "TokenMovedEvent",
     TURNO_TERMINATO: "TurnEndedEvent",
     COMBATTIMENTO_INIZIATO: "CombatStartedEvent",
+    // Eventi di gioco GM-autorevoli (instradati dal modulo 22).
+    HP_AGGIORNATO: "CombatantHpEvent",
+    NEMICO_GENERATO: "EnemySpawnedEvent",
     // Eventi di servizio.
     CONTROLLO_COMBATTIMENTO: "CombatControlEvent",
     NEBBIA_RIVELATA: "FogRevealedEvent",
@@ -158,6 +161,8 @@
       case TipiEvento.COMBATTIMENTO_INIZIATO:
       case TipiEvento.CONTROLLO_COMBATTIMENTO:
       case TipiEvento.NEBBIA_RIVELATA:
+      case TipiEvento.HP_AGGIORNATO:
+      case TipiEvento.NEMICO_GENERATO:
       case TipiEvento.SYNC_STATO:
         // Mutazioni dell'autorita': solo il Master.
         return ruoloAttore === Ruolo.MASTER;

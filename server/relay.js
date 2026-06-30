@@ -48,6 +48,8 @@ const SOLO_MASTER = {
   CombatStartedEvent: true,
   CombatControlEvent: true,
   FogRevealedEvent: true,
+  CombatantHpEvent: true,
+  EnemySpawnedEvent: true,
   StateSyncEvent: true
 };
 

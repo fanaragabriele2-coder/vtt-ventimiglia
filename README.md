@@ -26,9 +26,12 @@ vttg2506/
 │   ├── 17-per-pg-inventory.js
 │   ├── 18-sync-manager.js              ← Fase 1: WebSocket, ruoli GM/Player, rollback
 │   ├── 19-combat-state-machine.js      ← Fase 3: FSM combattimento + action economy
-│   └── 20-token-kinematics-network.js  ← Fase 2: throttle 10Hz, coordinate, raggio movimento
+│   ├── 20-token-kinematics-network.js  ← Fase 2: throttle 10Hz, coordinate, raggio movimento
+│   ├── 21-session-panel.js             ← UI: pannello di sessione multiplayer
+│   └── 22-network-game-events.js       ← routing di rete: HP/danni, nebbia, spawn nemici
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
+├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
 ├── dist/           ← build a file singolo (generata)
 │   └── ultimate-vtt.html
 ├── legacy/         ← monolite originale archiviato (non più usato)
@@ -96,6 +99,11 @@ Architettura a 3 fasi, tutta in HTML/JS, agganciata ai moduli esistenti. Resta
 - **Movimento interpolato.** I movimenti dei token in arrivo dalla rete (anteprime a ~10Hz e finale)
   vengono applicati in modo **animato**: la molla del modulo token li fa scivolare fluidi invece di
   «teletrasportarsi» da cella a cella.
+- **Sistemi di gioco sincronizzati — `UltimateVTTNetEvents` (`js/22`).** Instrada in rete, in modo
+  **GM-autorevole**, anche HP/danni (`applyDamageToCombatant`/`healCombatant` → `CombatantHpEvent`),
+  nebbia di guerra (`revealCircle`/`hideCircle`/`fillFog` → `FogRevealedEvent`) e comparsa nemici
+  (`VTTSpawn.spawn` → `EnemySpawnedEvent`). Avvolge le funzioni esistenti senza modificarle; i client
+  rieseguono l'azione (deterministica grazie all'hydration) e il guard remoto evita le eco a catena.
 
 ### Avvio del relay e connessione
 
