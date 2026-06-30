@@ -28,7 +28,8 @@ vttg2506/
 │   ├── 19-combat-state-machine.js      ← Fase 3: FSM combattimento + action economy
 │   ├── 20-token-kinematics-network.js  ← Fase 2: throttle 10Hz, coordinate, raggio movimento
 │   ├── 21-session-panel.js             ← UI: pannello di sessione multiplayer
-│   └── 22-network-game-events.js       ← routing di rete: HP/danni, nebbia, spawn nemici
+│   ├── 22-network-game-events.js       ← routing di rete: HP/danni, nebbia, spawn nemici
+│   └── 23-bg3-combat-hud.js            ← HUD combattimento stile BG3 (iniziativa, % colpire, azioni)
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -58,6 +59,22 @@ comunica con gli altri tramite `window.UltimateVTT*` (es. `UltimateVTTState`,
 
 Il Master può essere: **Groq** (chiave API gratuita su console.groq.com), **Ollama**
 locale, o il modello **classico** offline. La voce usa Web Speech (TTS + microfono, it-IT).
+
+## Combattimento stile Baldur's Gate 3
+
+`js/23-bg3-combat-hud.js` + `css/06-bg3-combat-hud.css` aggiungono una HUD di combattimento in
+stile **BG3** che mette in scena la meccanica 5e già presente (modulo 06 combat, modulo 19 FSM,
+modulo 05 action economy), **senza modificarli**. Compare solo a combattimento attivo:
+
+- **Barra dell'ordine d'iniziativa** in alto (turno corrente evidenziato, HP per combattente; click
+  su un nemico = lo seleziona come bersaglio).
+- **Anteprima della probabilità di colpire** il bersaglio (la "70%" di BG3), calcolata in 5e
+  (`d20 + bonus ≥ CA`, 20/1 naturale) con **vantaggio/svantaggio** (`1-(1-p)²` / `p²`).
+- **Economia delle azioni** del turno (azione / bonus / reazione) e **barra del movimento** residuo.
+- Selettore **Normale / Vantaggio / Svantaggio** e pulsanti **Attacca** / **Termina turno**.
+
+La matematica di colpire è esposta come funzioni pure testabili
+(`UltimateVTTBG3HUD.probColpire(...)`) e coperta da `tools/test/core-bg3-hud.js`.
 
 ## Salvataggio e backup
 

@@ -136,6 +136,38 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       document.querySelector(".vtt-sess-map-row select").value === "token-npc-2", null, { timeout: 6000 });
     check("Giocatore: mappatura del Master ricevuta e riflessa (token-npc-2)", true);
 
+    // --- HUD di combattimento stile BG3: compare a combattimento attivo, con la % di colpire ---
+    const hudPrima = await gm.evaluate(() => { const h = document.querySelector(".bg3-hud"); return h ? h.hidden : null; });
+    check("BG3 HUD: nascosta fuori dal combattimento", hudPrima === true);
+    await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.startCombat());
+    await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === false; }, null, { timeout: 6000 });
+    check("BG3 HUD: visibile dopo l'inizio del combattimento", true);
+    const nCard = await gm.evaluate(() => document.querySelectorAll(".bg3-init-card").length);
+    check("BG3 HUD: barra iniziativa con una card per combattente", nCard >= 2);
+    // L'iniziativa e' casuale: seleziona un bersaglio diverso dall'attaccante di turno, cosi' la
+    // percentuale e' sempre calcolabile (non si mostra una % "contro se stessi").
+    await gm.evaluate(() => {
+      const st = window.UltimateVTTCombat.getState();
+      const cur = st.combatants[st.currentTurnIndex];
+      const other = st.combatants.find(c => c.id !== cur.id && !c.defeated);
+      const sel = document.getElementById("moduleFiveTargetSelect");
+      if (sel && other) {
+        if (![].some.call(sel.options, o => o.value === other.id)) {
+          const o = document.createElement("option"); o.value = other.id; o.textContent = other.id; sel.appendChild(o);
+        }
+        sel.value = other.id;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    await gm.waitForFunction(() => { const e = document.querySelector(".bg3-hit-pct"); return e && /\d+%/.test(e.textContent); }, null, { timeout: 6000 });
+    const pct = await gm.evaluate(() => document.querySelector(".bg3-hit-pct").textContent);
+    check("BG3 HUD: mostra la percentuale di colpire sul bersaglio (" + pct + ")", /\d+%/.test(pct));
+    const hasEnd = await gm.evaluate(() => Array.prototype.some.call(document.querySelectorAll(".bg3-btn"), b => /Termina turno/.test(b.textContent)));
+    check("BG3 HUD: presente il pulsante 'Termina turno'", hasEnd === true);
+    await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
+    await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
+    check("BG3 HUD: torna nascosta a fine combattimento", true);
+
     // Disconnessione del giocatore -> il roster del GM torna a 1.
     await pl.click(".vtt-sess-btn:has-text('Disconnetti')");
     await gm.waitForFunction(() =>
