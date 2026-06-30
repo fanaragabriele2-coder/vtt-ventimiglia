@@ -50,6 +50,7 @@ const SOLO_MASTER = {
   FogRevealedEvent: true,
   CombatantHpEvent: true,
   EnemySpawnedEvent: true,
+  TokenMappingEvent: true,
   StateSyncEvent: true
 };
 

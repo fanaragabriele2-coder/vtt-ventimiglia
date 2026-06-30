@@ -121,6 +121,21 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     const nPl = await pl.evaluate(() => document.querySelectorAll(".vtt-sess-peer").length);
     check("Giocatore roster: vede 2 partecipanti", nPl === 2);
 
+    // --- Mappatura token<->combattente sincronizzata (GM modifica, giocatore riceve) ---
+    const nRigheGm = await gm.evaluate(() => document.querySelectorAll(".vtt-sess-map-row").length);
+    check("GM: sezione mappatura con righe per i combattenti", nRigheGm >= 1);
+    const selGmAbil = await gm.evaluate(() => !document.querySelector(".vtt-sess-map-row select").disabled);
+    check("GM: i select della mappatura sono abilitati", selGmAbil === true);
+    const selPlDisab = await pl.evaluate(() => document.querySelector(".vtt-sess-map-row select").disabled);
+    check("Giocatore: i select della mappatura sono in sola lettura", selPlDisab === true);
+
+    // Il GM assegna 'token-npc-2' al primo combattente (pc-local).
+    await gm.locator(".vtt-sess-map-row").nth(0).locator("select").selectOption("token-npc-2");
+    // Il giocatore riceve la mappatura via TokenMappingEvent e la riflette.
+    await pl.waitForFunction(() =>
+      document.querySelector(".vtt-sess-map-row select").value === "token-npc-2", null, { timeout: 6000 });
+    check("Giocatore: mappatura del Master ricevuta e riflessa (token-npc-2)", true);
+
     // Disconnessione del giocatore -> il roster del GM torna a 1.
     await pl.click(".vtt-sess-btn:has-text('Disconnetti')");
     await gm.waitForFunction(() =>

@@ -148,3 +148,24 @@
 .vtt-sess-peer .vtt-sess-name { font-weight: 600; color: #ecdfc2; }
 .vtt-sess-peer .vtt-sess-tokens { margin-left: auto; font-size: 11px; color: #9c917d; }
 .vtt-sess-roster-empty { font-size: 11px; color: #9c917d; }
+
+/* Mappatura token <-> combattente */
+.vtt-sess-map { display: flex; flex-direction: column; gap: 5px; }
+.vtt-sess-map-head { display: flex; align-items: center; justify-content: space-between; }
+.vtt-sess-map-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #c89b3c; }
+.vtt-sess-map-refresh {
+  background: none; border: 1px solid rgba(200, 155, 60, .4); color: #d8c7a3;
+  border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 7px;
+}
+.vtt-sess-map-refresh:hover { border-color: #f0d472; color: #fff; }
+.vtt-sess-map-body { display: flex; flex-direction: column; gap: 4px; }
+.vtt-sess-map-row { display: flex; align-items: center; gap: 7px; }
+.vtt-sess-map-name { flex: 0 0 38%; font-size: 12px; color: #ecdfc2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vtt-sess-map-sel {
+  flex: 1; min-width: 0; padding: 5px 7px; font: 12px system-ui, sans-serif;
+  color: #f3ead2; background: rgba(9, 7, 6, .7);
+  border: 1px solid rgba(200, 155, 60, .35); border-radius: 6px;
+}
+.vtt-sess-map-sel:focus { outline: none; border-color: #f0d472; }
+.vtt-sess-map-sel:disabled { opacity: .55; cursor: not-allowed; }
+.vtt-sess-map-empty { font-size: 11px; color: #9c917d; }

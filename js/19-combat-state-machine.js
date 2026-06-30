@@ -106,6 +106,42 @@
   function impostaMappaToken(tokenId, combatantId) {
     if (combatantId == null) { delete mappaTokenOverride[String(tokenId)]; }
     else { mappaTokenOverride[String(tokenId)] = String(combatantId); }
+    emettiMappa();   // GM-autorevole: propaga agli altri client
+    notifica();
+  }
+
+  // Imposta l'intera mappa esplicita in un colpo solo (sostituisce gli override correnti).
+  function impostaMappaCompleta(mappa) {
+    mappaTokenOverride = {};
+    if (mappa && typeof mappa === "object") {
+      Object.keys(mappa).forEach(function (k) {
+        if (mappa[k] != null) { mappaTokenOverride[String(k)] = String(mappa[k]); }
+      });
+    }
+    emettiMappa();
+    notifica();
+  }
+
+  // Mappa esplicita corrente (solo gli override; il resto resta euristico).
+  function getMappa() { return clonaLista(mappaTokenOverride); }
+
+  // Emissione GM-autorevole della mappa completa (idempotente: invia sempre l'intero oggetto).
+  function emettiMappa() {
+    var s = sync();
+    if (!s || applicandoRemoto() || !s.isMaster()) { return; }
+    s.emetti(s.creaEvento(s.TipiEvento.MAPPA_TOKEN, { mappa: clonaLista(mappaTokenOverride) }));
+  }
+
+  // Applica una mappa ricevuta dal Master (sostituisce gli override locali).
+  function gestisciMappaInbound(evento) {
+    var p = evento.payload || {};
+    if (p.mappa && typeof p.mappa === "object") {
+      mappaTokenOverride = {};
+      Object.keys(p.mappa).forEach(function (k) {
+        if (p.mappa[k] != null) { mappaTokenOverride[String(k)] = String(p.mappa[k]); }
+      });
+      notifica();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -380,6 +416,14 @@
     var fsmSnap = snap.combattimentoFsm || null;
     var combat = snap.combattimento || null;
 
+    // Mappatura esplicita token<->combattente dettata dal Master (per token personalizzati).
+    if (fsmSnap && fsmSnap.mappaToken && typeof fsmSnap.mappaToken === "object") {
+      mappaTokenOverride = {};
+      Object.keys(fsmSnap.mappaToken).forEach(function (k) {
+        if (fsmSnap.mappaToken[k] != null) { mappaTokenOverride[String(k)] = String(fsmSnap.mappaToken[k]); }
+      });
+    }
+
     // Ordine d'iniziativa autorevole: dal combat del Master (preferito) o dallo snapshot FSM.
     var combattenti = (combat && Array.isArray(combat.combatants) && combat.combatants.length)
       ? combat.combatants
@@ -430,6 +474,7 @@
     s.inAscolto(s.TipiEvento.COMBATTIMENTO_INIZIATO, gestisciCombattimentoIniziatoInbound);
     s.inAscolto(s.TipiEvento.TURNO_TERMINATO, gestisciTurnoTerminatoInbound);
     s.inAscolto(s.TipiEvento.CONTROLLO_COMBATTIMENTO, gestisciControlloInbound);
+    s.inAscolto(s.TipiEvento.MAPPA_TOKEN, gestisciMappaInbound);
   }
 
   // ---------------------------------------------------------------------------
@@ -444,7 +489,8 @@
       round: fsm.round,
       gmOverride: fsm.gmOverride,
       enforceMovimento: imposta.enforceMovimento,
-      budget: JSON.parse(JSON.stringify(budget))
+      budget: JSON.parse(JSON.stringify(budget)),
+      mappaToken: clonaLista(mappaTokenOverride)
     };
   }
 
@@ -483,6 +529,8 @@
     tokenACombattente: tokenACombattente,
     combattenteAToken: combattenteAToken,
     impostaMappaToken: impostaMappaToken,
+    impostaMappaCompleta: impostaMappaCompleta,
+    getMappa: getMappa,
     // idratazione a partita in corso (chiamata dal Sync Manager)
     applicaSnapshot: applicaSnapshot,
     // utile per la mappa

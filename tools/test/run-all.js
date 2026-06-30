@@ -15,6 +15,7 @@ const suite = [
   ["Relay E2E (autorizzazione, broadcast)", "relay-e2e.js"],
   ["Relay hardening (auth, GM token, rate-limit, validazione)", "relay-hardening.js"],
   ["Routing di rete sistemi di gioco (HP, nebbia, spawn)", "game-events.js"],
+  ["Mappatura esplicita token<->combattente", "mapping.js"],
   ["Pannello di sessione E2E (browser, opzionale)", "panel-e2e.js"]
 ];
 

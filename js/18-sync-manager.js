@@ -34,6 +34,7 @@
     // Eventi di gioco GM-autorevoli (instradati dal modulo 22).
     HP_AGGIORNATO: "CombatantHpEvent",
     NEMICO_GENERATO: "EnemySpawnedEvent",
+    MAPPA_TOKEN: "TokenMappingEvent",
     // Eventi di servizio.
     CONTROLLO_COMBATTIMENTO: "CombatControlEvent",
     NEBBIA_RIVELATA: "FogRevealedEvent",
@@ -163,6 +164,7 @@
       case TipiEvento.NEBBIA_RIVELATA:
       case TipiEvento.HP_AGGIORNATO:
       case TipiEvento.NEMICO_GENERATO:
+      case TipiEvento.MAPPA_TOKEN:
       case TipiEvento.SYNC_STATO:
         // Mutazioni dell'autorita': solo il Master.
         return ruoloAttore === Ruolo.MASTER;

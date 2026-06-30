@@ -104,6 +104,11 @@ Architettura a 3 fasi, tutta in HTML/JS, agganciata ai moduli esistenti. Resta
   nebbia di guerra (`revealCircle`/`hideCircle`/`fillFog` → `FogRevealedEvent`) e comparsa nemici
   (`VTTSpawn.spawn` → `EnemySpawnedEvent`). Avvolge le funzioni esistenti senza modificarle; i client
   rieseguono l'azione (deterministica grazie all'hydration) e il guard remoto evita le eco a catena.
+- **Mappatura esplicita token ↔ combattente.** Oltre all'euristica (`token-pc↔pc-local`,
+  `token-npc-N↔npc-N`), il Master può assegnare esplicitamente ogni token al suo combattente dal
+  pannello di sessione (utile con token personalizzati o party numerosi). La mappa è **GM-autorevole**
+  (`TokenMappingEvent`), entra nello snapshot di hydration e i giocatori la ricevono in sola lettura;
+  il gating del movimento (`puoMuovereOra`, `eIlTurnoDi`) la usa al posto dell'euristica.
 
 ### Avvio del relay e connessione
 

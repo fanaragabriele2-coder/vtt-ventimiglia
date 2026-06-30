@@ -166,6 +166,19 @@
     roster.appendChild(rosterList);
     body.appendChild(roster);
 
+    // Mappatura esplicita token <-> combattente (per token personalizzati / party numerosi)
+    var mappa = el("div", "vtt-sess-map");
+    var mappaHead = el("div", "vtt-sess-map-head");
+    mappaHead.appendChild(el("span", "vtt-sess-map-title", "Mappatura token ↔ combattente"));
+    var mappaRefresh = el("button", "vtt-sess-map-refresh", "↻"); mappaRefresh.type = "button";
+    mappaRefresh.title = "Aggiorna l'elenco";
+    mappaRefresh.addEventListener("click", popolaMappatura);
+    mappaHead.appendChild(mappaRefresh);
+    mappa.appendChild(mappaHead);
+    var mapBody = el("div", "vtt-sess-map-body");
+    mappa.appendChild(mapBody);
+    body.appendChild(mappa);
+
     panel.appendChild(body);
     document.body.appendChild(toggle);
     document.body.appendChild(panel);
@@ -173,7 +186,8 @@
     rif = {
       toggle: toggle, panel: panel, sdot: sdot, stext: stext, ssub: ssub, turn: turn,
       inUrl: inUrl, inId: inId, inAuth: inAuth, selRuolo: selRuolo, fGm: fGm, inGm: inGm,
-      fOwn: fOwn, owners: owners, btnConn: btnConn, btnDisc: btnDisc, rosterList: rosterList
+      fOwn: fOwn, owners: owners, btnConn: btnConn, btnDisc: btnDisc, rosterList: rosterList,
+      mapBody: mapBody
     };
 
     // Eventi UI
@@ -189,6 +203,82 @@
     aggiornaVisibilitaOwners();
     aggiornaStato();
     aggiornaTurno();
+    popolaMappatura();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mappatura esplicita token <-> combattente
+  // ---------------------------------------------------------------------------
+  function fsm() { return window.UltimateVTTCombatFSM || null; }
+
+  // La mappa e' GM-autorevole: i giocatori la ricevono e non la modificano.
+  function mappaModificabile() {
+    var s = sync();
+    if (!s || !s.statoConnessione) { return true; } // single-player: modificabile
+    var st = s.statoConnessione();
+    return !st.abilitato || st.ruolo === "gm";
+  }
+
+  function popolaMappatura() {
+    if (!costruito || !rif.mapBody) { return; }
+    var f = fsm();
+    rif.mapBody.innerHTML = "";
+    if (!f || typeof f.getMappa !== "function") {
+      rif.mapBody.appendChild(el("div", "vtt-sess-map-empty", "FSM combattimento non disponibile."));
+      return;
+    }
+
+    // Combattenti dal combat tracker.
+    var combattenti = [];
+    if (window.UltimateVTTCombat && typeof window.UltimateVTTCombat.getState === "function") {
+      try { var cs = window.UltimateVTTCombat.getState(); combattenti = (cs && cs.combatants) || []; } catch (e) { combattenti = []; }
+    }
+    // Token disponibili.
+    var tokens = [];
+    var tp = tokenPhysics();
+    if (tp && typeof tp.getState === "function") {
+      try { var ts = tp.getState(); tokens = (ts && ts.tokens) || []; } catch (e) { tokens = []; }
+    }
+    if (!combattenti.length) {
+      rif.mapBody.appendChild(el("div", "vtt-sess-map-empty", "Nessun combattente: avvia un combattimento."));
+      return;
+    }
+
+    var modificabile = mappaModificabile();
+    combattenti.forEach(function (c) {
+      var riga = el("div", "vtt-sess-map-row");
+      riga.appendChild(el("span", "vtt-sess-map-name", c.name || c.id));
+      var sel = el("select", "vtt-sess-map-sel");
+      var optAuto = el("option", null, "(automatico)"); optAuto.value = ""; sel.appendChild(optAuto);
+      tokens.forEach(function (t) {
+        var o = el("option", null, (t.name || t.id) + " · " + t.id); o.value = t.id; sel.appendChild(o);
+      });
+      // Token correntemente associato a questo combattente.
+      var attuale = (typeof f.combattenteAToken === "function") ? f.combattenteAToken(c.id) : null;
+      sel.value = attuale && tokens.some(function (t) { return t.id === attuale; }) ? attuale : "";
+      sel.disabled = !modificabile;
+      sel.addEventListener("change", function () { assegnaMappa(c.id, sel.value); });
+      riga.appendChild(sel);
+      rif.mapBody.appendChild(riga);
+    });
+
+    if (!modificabile) {
+      rif.mapBody.appendChild(el("div", "vtt-sess-map-empty", "Mappatura dettata dal Master (sola lettura)."));
+    }
+  }
+
+  // Assegna il token 'tokenId' (o nessuno) al combattente 'combatantId', mantenendo 1 token per combattente.
+  function assegnaMappa(combatantId, tokenId) {
+    var f = fsm();
+    if (!f || typeof f.impostaMappaCompleta !== "function") { return; }
+    var mappa = {};
+    var corrente = (typeof f.getMappa === "function") ? f.getMappa() : {};
+    Object.keys(corrente || {}).forEach(function (k) {
+      if (corrente[k] !== combatantId) { mappa[k] = corrente[k]; } // togli eventuali altri token su questo combattente
+    });
+    if (tokenId) { mappa[tokenId] = combatantId; }
+    f.impostaMappaCompleta(mappa);
+    popolaMappatura();
   }
 
   // ---------------------------------------------------------------------------
@@ -383,6 +473,7 @@
       aggiornaVisibilitaOwners();
       aggiornaStato();
       aggiornaTurno();
+      popolaMappatura();   // combattenti/token possono essere cambiati
     }
   }
 
@@ -394,11 +485,15 @@
     costruisci();
 
     // Stato connessione live.
-    window.addEventListener("vtt-sync", aggiornaStato);
+    window.addEventListener("vtt-sync", function () { aggiornaStato(); if (aperto) { popolaMappatura(); } });
     // Esito autenticazione (token sessione / token Master).
     window.addEventListener("vtt-auth", function (e) { mostraAuth(e && e.detail); });
-    // Stato della FSM (turno corrente).
-    window.addEventListener("vtt-combat-fsm", function (e) { aggiornaTurno(e && e.detail); });
+    // Stato della FSM (turno corrente). Sui client in sola lettura (giocatori) si riallinea anche
+    // la mappatura ricevuta dal Master; sul Master non si tocca per non clobberare l'editing.
+    window.addEventListener("vtt-combat-fsm", function (e) {
+      aggiornaTurno(e && e.detail);
+      if (aperto && !mappaModificabile()) { popolaMappatura(); }
+    });
     // Roster dei partecipanti dal relay.
     var s = sync();
     if (s && typeof s.inAscolto === "function" && s.TipiEvento) {
