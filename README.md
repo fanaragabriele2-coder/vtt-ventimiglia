@@ -78,6 +78,12 @@ Architettura a 3 fasi, tutta in HTML/JS, agganciata ai moduli esistenti. Resta
   `RollingInitiative` → `CombatActive(turnId)` → `CombatPaused(GM)`, con budget di movimento
   (velocità − movimento speso) collegato all'action economy del PG.
 
+- **Pannello di sessione — `UltimateVTTSessionPanel` (`js/21` + `css/05`):** pannello flottante
+  (bottone **🌐 SESSIONE** in basso a sinistra) per gestire la sessione senza console: URL del relay,
+  nome/identità, ruolo (Master / Giocatore), selezione dei **token posseduti**, Connetti/Disconnetti
+  con stato live, stato del **turno** corrente e **lista partecipanti** (alimentata dal `RosterEvent`
+  che il relay trasmette a ogni ingresso/uscita).
+
 **Turni autorevoli + ingresso a partita in corso:**
 - **Turni dettati dal Master.** Sul client giocatore l'ordine d'iniziativa e il turno corrente
   non vengono ricalcolati in locale: arrivano dal Master via `CombatStartedEvent` / `TurnEndedEvent`

@@ -67,6 +67,8 @@ server.on("upgrade", function (req, socket) {
   });
   socket.on("close", function () { chiudiClient(id); });
   socket.on("error", function () { chiudiClient(id); });
+
+  trasmettiRoster(); // notifica a tutti l'elenco aggiornato dei partecipanti
 });
 
 // ---------------------------------------------------------------------------
@@ -173,6 +175,7 @@ function gestisciMessaggio(id, testo) {
     if (typeof msg.attore === "string" && msg.attore) { info.attore = msg.attore; }
     info.tokenPosseduti = new Set(Array.isArray(msg.tokenPosseduti) ? msg.tokenPosseduti.map(String) : []);
     log("Client #" + id + " e' '" + info.attore + "' con ruolo " + info.ruolo + ".");
+    trasmettiRoster(); // ruolo/identita'/possessi aggiornati: rinfresca il roster
     return;
   }
 
@@ -224,6 +227,20 @@ function inoltraAiMaster(msg) {
   });
 }
 
+// Elenco dei partecipanti correnti, inviato a tutti come RosterEvent (alimenta il pannello di sessione).
+function trasmettiRoster() {
+  const partecipanti = [];
+  client.forEach(function (info) {
+    if (!info.vivo) { return; }
+    partecipanti.push({
+      attore: info.attore,
+      ruolo: info.ruolo,
+      tokenPosseduti: Array.from(info.tokenPosseduti)
+    });
+  });
+  broadcast({ tipo: "RosterEvent", attore: "server", ruolo: "gm", ts: Date.now(), payload: { partecipanti: partecipanti } });
+}
+
 function chiudiClient(id) {
   const info = client.get(id);
   if (!info) { return; }
@@ -231,6 +248,7 @@ function chiudiClient(id) {
   try { info.socket.destroy(); } catch (e) { /* ignora */ }
   client.delete(id);
   log("Client #" + id + " disconnesso (" + client.size + " rimasti).");
+  trasmettiRoster(); // aggiorna il roster dopo l'uscita
 }
 
 function log(messaggio) {

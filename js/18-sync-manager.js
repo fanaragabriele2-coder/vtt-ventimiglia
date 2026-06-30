@@ -36,6 +36,7 @@
     NEBBIA_RIVELATA: "FogRevealedEvent",
     SYNC_STATO: "StateSyncEvent",
     RICHIESTA_SYNC: "StateSyncRequest",
+    ROSTER: "RosterEvent",
     ACK: "AckEvent",
     RIFIUTO: "RejectEvent"
   };
@@ -165,6 +166,17 @@
   // ---------------------------------------------------------------------------
   // Gestione coda / invio / rollback predittivo
   // ---------------------------------------------------------------------------
+  // Presentazione al relay: ruolo, identita' e token posseduti (base dell'autorizzazione lato server).
+  function inviaHello() {
+    return inviaRaw({
+      tipo: "hello",
+      attore: config.idGiocatore,
+      ruolo: config.ruolo,
+      tokenPosseduti: Array.isArray(config.tokenPosseduti) ? config.tokenPosseduti : [],
+      ts: ora()
+    });
+  }
+
   function inviaRaw(oggetto) {
     if (!socket || socket.readyState !== 1 /* OPEN */) { return false; }
     try {
@@ -402,8 +414,8 @@
       connesso = true;
       tentativiRiconnessione = 0;
       log("Connesso al relay: " + config.url);
-      // Presentazione: comunica ruolo e identita'.
-      inviaRaw({ tipo: "hello", attore: config.idGiocatore, ruolo: config.ruolo, ts: ora() });
+      // Presentazione: comunica ruolo, identita' E i token posseduti (il relay valida i movimenti su questi).
+      inviaHello();
       // Chiede uno snapshot autorevole e svuota la coda offline.
       inviaRaw({ tipo: TipiEvento.RICHIESTA_SYNC, attore: config.idGiocatore, ruolo: config.ruolo });
       svuotaOutbox();
@@ -454,6 +466,7 @@
 
   function impostaPossesso(tokenIds) {
     config.tokenPosseduti = Array.isArray(tokenIds) ? tokenIds.map(String) : null;
+    if (connesso) { inviaHello(); } // ri-annuncia al relay il possesso aggiornato
     notificaStato();
   }
 
