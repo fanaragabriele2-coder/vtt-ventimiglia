@@ -57,6 +57,15 @@ const SOLO_MASTER = {
 let prossimoId = 1;
 const client = new Map(); // id -> { socket, ruolo, attore, tokenPosseduti:Set, buffer, vivo, autenticato, rate, scartati }
 
+// Rete di sicurezza: un frame malformato o un bug in un singolo handler non deve abbattere
+// l'intero processo (e con esso la sessione di TUTTI i client connessi). Si logga e si continua.
+process.on("uncaughtException", function (err) {
+  log("ECCEZIONE NON GESTITA (il relay resta attivo): " + (err && err.stack ? err.stack : err));
+});
+process.on("unhandledRejection", function (motivo) {
+  log("PROMISE RIFIUTATA NON GESTITA (il relay resta attivo): " + motivo);
+});
+
 // ---------------------------------------------------------------------------
 // Server HTTP/HTTPS + upgrade a WebSocket
 // ---------------------------------------------------------------------------
@@ -355,6 +364,15 @@ function chiudiClient(id) {
 function log(messaggio) {
   console.log("[" + new Date().toISOString() + "] " + messaggio);
 }
+
+server.on("error", function (err) {
+  if (err && err.code === "EADDRINUSE") {
+    log("ERRORE: la porta " + PORT + " e' gia' in uso. Avvia con PORT=<altra porta> node server/relay.js.");
+    process.exit(1);
+  }
+  log("ERRORE del server HTTP/WebSocket: " + (err && err.stack ? err.stack : err));
+  process.exit(1);
+});
 
 server.listen(PORT, function () {
   log("VTT relay WebSocket in ascolto su " + SCHEMA + "://localhost:" + PORT + "/");

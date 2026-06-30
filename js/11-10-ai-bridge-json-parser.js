@@ -414,6 +414,94 @@
         return applySnapshot(parsed.value);
       }
 
+      // Backup scaricabile: a differenza di saveTable() (solo localStorage del browner corrente),
+      // produce un file .json che l'utente puo' conservare altrove e ripristinare anche su un
+      // altro dispositivo/browser. Riusa lo stesso createSnapshot() del salvataggio in slot.
+      function exportSnapshotToFile() {
+        const snapshot = createSnapshot();
+        const serialized = JSON.stringify(snapshot, null, 2);
+        const slot = bridgeState.lastSaveSlot || "slot1";
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const filename = "vtt-ventimiglia-" + slot + "-" + timestamp + ".json";
+
+        try {
+          const blob = new Blob([serialized], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          bridgeState.lastStatus = "exported file";
+          bridgeState.lastResult = "Backup scaricato: " + filename + " (" + serialized.length + " bytes).";
+          pushHistory("export-file", bridgeState.lastResult, true);
+          renderBridgeUi();
+          return {
+            ok: true,
+            filename: filename,
+            bytes: serialized.length,
+            snapshot: snapshot
+          };
+        } catch (error) {
+          bridgeState.lastStatus = "export error";
+          bridgeState.lastResult = "Download backup fallito: " + error.message;
+          pushHistory("export-file", bridgeState.lastResult, false);
+          renderBridgeUi();
+          return {
+            ok: false,
+            message: bridgeState.lastResult
+          };
+        }
+      }
+
+      // Ripristina da un file scelto dall'utente (es. <input type="file"> .files[0]). Asincrono
+      // (FileReader): ritorna una Promise che risolve sempre con { ok, message, ... }, mai con un
+      // throw, cosi' chi chiama puo' trattarla allo stesso modo di un esito non riuscito.
+      function importSnapshotFromFile(file) {
+        return new Promise(function resolveImport(resolve) {
+          if (!file) {
+            const message = "Nessun file selezionato.";
+            bridgeState.lastStatus = "import error";
+            bridgeState.lastResult = message;
+            pushHistory("import-file", message, false);
+            renderBridgeUi();
+            resolve({ ok: false, message: message });
+            return;
+          }
+
+          const reader = new FileReader();
+
+          reader.onerror = function handleReadError() {
+            const message = "Lettura del file di backup fallita.";
+            bridgeState.lastStatus = "import error";
+            bridgeState.lastResult = message;
+            pushHistory("import-file", message, false);
+            renderBridgeUi();
+            resolve({ ok: false, message: message });
+          };
+
+          reader.onload = function handleReadDone() {
+            let result;
+            try {
+              const parsed = JSON.parse(String(reader.result || ""));
+              result = applySnapshot(parsed);
+            } catch (error) {
+              result = { ok: false, message: "File di backup non valido: " + error.message };
+            }
+            bridgeState.lastStatus = result.ok ? "imported file" : "import error";
+            bridgeState.lastResult = result.ok ? (result.message + " (da file).") : result.message;
+            pushHistory("import-file", bridgeState.lastResult, result.ok);
+            renderBridgeUi();
+            resolve(result);
+          };
+
+          reader.readAsText(file);
+        });
+      }
+
       function executeCommand(commandPayload) {
         const command = normalizeCommand(cloneData(commandPayload));
         const name = String(command.command || "noop");
@@ -637,6 +725,9 @@
         const saveButton = getElement("saveTableButton");
         const loadButton = getElement("loadTableButton");
         const slotSelect = getElement("saveSlotSelect");
+        const downloadBackupButton = getElement("downloadBackupButton");
+        const restoreBackupButton = getElement("restoreBackupButton");
+        const restoreBackupInput = getElement("restoreBackupInput");
 
         if (exampleButton) {
           exampleButton.addEventListener("click", cycleExample);
@@ -668,6 +759,25 @@
             renderBridgeUi();
           });
         }
+
+        if (downloadBackupButton) {
+          downloadBackupButton.addEventListener("click", exportSnapshotToFile);
+        }
+
+        if (restoreBackupButton && restoreBackupInput) {
+          restoreBackupButton.addEventListener("click", function handleRestoreClick() {
+            restoreBackupInput.click();
+          });
+        }
+
+        if (restoreBackupInput) {
+          restoreBackupInput.addEventListener("change", function handleRestoreFileChosen() {
+            const file = restoreBackupInput.files && restoreBackupInput.files[0];
+            importSnapshotFromFile(file).then(function resetInput() {
+              restoreBackupInput.value = ""; // permette di ricaricare lo stesso file una seconda volta
+            });
+          });
+        }
       }
 
       function initializeBridge() {
@@ -686,6 +796,8 @@
         loadTable: loadTable,
         exportSnapshotToInput: exportSnapshotToInput,
         importSnapshotFromInput: importSnapshotFromInput,
+        exportSnapshotToFile: exportSnapshotToFile,
+        importSnapshotFromFile: importSnapshotFromFile,
         executeCommand: executeCommand,
         executePayload: executePayload,
         executeInput: executeInput,

@@ -10,10 +10,18 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const suite = [
+  // Moduli core (1-17): nessuna dipendenza dal livello multiplayer.
+  ["Core: state manager PG (modulo 04)", "core-state.js"],
+  ["Core: action economy / inventario (modulo 05)", "core-inventory.js"],
+  ["Core: combat tracker / dadi / danni (modulo 06)", "core-combat.js"],
+  ["Core: XP & loot / level-up (modulo 15)", "core-progression.js"],
+  ["Core: backup scaricabile / ripristino (modulo 11)", "core-backup.js"],
+  // Livello multiplayer real-time (Fasi 1-3 + hardening).
   ["Smoke moduli 18/19/20", "smoke.js"],
   ["Sync turni / hydration / interpolazione", "sync.js"],
   ["Relay E2E (autorizzazione, broadcast)", "relay-e2e.js"],
   ["Relay hardening (auth, GM token, rate-limit, validazione)", "relay-hardening.js"],
+  ["Relay resilience (errori di processo gestiti)", "relay-resilience.js"],
   ["Routing di rete sistemi di gioco (HP, nebbia, spawn)", "game-events.js"],
   ["Mappatura esplicita token<->combattente", "mapping.js"],
   ["Pannello di sessione E2E (browser, opzionale)", "panel-e2e.js"]

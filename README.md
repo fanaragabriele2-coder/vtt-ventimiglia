@@ -59,6 +59,14 @@ comunica con gli altri tramite `window.UltimateVTT*` (es. `UltimateVTTState`,
 Il Master può essere: **Groq** (chiave API gratuita su console.groq.com), **Ollama**
 locale, o il modello **classico** offline. La voce usa Web Speech (TTS + microfono, it-IT).
 
+## Salvataggio e backup
+
+Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
+include **⬇ Backup** / **⬆ Ripristina** (`js/11-10-ai-bridge-json-parser.js`): scaricano/caricano
+un file `.json` indipendente dal browser, utile per portare la partita su un altro dispositivo o
+come copia di sicurezza — `localStorage` vive solo nel browser di chi lo usa (tipicamente il
+Master), quindi è l'unico modo per non perdere la partita se quel browser/profilo va perso.
+
 ## Creazione personaggio
 
 Menu iniziale (`js/14-start-menu-...`): 8 razze e 6 classi con bonus di razza,
@@ -148,6 +156,10 @@ AUTH_TOKEN=segreto GM_TOKEN=segreto-master node server/relay.js
   (`AuthEvent` non fatale), evitando che chiunque si dichiari Master.
 - Inoltre il relay applica **validazione dei payload** (dimensione frame/messaggio), **rate limiting**
   per client (token bucket) e chiusura dei client palesemente abusivi.
+- **Resilienza**: `process.on("uncaughtException"/"unhandledRejection")` evita che un errore
+  imprevisto in un singolo handler abbatta l'intero processo (e con esso la sessione di tutti i
+  client connessi); un conflitto di porta (`EADDRINUSE`) produce un messaggio chiaro invece di uno
+  stack trace grezzo.
 
 Nel pannello i campi **Token sessione** e **Token Master** corrispondono ad `AUTH_TOKEN` e `GM_TOKEN`.
 
