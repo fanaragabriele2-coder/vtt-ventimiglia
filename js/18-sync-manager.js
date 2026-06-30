@@ -287,7 +287,63 @@
     try { if (window.UltimateVTTState) { snap.stato = window.UltimateVTTState.serialize(); } } catch (e) { /* ignora */ }
     try { if (window.UltimateVTTCombat) { snap.combattimento = window.UltimateVTTCombat.getState(); } } catch (e) { /* ignora */ }
     try { if (window.UltimateVTTTokenPhysics) { snap.token = window.UltimateVTTTokenPhysics.getState(); } } catch (e) { /* ignora */ }
+    // Stato autorevole della macchina a stati (turno corrente, round, pausa, budget): serve a
+    // chi entra a partita in corso per allineare i turni esattamente a quelli del Master.
+    try { if (window.UltimateVTTCombatFSM && window.UltimateVTTCombatFSM.getStato) { snap.combattimentoFsm = window.UltimateVTTCombatFSM.getStato(); } } catch (e) { /* ignora */ }
     return snap;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Idratazione (Fase 2 multiplayer): applica uno snapshot autorevole ricevuto dal Master.
+  // Solo i client NON-Master si idratano; il Master e' la fonte e si ignora.
+  // ---------------------------------------------------------------------------
+  function applicaSnapshot(snap) {
+    if (!snap || typeof snap !== "object") { return; }
+    if (isMaster()) { return; } // il Master e' la fonte autorevole
+
+    // 1) Stato del PG (risorse, statistiche, ...): il modulo 04 espone hydrate().
+    try {
+      if (snap.stato && window.UltimateVTTState && typeof window.UltimateVTTState.hydrate === "function") {
+        window.UltimateVTTState.hydrate(snap.stato);
+      }
+    } catch (e) { log("Hydration stato fallita: " + (e && e.message)); }
+
+    // 2) Posizioni dei token condivisi (riposiziona per id quelli presenti localmente).
+    try { applicaTokenSnapshot(snap.token); } catch (e) { log("Hydration token fallita: " + (e && e.message)); }
+
+    // 3) Combattimento + turni: delega alla macchina a stati (modulo 19).
+    try {
+      if (window.UltimateVTTCombatFSM && typeof window.UltimateVTTCombatFSM.applicaSnapshot === "function") {
+        window.UltimateVTTCombatFSM.applicaSnapshot(snap);
+      }
+    } catch (e) { log("Hydration FSM fallita: " + (e && e.message)); }
+
+    log("Stato sincronizzato dal Master: hydration completata.");
+  }
+
+  // Riposiziona i token presenti in entrambe le parti (match per id). I token del Master non
+  // presenti localmente non sono ricreabili con lo stesso id (addToken genera id propri): vengono
+  // solo contati e segnalati, senza creare duplicati.
+  function applicaTokenSnapshot(snapToken) {
+    if (!snapToken || !Array.isArray(snapToken.tokens) || !window.UltimateVTTTokenPhysics) { return; }
+    var tp = window.UltimateVTTTokenPhysics;
+    var statoLocale = (typeof tp.getState === "function") ? tp.getState() : null;
+    var locali = statoLocale && Array.isArray(statoLocale.tokens) ? statoLocale.tokens : [];
+    var idLocali = {};
+    locali.forEach(function (t) { if (t && t.id != null) { idLocali[t.id] = true; } });
+
+    var nonTrovati = 0;
+    snapToken.tokens.forEach(function (t) {
+      if (!t || t.id == null) { return; }
+      if (idLocali[t.id] && typeof tp.moveTokenToCell === "function") {
+        tp.moveTokenToCell(t.id, t.cellX, t.cellY, false);
+      } else if (!idLocali[t.id]) {
+        nonTrovati += 1;
+      }
+    });
+    if (nonTrovati > 0) {
+      log("Hydration token: " + nonTrovati + " token del Master non presenti localmente (id non riproducibili).");
+    }
   }
 
   function rispondiConSync() {
@@ -484,9 +540,14 @@
     inAscolto: inAscolto,
     rimuoviAscolto: rimuoviAscolto,
     applicaInbound: applicaInbound,
+    applicaSnapshot: applicaSnapshot,
+    costruisciSnapshot: costruisciSnapshot,
     staApplicandoRemoto: staApplicandoRemoto,
     autorizzato: autorizzato
   };
+
+  // Idratazione automatica: ogni StateSyncEvent autorevole ricevuto dal Master viene applicato.
+  inAscolto(TipiEvento.SYNC_STATO, function (evento) { applicaSnapshot(evento.payload); });
 
   if (window.UltimateVTT && typeof window.UltimateVTT.registerModule === "function") {
     try {

@@ -33,6 +33,7 @@
 
   var budget = {};        // combatantId -> { velocita, usato }
   var mappaTokenOverride = {}; // tokenId -> combatantId (override manuali)
+  var ordineAutoritativo = []; // ordine d'iniziativa dettato dal Master (lato giocatore)
   var listeners = [];     // osservatori UI della FSM
   var imposta = {
     enforceMovimento: true // se true il livello mappa limita il movimento dei giocatori
@@ -129,6 +130,19 @@
     });
   }
 
+  function clonaLista(lista) {
+    try { return JSON.parse(JSON.stringify(lista)); } catch (e) { return Array.isArray(lista) ? lista.slice() : []; }
+  }
+
+  // Ricostruisce il budget a partire da un elenco di combattenti esplicito (lato giocatore,
+  // dove l'ordine d'iniziativa e' quello dettato dal Master, non quello del combat locale).
+  function ricostruisciBudgetDaLista(lista) {
+    budget = {};
+    (lista || []).forEach(function (c) {
+      if (c && c.id != null) { budget[String(c.id)] = { velocita: velocitaDi(String(c.id)), usato: 0 }; }
+    });
+  }
+
   function azzeraBudgetTurno(combatantId) {
     if (!combatantId) { return; }
     if (!budget[combatantId]) { budget[combatantId] = { velocita: velocitaDi(combatantId), usato: 0 }; }
@@ -222,7 +236,9 @@
     var combattenti = st && Array.isArray(st.combatants)
       ? st.combatants.map(function (c) { return { id: c.id, name: c.name, initiative: c.initiative }; })
       : [];
-    s.emetti(s.creaEventoCombattimentoIniziato(attivo, turnoCorrenteId(), combattenti));
+    var evento = s.creaEventoCombattimentoIniziato(attivo, turnoCorrenteId(), combattenti);
+    evento.payload.round = st ? st.round : 0; // i client allineano anche il numero di round
+    s.emetti(evento);
   }
 
   function emettiTurnoTerminato(daId) {
@@ -318,32 +334,94 @@
   // Applicazione degli eventi inbound dal Sync Manager
   // ---------------------------------------------------------------------------
   function gestisciCombattimentoIniziatoInbound(evento) {
-    var st = statoCombat();
-    var attivoOra = st && st.active;
-    if (evento.payload.attivo && !attivoOra) {
-      iniziaCombattimento();
-    } else if (!evento.payload.attivo && attivoOra) {
-      terminaCombattimento();
+    var p = evento.payload || {};
+    // Il Master e' la fonte autorevole: si riallinea solo dal proprio combat locale.
+    if (isMaster()) { sincronizzaDaCombat(); return; }
+
+    // Lato giocatore: l'ordine d'iniziativa e lo stato dei turni sono DETTATI dal Master.
+    // Non si pilota il combat locale con euristiche (eviterebbe desync sull'ordine).
+    if (Array.isArray(p.combattenti) && p.combattenti.length) {
+      ordineAutoritativo = clonaLista(p.combattenti);
+      ricostruisciBudgetDaLista(ordineAutoritativo);
+    }
+    if (p.attivo) {
+      var round = typeof p.round === "number" ? p.round : fsm.round;
+      vaiAStato(Stati.ATTIVO, { turnoId: p.turnoCorrenteId != null ? String(p.turnoCorrenteId) : null, round: round, gmOverride: false });
+      azzeraBudgetTurno(p.turnoCorrenteId != null ? String(p.turnoCorrenteId) : null);
     } else {
-      sincronizzaDaCombat();
+      vaiAStato(Stati.FUORI, { turnoId: null, round: 0, gmOverride: false });
     }
   }
 
   function gestisciTurnoTerminatoInbound(evento) {
-    var atteso = evento.payload.a;
-    // Avanza finche' il turno corrente coincide con quello indicato (max un giro completo).
-    var st = statoCombat();
-    var n = st && Array.isArray(st.combatants) ? st.combatants.length : 0;
-    for (var i = 0; i <= n; i += 1) {
-      if (turnoCorrenteId() === atteso || atteso == null) { break; }
-      terminaTurno();
-    }
-    sincronizzaDaCombat();
+    var p = evento.payload || {};
+    // Il Master e' autorevole: si riallinea dal combat locale.
+    if (isMaster()) { sincronizzaDaCombat(); return; }
+
+    // Lato giocatore: il nuovo turno corrente e' quello indicato dal Master (payload.a).
+    var nuovo = p.a != null ? String(p.a) : turnoCorrenteId();
+    var round = typeof p.round === "number" ? p.round : fsm.round;
+    vaiAStato(Stati.ATTIVO, { turnoId: nuovo, round: round, gmOverride: false });
+    azzeraBudgetTurno(nuovo);
   }
 
   function gestisciControlloInbound(evento) {
     if (evento.payload.azione === "pausa") { vaiAStato(Stati.PAUSA, { gmOverride: true }); }
     else if (evento.payload.azione === "riprendi") { vaiAStato(Stati.ATTIVO, { turnoId: turnoCorrenteId(), gmOverride: false }); }
+  }
+
+  // Idratazione a partita in corso (Fase 2 del multiplayer): un giocatore che entra a metà
+  // riceve lo snapshot autorevole dal Master e allinea la FSM dei turni + il budget di movimento.
+  // Lo chiama il Sync Manager (modulo 18) dopo aver idratato stato del PG e posizioni dei token.
+  function applicaSnapshot(snap) {
+    if (!snap || typeof snap !== "object") { return; }
+    if (isMaster()) { return; } // il Master e' la fonte autorevole: non si auto-idrata
+
+    var fsmSnap = snap.combattimentoFsm || null;
+    var combat = snap.combattimento || null;
+
+    // Ordine d'iniziativa autorevole: dal combat del Master (preferito) o dallo snapshot FSM.
+    var combattenti = (combat && Array.isArray(combat.combatants) && combat.combatants.length)
+      ? combat.combatants
+      : (fsmSnap && Array.isArray(fsmSnap.ordine) ? fsmSnap.ordine : []);
+    if (combattenti && combattenti.length) {
+      ordineAutoritativo = clonaLista(combattenti);
+      ricostruisciBudgetDaLista(ordineAutoritativo);
+    }
+
+    if (fsmSnap) {
+      // Idrata direttamente lo stato della FSM così com'è sul Master.
+      var round = typeof fsmSnap.round === "number" ? fsmSnap.round : fsm.round;
+      if (fsmSnap.nome === Stati.ATTIVO) {
+        vaiAStato(Stati.ATTIVO, { turnoId: fsmSnap.turnoId != null ? String(fsmSnap.turnoId) : null, round: round, gmOverride: false });
+        azzeraBudgetTurno(fsmSnap.turnoId != null ? String(fsmSnap.turnoId) : null);
+      } else if (fsmSnap.nome === Stati.PAUSA) {
+        vaiAStato(Stati.PAUSA, { turnoId: fsmSnap.turnoId != null ? String(fsmSnap.turnoId) : null, round: round, gmOverride: true });
+      } else {
+        vaiAStato(Stati.FUORI, { turnoId: null, round: 0, gmOverride: false });
+      }
+      // Ripristina il movimento già speso nel turno corrente, se noto.
+      if (fsmSnap.budget && typeof fsmSnap.budget === "object") {
+        Object.keys(fsmSnap.budget).forEach(function (id) {
+          var voce = fsmSnap.budget[id];
+          if (!budget[id]) { budget[id] = { velocita: velocitaDi(id), usato: 0 }; }
+          if (voce && typeof voce.usato === "number") { budget[id].usato = voce.usato; }
+          if (voce && typeof voce.velocita === "number") { budget[id].velocita = voce.velocita; }
+        });
+        notifica();
+      }
+    } else if (combat) {
+      // Nessuno snapshot FSM: deduci lo stato dei turni dal combat del Master.
+      if (combat.active) {
+        var idx = combat.currentTurnIndex;
+        var tid = (idx >= 0 && Array.isArray(combat.combatants) && combat.combatants[idx]) ? combat.combatants[idx].id : null;
+        vaiAStato(Stati.ATTIVO, { turnoId: tid != null ? String(tid) : null, round: combat.round || 0, gmOverride: false });
+        azzeraBudgetTurno(tid != null ? String(tid) : null);
+      } else {
+        vaiAStato(Stati.FUORI, { turnoId: null, round: 0, gmOverride: false });
+      }
+    }
+    log("FSM idratata dallo snapshot del Master (turno=" + fsm.turnoId + ", round=" + fsm.round + ").");
   }
 
   function registraAscolti() {
@@ -405,6 +483,8 @@
     tokenACombattente: tokenACombattente,
     combattenteAToken: combattenteAToken,
     impostaMappaToken: impostaMappaToken,
+    // idratazione a partita in corso (chiamata dal Sync Manager)
+    applicaSnapshot: applicaSnapshot,
     // utile per la mappa
     statiPossibili: Stati
   };

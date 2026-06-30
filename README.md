@@ -78,6 +78,16 @@ Architettura a 3 fasi, tutta in HTML/JS, agganciata ai moduli esistenti. Resta
   `RollingInitiative` → `CombatActive(turnId)` → `CombatPaused(GM)`, con budget di movimento
   (velocità − movimento speso) collegato all'action economy del PG.
 
+**Turni autorevoli + ingresso a partita in corso:**
+- **Turni dettati dal Master.** Sul client giocatore l'ordine d'iniziativa e il turno corrente
+  non vengono ricalcolati in locale: arrivano dal Master via `CombatStartedEvent` / `TurnEndedEvent`
+  e la FSM li applica così come sono (`UltimateVTTCombatFSM.applicaSnapshot` per lo stato completo).
+  Il gating del movimento (`puoMuovereOra`, `eIlTurnoDi`) usa quindi sempre il turno autorevole.
+- **Hydration mid-game.** Chi si connette a partita iniziata invia un `StateSyncRequest`; il Master
+  risponde con uno `StateSyncEvent` (snapshot di stato PG, posizioni token, combattimento **e** stato
+  FSM con turno/round/budget). Il nuovo arrivato idrata stato e mappa e allinea i turni al Master,
+  senza interrompere il gioco degli altri.
+
 ### Avvio del relay e connessione
 
 ```
