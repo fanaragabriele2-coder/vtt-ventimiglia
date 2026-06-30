@@ -20,9 +20,27 @@
 
 const http = require("http");
 const crypto = require("crypto");
+const fs = require("fs");
 
 const PORT = parseInt(process.env.PORT, 10) || 4600;
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; // costante di handshake RFC 6455
+
+// --- Hardening / produzione (tutto opzionale, attivato da variabili d'ambiente) -------------
+// TLS_CERT + TLS_KEY  -> server WSS (TLS). In loro assenza resta WS in chiaro (sviluppo).
+// AUTH_TOKEN          -> richiesto a TUTTI i client (nel messaggio hello) per accedere.
+// GM_TOKEN            -> richiesto per assumere il ruolo "gm"; senza, la richiesta gm e' declassata.
+const TLS_CERT = process.env.TLS_CERT || null;
+const TLS_KEY = process.env.TLS_KEY || null;
+const AUTH_TOKEN = process.env.AUTH_TOKEN || null;
+const GM_TOKEN = process.env.GM_TOKEN || null;
+
+// Limiti anti-abuso.
+const MAX_FRAME = 256 * 1024;     // dimensione massima di un singolo frame WebSocket
+const MAX_BUFFER = 1024 * 1024;   // buffer massimo accumulato per client (frame incompleti)
+const MAX_MSG_CHARS = 200 * 1024; // lunghezza massima del testo JSON di un messaggio
+const RATE_CAPACITY = 80;         // secchio a gettoni: capacita' massima
+const RATE_REFILL = 40;           // gettoni ricaricati al secondo
+const RATE_SCARTI_MAX = 300;      // oltre questi messaggi scartati di fila, il client viene chiuso
 
 // Tipi di evento che solo il Master puo' originare.
 const SOLO_MASTER = {
@@ -34,15 +52,26 @@ const SOLO_MASTER = {
 };
 
 let prossimoId = 1;
-const client = new Map(); // id -> { socket, ruolo, attore, tokenPosseduti:Set, buffer:Buffer, vivo }
+const client = new Map(); // id -> { socket, ruolo, attore, tokenPosseduti:Set, buffer, vivo, autenticato, rate, scartati }
 
 // ---------------------------------------------------------------------------
-// Server HTTP + upgrade a WebSocket
+// Server HTTP/HTTPS + upgrade a WebSocket
 // ---------------------------------------------------------------------------
-const server = http.createServer(function (req, res) {
+const usaTls = Boolean(TLS_CERT && TLS_KEY);
+const SCHEMA = usaTls ? "wss" : "ws";
+
+function gestoreHttp(req, res) {
   res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-  res.end("VTT relay attivo. Connettiti via WebSocket su ws://<host>:" + PORT + "/");
-});
+  res.end("VTT relay attivo. Connettiti via WebSocket su " + SCHEMA + "://<host>:" + PORT + "/");
+}
+
+let server;
+if (usaTls) {
+  const https = require("https");
+  server = https.createServer({ cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) }, gestoreHttp);
+} else {
+  server = http.createServer(gestoreHttp);
+}
 
 server.on("upgrade", function (req, socket) {
   const chiave = req.headers["sec-websocket-key"];
@@ -57,7 +86,12 @@ server.on("upgrade", function (req, socket) {
   );
 
   const id = prossimoId++;
-  const info = { socket: socket, ruolo: "player", attore: "anon-" + id, tokenPosseduti: new Set(), buffer: Buffer.alloc(0), vivo: true };
+  const info = {
+    socket: socket, ruolo: "player", attore: "anon-" + id, tokenPosseduti: new Set(),
+    buffer: Buffer.alloc(0), vivo: true,
+    autenticato: !AUTH_TOKEN,                                  // senza AUTH_TOKEN tutti sono autorizzati
+    rate: { gettoni: RATE_CAPACITY, ts: Date.now() }, scartati: 0
+  };
   client.set(id, info);
   log("Client #" + id + " connesso (" + client.size + " totali).");
 
@@ -77,6 +111,13 @@ server.on("upgrade", function (req, socket) {
 function consumaFrame(id) {
   const info = client.get(id);
   if (!info) { return; }
+
+  // Protezione memoria: un buffer che cresce senza completare un frame e' un abuso.
+  if (info.buffer.length > MAX_BUFFER) {
+    log("Client #" + id + ": buffer oltre il limite (" + info.buffer.length + " byte), chiusura.");
+    chiudiClient(id);
+    return;
+  }
 
   while (info.buffer.length >= 2) {
     const buf = info.buffer;
@@ -99,6 +140,13 @@ function consumaFrame(id) {
       const basso = buf.readUInt32BE(offset + 4);
       lunghezza = alto * 0x100000000 + basso;
       offset += 8;
+    }
+
+    // Tetto sulla dimensione del singolo frame: oltre, si chiude il client (anti-abuso).
+    if (lunghezza > MAX_FRAME) {
+      log("Client #" + id + ": frame oltre il limite (" + lunghezza + " byte), chiusura.");
+      chiudiClient(id);
+      return;
     }
 
     let chiaveMaschera = null;
@@ -161,17 +209,61 @@ function inviaJson(socket, oggetto) { inviaFrame(socket, JSON.stringify(oggetto)
 // ---------------------------------------------------------------------------
 // Logica applicativa: hello, autorizzazione, broadcast
 // ---------------------------------------------------------------------------
+// Token bucket per-client: limita la frequenza dei messaggi. Ritorna true se il messaggio passa.
+function consentitoDalRate(info) {
+  const adesso = Date.now();
+  const trascorsi = (adesso - info.rate.ts) / 1000;
+  info.rate.ts = adesso;
+  info.rate.gettoni = Math.min(RATE_CAPACITY, info.rate.gettoni + trascorsi * RATE_REFILL);
+  if (info.rate.gettoni >= 1) { info.rate.gettoni -= 1; info.scartati = 0; return true; }
+  info.scartati += 1;
+  return false;
+}
+
 function gestisciMessaggio(id, testo) {
   const info = client.get(id);
   if (!info) { return; }
 
+  // Validazione dimensione del testo (anti-abuso, prima del parse).
+  if (typeof testo !== "string" || testo.length > MAX_MSG_CHARS) {
+    log("Client #" + id + ": messaggio troppo grande (" + (testo ? testo.length : 0) + " char), ignorato.");
+    return;
+  }
+
+  // Rate limiting: troppi messaggi -> scartati; abuso prolungato -> chiusura.
+  if (!consentitoDalRate(info)) {
+    if (info.scartati >= RATE_SCARTI_MAX) {
+      log("Client #" + id + ": rate limit superato a lungo (" + info.scartati + " scarti), chiusura.");
+      chiudiClient(id);
+    }
+    return;
+  }
+
   let msg;
   try { msg = JSON.parse(testo); } catch (e) { return; }
-  if (!msg || typeof msg !== "object" || !msg.tipo) { return; }
+  // Validazione strutturale di base.
+  if (!msg || typeof msg !== "object" || typeof msg.tipo !== "string") { return; }
+  if (msg.payload != null && typeof msg.payload !== "object") { return; }
 
-  // Presentazione del client: registra ruolo, identita' e token posseduti.
+  // Presentazione del client: registra ruolo, identita', token posseduti e verifica i token d'accesso.
   if (msg.tipo === "hello") {
-    info.ruolo = msg.ruolo === "gm" ? "gm" : "player";
+    // Gate d'accesso: se e' richiesto un AUTH_TOKEN, deve combaciare, altrimenti connessione chiusa.
+    if (AUTH_TOKEN && msg.token !== AUTH_TOKEN) {
+      log("Client #" + id + ": AUTH_TOKEN non valido, connessione rifiutata.");
+      inviaJson(info.socket, { tipo: "AuthEvent", ok: false, fatale: true, motivo: "Token di sessione non valido." });
+      chiudiClient(id);
+      return;
+    }
+    info.autenticato = true;
+
+    let ruoloRichiesto = msg.ruolo === "gm" ? "gm" : "player";
+    // Per assumere il ruolo Master serve il GM_TOKEN (se configurato): altrimenti declassamento.
+    if (ruoloRichiesto === "gm" && GM_TOKEN && msg.gmToken !== GM_TOKEN) {
+      ruoloRichiesto = "player";
+      log("Client #" + id + ": GM_TOKEN non valido, ruolo declassato a giocatore.");
+      inviaJson(info.socket, { tipo: "AuthEvent", ok: false, fatale: false, motivo: "Token Master non valido: ruolo giocatore." });
+    }
+    info.ruolo = ruoloRichiesto;
     if (typeof msg.attore === "string" && msg.attore) { info.attore = msg.attore; }
     info.tokenPosseduti = new Set(Array.isArray(msg.tokenPosseduti) ? msg.tokenPosseduti.map(String) : []);
     log("Client #" + id + " e' '" + info.attore + "' con ruolo " + info.ruolo + ".");
@@ -180,6 +272,12 @@ function gestisciMessaggio(id, testo) {
   }
 
   if (msg.tipo === "ping") { inviaJson(info.socket, { tipo: "pong", ts: Date.now() }); return; }
+
+  // Oltre l'hello, ogni messaggio richiede un client autenticato.
+  if (!info.autenticato) {
+    inviaJson(info.socket, { tipo: "RejectEvent", seq: msg.seq, motivo: "Non autenticato." });
+    return;
+  }
 
   // Richiesta di sync completo: inoltrala ai Master, che risponderanno con StateSyncEvent.
   if (msg.tipo === "StateSyncRequest") {
@@ -256,5 +354,8 @@ function log(messaggio) {
 }
 
 server.listen(PORT, function () {
-  log("VTT relay WebSocket in ascolto su ws://localhost:" + PORT + "/");
+  log("VTT relay WebSocket in ascolto su " + SCHEMA + "://localhost:" + PORT + "/");
+  log("Sicurezza: TLS=" + (usaTls ? "on" : "off") +
+      ", AUTH_TOKEN=" + (AUTH_TOKEN ? "richiesto" : "off") +
+      ", GM_TOKEN=" + (GM_TOKEN ? "richiesto" : "off") + ".");
 });

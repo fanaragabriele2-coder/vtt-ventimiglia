@@ -31,7 +31,10 @@
   // Persistenza leggera delle preferenze (URL, identita', ruolo, token)
   // ---------------------------------------------------------------------------
   function caricaPrefs() {
-    var def = { url: URL_DEFAULT, idGiocatore: "giocatore-" + Math.random().toString(36).slice(2, 6), ruolo: "gm", token: [] };
+    var def = {
+      url: URL_DEFAULT, idGiocatore: "giocatore-" + Math.random().toString(36).slice(2, 6),
+      ruolo: "gm", token: [], authToken: "", gmToken: ""
+    };
     try {
       var raw = window.localStorage && window.localStorage.getItem(CHIAVE_STORAGE);
       if (raw) {
@@ -41,6 +44,8 @@
           if (typeof p.idGiocatore === "string" && p.idGiocatore) { def.idGiocatore = p.idGiocatore; }
           if (p.ruolo === "gm" || p.ruolo === "player") { def.ruolo = p.ruolo; }
           if (Array.isArray(p.token)) { def.token = p.token.map(String); }
+          if (typeof p.authToken === "string") { def.authToken = p.authToken; }
+          if (typeof p.gmToken === "string") { def.gmToken = p.gmToken; }
         }
       }
     } catch (e) { /* preferenze assenti */ }
@@ -114,6 +119,13 @@
     fId.appendChild(inId);
     body.appendChild(fId);
 
+    // Token di sessione (facoltativo: solo se il relay richiede AUTH_TOKEN)
+    var fAuth = el("div", "vtt-sess-field");
+    fAuth.appendChild(el("label", null, "Token sessione (se richiesto)"));
+    var inAuth = el("input"); inAuth.type = "password"; inAuth.value = prefs.authToken; inAuth.placeholder = "facoltativo";
+    fAuth.appendChild(inAuth);
+    body.appendChild(fAuth);
+
     // Ruolo
     var fRuolo = el("div", "vtt-sess-field");
     fRuolo.appendChild(el("label", null, "Ruolo"));
@@ -124,6 +136,13 @@
     selRuolo.value = prefs.ruolo;
     fRuolo.appendChild(selRuolo);
     body.appendChild(fRuolo);
+
+    // Token Master (facoltativo: solo per il ruolo Master se il relay richiede GM_TOKEN)
+    var fGm = el("div", "vtt-sess-field");
+    fGm.appendChild(el("label", null, "Token Master (se richiesto)"));
+    var inGm = el("input"); inGm.type = "password"; inGm.value = prefs.gmToken; inGm.placeholder = "facoltativo";
+    fGm.appendChild(inGm);
+    body.appendChild(fGm);
 
     // Token posseduti (solo per il giocatore)
     var fOwn = el("div", "vtt-sess-field");
@@ -153,14 +172,16 @@
 
     rif = {
       toggle: toggle, panel: panel, sdot: sdot, stext: stext, ssub: ssub, turn: turn,
-      inUrl: inUrl, inId: inId, selRuolo: selRuolo, fOwn: fOwn, owners: owners,
-      btnConn: btnConn, btnDisc: btnDisc, rosterList: rosterList
+      inUrl: inUrl, inId: inId, inAuth: inAuth, selRuolo: selRuolo, fGm: fGm, inGm: inGm,
+      fOwn: fOwn, owners: owners, btnConn: btnConn, btnDisc: btnDisc, rosterList: rosterList
     };
 
     // Eventi UI
     selRuolo.addEventListener("change", function () { aggiornaVisibilitaOwners(); salvaCorrente(); });
     inUrl.addEventListener("change", salvaCorrente);
     inId.addEventListener("change", salvaCorrente);
+    inAuth.addEventListener("change", salvaCorrente);
+    inGm.addEventListener("change", salvaCorrente);
     btnConn.addEventListener("click", connetti);
     btnDisc.addEventListener("click", disconnetti);
 
@@ -212,6 +233,7 @@
     if (!rif.fOwn) { return; }
     var player = rif.selRuolo.value === "player";
     rif.fOwn.style.display = player ? "" : "none";
+    if (rif.fGm) { rif.fGm.style.display = player ? "none" : ""; } // token Master solo per il GM
     if (player) { popolaOwners(); }
   }
 
@@ -221,7 +243,9 @@
       url: rif.inUrl.value.trim() || URL_DEFAULT,
       idGiocatore: rif.inId.value.trim() || ("giocatore-" + Math.random().toString(36).slice(2, 6)),
       ruolo: rif.selRuolo.value,
-      token: tokenSelezionati()
+      token: tokenSelezionati(),
+      authToken: rif.inAuth.value,
+      gmToken: rif.inGm.value
     });
   }
 
@@ -235,8 +259,13 @@
     var id = rif.inId.value.trim() || ("giocatore-" + Math.random().toString(36).slice(2, 6));
     var ruolo = rif.selRuolo.value === "player" ? s.Ruolo.GIOCATORE : s.Ruolo.MASTER;
     var token = ruolo === s.Ruolo.GIOCATORE ? tokenSelezionati() : null; // il Master possiede tutto
+    var authToken = rif.inAuth.value.trim();
+    var gmToken = rif.inGm.value.trim();
     salvaCorrente();
-    s.connetti(url, { ruolo: ruolo, idGiocatore: id, tokenPosseduti: token });
+    s.connetti(url, {
+      ruolo: ruolo, idGiocatore: id, tokenPosseduti: token,
+      token: authToken, gmToken: ruolo === s.Ruolo.MASTER ? gmToken : ""
+    });
     log("Connessione al relay " + url + " come " + (ruolo === s.Ruolo.MASTER ? "Master" : "Giocatore") + " (" + id + ").");
     aggiornaStato();
   }
@@ -280,7 +309,17 @@
     rif.btnDisc.disabled = !st.abilitato;
     rif.inUrl.disabled = st.abilitato;
     rif.inId.disabled = st.abilitato;
+    rif.inAuth.disabled = st.abilitato;
+    rif.inGm.disabled = st.abilitato;
     rif.selRuolo.disabled = st.abilitato;
+  }
+
+  // Mostra l'esito dell'autenticazione comunicato dal relay (token errato / declassamento).
+  function mostraAuth(detail) {
+    if (!costruito || !detail || detail.ok) { return; }
+    rif.stext.textContent = detail.fatale ? "Accesso negato" : "Declassato a giocatore";
+    rif.ssub.textContent = detail.motivo || "";
+    if (detail.fatale) { rif.toggle.classList.remove("online"); }
   }
 
   var NOMI_STATO = {
@@ -356,6 +395,8 @@
 
     // Stato connessione live.
     window.addEventListener("vtt-sync", aggiornaStato);
+    // Esito autenticazione (token sessione / token Master).
+    window.addEventListener("vtt-auth", function (e) { mostraAuth(e && e.detail); });
     // Stato della FSM (turno corrente).
     window.addEventListener("vtt-combat-fsm", function (e) { aggiornaTurno(e && e.detail); });
     // Roster dei partecipanti dal relay.

@@ -37,6 +37,7 @@
     SYNC_STATO: "StateSyncEvent",
     RICHIESTA_SYNC: "StateSyncRequest",
     ROSTER: "RosterEvent",
+    AUTH: "AuthEvent",
     ACK: "AckEvent",
     RIFIUTO: "RejectEvent"
   };
@@ -46,6 +47,8 @@
     ruolo: Ruolo.MASTER,        // default: host single-device = Master con autorita' totale
     idGiocatore: "host",        // identificativo dell'attore locale
     tokenPosseduti: null,       // null = possiede tutto (tipico del Master); altrimenti array di id
+    token: null,                // token di sessione (se il relay richiede AUTH_TOKEN)
+    gmToken: null,              // token per assumere il ruolo Master (se il relay richiede GM_TOKEN)
     url: null
   };
 
@@ -168,13 +171,16 @@
   // ---------------------------------------------------------------------------
   // Presentazione al relay: ruolo, identita' e token posseduti (base dell'autorizzazione lato server).
   function inviaHello() {
-    return inviaRaw({
+    var hello = {
       tipo: "hello",
       attore: config.idGiocatore,
       ruolo: config.ruolo,
       tokenPosseduti: Array.isArray(config.tokenPosseduti) ? config.tokenPosseduti : [],
       ts: ora()
-    });
+    };
+    if (config.token) { hello.token = config.token; }       // gate d'accesso (AUTH_TOKEN del relay)
+    if (config.gmToken) { hello.gmToken = config.gmToken; }  // sblocco ruolo Master (GM_TOKEN del relay)
+    return inviaRaw(hello);
   }
 
   function inviaRaw(oggetto) {
@@ -262,6 +268,28 @@
     }
   }
 
+  // Esito dell'autenticazione comunicato dal relay (token di sessione / token Master).
+  function gestisciAuth(msg) {
+    if (msg.ok === false) {
+      if (msg.fatale) {
+        log("Autenticazione rifiutata dal relay: " + (msg.motivo || "") + " — riconnessione interrotta.");
+        vuoleConnessione = false; // niente martellamento del relay con credenziali errate
+        if (timerRiconnessione) { clearTimeout(timerRiconnessione); timerRiconnessione = null; }
+      } else {
+        log("Relay: " + (msg.motivo || "ruolo declassato a giocatore."));
+        config.ruolo = Ruolo.GIOCATORE; // allinea il ruolo locale al declassamento del relay
+      }
+      notificaStato();
+    }
+    if (typeof window.CustomEvent === "function") {
+      try {
+        window.dispatchEvent(new CustomEvent("vtt-auth", {
+          detail: { ok: msg.ok !== false, fatale: Boolean(msg.fatale), motivo: msg.motivo || "" }
+        }));
+      } catch (e) { /* ignora */ }
+    }
+  }
+
   // Applica un messaggio ricevuto dalla socket (o iniettato manualmente nei test).
   function applicaInbound(raw) {
     var msg;
@@ -276,6 +304,7 @@
     if (msg.tipo === TipiEvento.ACK) { confermaPending(msg.seq); return; }
     if (msg.tipo === TipiEvento.RIFIUTO) { rollbackPending(msg.seq, msg.motivo); return; }
     if (msg.tipo === TipiEvento.RICHIESTA_SYNC) { rispondiConSync(); return; }
+    if (msg.tipo === TipiEvento.AUTH) { gestisciAuth(msg); return; }
 
     // Eco del nostro stesso evento (il relay rimanda i nostri eventi): vale come ACK.
     if (msg.attore && msg.attore === config.idGiocatore) {
@@ -456,6 +485,9 @@
     if (opzioni.ruolo === Ruolo.MASTER || opzioni.ruolo === Ruolo.GIOCATORE) { config.ruolo = opzioni.ruolo; }
     if (typeof opzioni.idGiocatore === "string" && opzioni.idGiocatore) { config.idGiocatore = opzioni.idGiocatore; }
     if (Array.isArray(opzioni.tokenPosseduti)) { config.tokenPosseduti = opzioni.tokenPosseduti.map(String); }
+    if (opzioni.tokenPosseduti === null) { config.tokenPosseduti = null; }
+    if (typeof opzioni.token === "string") { config.token = opzioni.token || null; }
+    if (typeof opzioni.gmToken === "string") { config.gmToken = opzioni.gmToken || null; }
     notificaStato();
     return clonaProfondo(config);
   }

@@ -93,6 +93,9 @@ Architettura a 3 fasi, tutta in HTML/JS, agganciata ai moduli esistenti. Resta
   risponde con uno `StateSyncEvent` (snapshot di stato PG, posizioni token, combattimento **e** stato
   FSM con turno/round/budget). Il nuovo arrivato idrata stato e mappa e allinea i turni al Master,
   senza interrompere il gioco degli altri.
+- **Movimento interpolato.** I movimenti dei token in arrivo dalla rete (anteprime a ~10Hz e finale)
+  vengono applicati in modo **animato**: la molla del modulo token li fa scivolare fluidi invece di
+  «teletrasportarsi» da cella a cella.
 
 ### Avvio del relay e connessione
 
@@ -100,7 +103,8 @@ Architettura a 3 fasi, tutta in HTML/JS, agganciata ai moduli esistenti. Resta
 node server/relay.js          # ws://localhost:4600  (PORT=xxxx per cambiare porta)
 ```
 
-Dalla console del browser (o da un futuro pannello di sessione):
+Il modo più semplice di connettersi è il **pannello 🌐 SESSIONE** (in basso a sinistra). In
+alternativa, dalla console del browser:
 
 ```js
 // Master (host autorevole)
@@ -112,4 +116,27 @@ UltimateVTTSync.connetti("ws://localhost:4600", {
 });
 ```
 
-I nuovi global esposti sono `UltimateVTTSync`, `UltimateVTTCombatFSM`, `UltimateVTTKinematics`.
+### Hardening del relay (produzione)
+
+Tutto opzionale e attivabile da variabili d'ambiente; in loro assenza il relay resta in WS chiaro
+e senza autenticazione (comodo in sviluppo):
+
+```
+# WSS/TLS (relay cifrato)
+TLS_CERT=/path/cert.pem TLS_KEY=/path/key.pem node server/relay.js
+
+# Token di sessione (richiesto a tutti) + token Master (richiesto per il ruolo gm)
+AUTH_TOKEN=segreto GM_TOKEN=segreto-master node server/relay.js
+```
+
+- **`AUTH_TOKEN`**: chi non lo presenta nell'`hello` viene rifiutato (`AuthEvent` fatale) e disconnesso;
+  il client interrompe i tentativi di riconnessione.
+- **`GM_TOKEN`**: chi chiede il ruolo `gm` senza il token giusto viene **declassato a giocatore**
+  (`AuthEvent` non fatale), evitando che chiunque si dichiari Master.
+- Inoltre il relay applica **validazione dei payload** (dimensione frame/messaggio), **rate limiting**
+  per client (token bucket) e chiusura dei client palesemente abusivi.
+
+Nel pannello i campi **Token sessione** e **Token Master** corrispondono ad `AUTH_TOKEN` e `GM_TOKEN`.
+
+I nuovi global esposti sono `UltimateVTTSync`, `UltimateVTTCombatFSM`, `UltimateVTTKinematics`,
+`UltimateVTTSessionPanel`.

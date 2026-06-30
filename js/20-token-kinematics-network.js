@@ -254,8 +254,10 @@
     if (!ph || typeof ph.moveTokenToCell !== "function") { return; }
     var p = evento.payload || {};
     try {
-      // anteprima => spostamento immediato (no animazione), finale => animato.
-      ph.moveTokenToCell(p.tokenId, p.cellaX, p.cellaY, !p.anteprima);
+      // Movimenti remoti SEMPRE animati (animated=true): la molla di easing del modulo 8 interpola
+      // i token verso ogni cella di anteprima (~10Hz) facendoli scivolare in modo fluido invece di
+      // "teletrasportarsi" a scatti. L'ultimo evento finale fa assestare il token sulla cella esatta.
+      ph.moveTokenToCell(p.tokenId, p.cellaX, p.cellaY, true);
     } catch (e) { log("Applicazione TokenMosso inbound fallita: " + (e && e.message)); }
   }
 
