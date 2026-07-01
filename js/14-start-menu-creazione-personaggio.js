@@ -169,9 +169,16 @@
         bAdd.onclick=function(){ var b=buildFromForm(); if(b){ party.push(b); renderCreate(); } };
         var bStart=el("button","vsm-btn go","🎲  INIZIA L'AVVENTURA");
         bStart.onclick=function(){
-          var solo=buildFromForm();
           var list=party.slice();
-          if(solo) list.push(solo);
+          // Il form corrente conta come personaggio SOLO se non e' gia' stato esplicitamente
+          // aggiunto al party (altrimenti "INIZIA L'AVVENTURA" aggiungeva sempre un PG in piu',
+          // preso da qualunque razza/classe/nome fosse rimasta nel form, anche dopo che l'utente
+          // aveva gia' creato il party voluto con "AGGIUNGI AL PARTY" — es. 2 PG creati apposta
+          // diventavano 3, col terzo "a caso" mai richiesto).
+          if(!list.length){
+            var solo=buildFromForm();
+            if(solo) list.push(solo);
+          }
           if(!list.length){ msg("Crea almeno un personaggio."); return; }
           startAdventure(list);
         };

@@ -265,6 +265,16 @@ di `UltimateVTTInventory`, prima di qualunque hydrate) e usandolo come fallback 
 inventario salvato né build — invece di ereditare in silenzio lo zaino di qualcun altro, un PG mai
 visto prima riparte da un kit pulito. Prima suite di test per questo modulo (nessuna esisteva).
 
+**Creazione personaggio: niente più un PG fantasma nel party (`js/14`).** Cliccando "INIZIA
+L'AVVENTURA", il codice costruiva **sempre** un personaggio da qualunque razza/classe/nome fosse
+rimasta nel form in quel momento e lo aggiungeva alla lista — *anche* se l'utente aveva già creato
+il party voluto esplicitamente con "AGGIUNGI AL PARTY". Risultato: creare 2 personaggi e cliccare
+"inizia" ne aggiungeva un terzo mai richiesto, con la razza/classe/nome lasciati nel form (spesso i
+valori di default o un nome suggerito a caso). Corretto: il form conta come personaggio "al volo"
+solo se il party è ancora vuoto (nessun "AGGIUNGI AL PARTY" cliccato) — il classico avvio rapido con
+un solo eroe resta invariato, ma un party già composto esplicitamente parte con **esattamente** i
+personaggi scelti. Prima suite di test per questo modulo (nessuna esisteva).
+
 ## Salvataggio e backup
 
 Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
