@@ -471,7 +471,13 @@
       }
 
       function readGroqApiKey() {
-        try { return window.localStorage.getItem(groqMasterStorageKey) || DEFAULT_GROQ_API_KEY || ""; } catch (e) { return DEFAULT_GROQ_API_KEY || ""; }
+        // Se una build personale ha una chiave incorporata (DEFAULT_GROQ_API_KEY non vuota), quella
+        // ha SEMPRE la precedenza su localStorage: altrimenti una chiave vecchia/revocata salvata in
+        // precedenza dal browser continuerebbe a essere usata anche dopo aver aggiornato il file con
+        // una chiave nuova, e il Master resterebbe rotto (401) senza un motivo apparente. Nel
+        // repository DEFAULT_GROQ_API_KEY e' vuota, quindi vale il comportamento normale (localStorage).
+        if (DEFAULT_GROQ_API_KEY) { return DEFAULT_GROQ_API_KEY; }
+        try { return window.localStorage.getItem(groqMasterStorageKey) || ""; } catch (e) { return ""; }
       }
 
       function writeGroqApiKey(key) {
