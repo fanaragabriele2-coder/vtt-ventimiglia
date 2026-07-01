@@ -26,18 +26,20 @@
         round: 0,
         currentTurnIndex: -1,
         rollMode: "normal",
-        selectedTargetId: "npc-1",
+        selectedTargetId: null,
         lastEvent: "Combattimento non iniziato.",
         lastRoll: {
           title: "In attesa",
           detail: "Nessun tiro eseguito."
         },
-        nextNpcNumber: 4,
+        nextNpcNumber: 1,
+        // Il tracker parte SOLO con il PG: i nemici NON devono esistere finche' il Master non li fa
+        // comparire (VTTSpawn.spawn -> addNpc). Prima qui c'erano 3 PNG fissi (Goblin/Bandito/
+        // Scheletro) sempre presenti: comparivano nell'iniziativa e nella HUD anche quando il Master,
+        // nella chat, stava facendo tutt'altro (andare al municipio, aprire una porta) e non aveva
+        // affatto evocato nemici — dando l'impressione di un combattimento partito dal nulla.
         combatants: [
-          { id: "pc-local", kind: "pc", name: "Eroe Locale", armorClass: 10, hitPoints: 10, maxHitPoints: 10, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 0, attackBonus: 4, damageFormula: "1d8+2", defeated: false },
-          { id: "npc-1", kind: "npc", name: "Goblin", armorClass: 15, hitPoints: 7, maxHitPoints: 7, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 2, attackBonus: 4, damageFormula: "1d6+2", defeated: false },
-          { id: "npc-2", kind: "npc", name: "Bandito", armorClass: 12, hitPoints: 11, maxHitPoints: 11, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 1, attackBonus: 3, damageFormula: "1d6+1", defeated: false },
-          { id: "npc-3", kind: "npc", name: "Scheletro", armorClass: 13, hitPoints: 13, maxHitPoints: 13, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 2, attackBonus: 4, damageFormula: "1d6+2", defeated: false }
+          { id: "pc-local", kind: "pc", name: "Eroe Locale", armorClass: 10, hitPoints: 10, maxHitPoints: 10, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 0, attackBonus: 4, damageFormula: "1d8+2", defeated: false }
         ]
       };
 
@@ -587,6 +589,40 @@
         };
       }
 
+      // Attacco diretto tra due combattenti SPECIFICI (non dipende dal turno corrente ne' dai campi
+      // del DOM): usato dall'IA dei nemici (modulo 33) per far attaccare un PNG contro un bersaglio
+      // preciso. Tira per colpire e, se colpisce, tira i danni e li applica; imposta lastRoll/
+      // lastEvent nel formato "Attaccante vs Bersaglio ..." (cosi' la memoria di combattimento del
+      // modulo 29 e l'attribuzione XP del modulo 15 lo riconoscono come qualunque altro attacco).
+      function resolveAttackBetween(attackerId, targetId, mode) {
+        const attacker = getCombatant(attackerId);
+        const target = getCombatant(targetId);
+        if (!attacker || !target) { return null; }
+        const rollMode = (mode === "advantage" || mode === "disadvantage") ? mode : "normal";
+        const attackRoll = rollD20WithMode(rollMode);
+        const attackTotal = attackRoll.chosen + (attacker.attackBonus || 0);
+        const critical = Boolean(attackRoll.naturalTwenty);
+        const automaticMiss = attackRoll.naturalOne;
+        const targetAc = typeof target.armorClass === "number" ? target.armorClass : 10;
+        const hit = !automaticMiss && (critical || attackTotal >= targetAc);
+        let damageRoll = null;
+        if (hit) {
+          damageRoll = rollDamageFormula(attacker.damageFormula || "1d4", critical);
+          applyDamageToCombatant(target.id, damageRoll.total);
+        }
+        const hitText = hit ? (critical ? "CRITICO" : "colpito") : "mancato";
+        const damageText = damageRoll ? " Danni: " + damageRoll.total + " (" + describeDamageRoll(damageRoll) + ")." : "";
+        combatState.lastRoll.title = attacker.name + " vs " + target.name;
+        combatState.lastRoll.detail = "d20 " + attackRoll.chosen + "+" + (attacker.attackBonus || 0) + "=" + attackTotal + " vs CA " + targetAc + ": " + hitText + "." + damageText;
+        combatState.lastEvent = combatState.lastRoll.detail;
+        renderCombat();
+        appendLog(combatState.lastRoll.detail);
+        return {
+          attacker: cloneData(attacker), target: cloneData(target),
+          attackRoll: attackRoll, attackTotal: attackTotal, hit: hit, critical: critical, damageRoll: damageRoll
+        };
+      }
+
       /* ---- PATCH: DUE FASI (colpire → danni) con HUD animato ---- */
       var pendingAttackStep = null;
 
@@ -1111,6 +1147,12 @@
         healCombatant: healCombatant,
         setRollMode: setRollMode,
         resolveAttack: resolveAttack,
+        // Attacco a DUE FASI con animazione dei dadi (tiro per colpire -> tiro per i danni): e' il
+        // flusso che mostra davvero i dadi al giocatore. La HUD BG3 (modulo 23) lo usa se presente,
+        // cosi' cliccare "Attacca" fa vedere il tiro invece di risolvere tutto in silenzio.
+        resolveAttackAnimato: resolveAttackStep1,
+        // Attacco diretto tra due combattenti (usato dall'IA nemici, modulo 33).
+        resolveAttackBetween: resolveAttackBetween,
         renderCombat: renderCombat
       };
 

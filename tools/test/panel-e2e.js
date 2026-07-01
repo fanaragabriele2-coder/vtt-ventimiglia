@@ -166,7 +166,15 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     // --- HUD di combattimento stile BG3: compare a combattimento attivo, con la % di colpire ---
     const hudPrima = await gm.evaluate(() => { const h = document.querySelector(".bg3-hud"); return h ? h.hidden : null; });
     check("BG3 HUD: nascosta fuori dal combattimento", hudPrima === true);
-    await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.startCombat());
+    // Il tracker parte SOLO col PG (nessun nemico predefinito): il Master fa comparire i nemici,
+    // il che avvia anche il combattimento (VTTSpawn.spawn -> addNpc + startCombat) e collega ogni
+    // token al suo combattente (mappatura esplicita), cosi' HUD, Spingi e IA li ritrovano.
+    await gm.evaluate(() => window.VTTSpawn && window.VTTSpawn.spawn([{ name: "Goblin", count: 2 }]));
+    // Ferma il campionamento dell'IA dei nemici (modulo 33) su questa pagina: ha una sua suite
+    // dedicata, e qui i test seguenti (Spingi, mappatura) muovono i token a mano — l'IA che agisce
+    // in autonomia sul turno di un PNG li contaminerebbe. La si riattiva manualmente piu' avanti,
+    // con un controllo dedicato, chiamando _tick() in modo deterministico.
+    await gm.evaluate(() => window.UltimateVTTEnemyAI && window.UltimateVTTEnemyAI.fermaSampler());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === false; }, null, { timeout: 6000 });
     check("BG3 HUD: visibile dopo l'inizio del combattimento", true);
     const nCard = await gm.evaluate(() => document.querySelectorAll(".bg3-init-card").length);
@@ -307,6 +315,33 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("Condizioni: comando IA clearCondition eseguito dal Master", condRimozione.ok === true);
     await pl.waitForFunction((id) => window.UltimateVTTConditions && !window.UltimateVTTConditions.haCondizione(id, "prono"), condBersaglio, { timeout: 6000 });
     check("Condizioni: la rimozione si propaga al Giocatore via rete", true);
+
+    // --- IA dei nemici (modulo 33): al turno di un PNG, sul Master, il nemico agisce da solo. Con
+    // il campionamento fermato all'inizio, si invoca _tick() in modo deterministico: si porta il
+    // turno su un PNG vivo, si registrano gli HP del PG, si esegue un tick e si verifica che il
+    // nemico abbia agito (il turno e' avanzato; e/o il PG ha subito danni se il nemico era a portata). ---
+    const aiEsito = await gm.evaluate(() => {
+      const C = window.UltimateVTTCombat;
+      // Avvicina un goblin al PG cosi' l'attacco e' a portata, e porta il turno a quel goblin.
+      const st = C.getState();
+      const goblin = st.combatants.find(c => c.kind === "npc" && !c.defeated);
+      if (!goblin) { return { ok: false }; }
+      const tokGob = window.UltimateVTTCombatFSM.combattenteAToken(goblin.id);
+      const tokPg = window.UltimateVTTCombatFSM.combattenteAToken("pc-local");
+      const tp = window.UltimateVTTTokenPhysics.getState();
+      const pgTok = tp.tokens.find(t => t.id === tokPg);
+      if (pgTok && tokGob) { window.UltimateVTTTokenPhysics.moveTokenToCell(tokGob, pgTok.cellX + 1, pgTok.cellY, false); }
+      // Ruota il turno finche' tocca a quel goblin.
+      let guard = 0;
+      while (guard++ < 12) { const s = C.getState(); if (s.combatants[s.currentTurnIndex] && s.combatants[s.currentTurnIndex].id === goblin.id) break; C.nextTurn(); }
+      const roundPrima = C.getState().round;
+      const idxPrima = C.getState().currentTurnIndex;
+      // Un tick reale dell'IA: il goblin deve agire e concludere il turno.
+      window.UltimateVTTEnemyAI._tick();
+      const dopo = C.getState();
+      return { ok: true, avanzato: (dopo.currentTurnIndex !== idxPrima) || (dopo.round !== roundPrima) };
+    });
+    check("IA nemici: al turno di un PNG il nemico agisce e conclude il turno (turno avanzato)", aiEsito.ok === true && aiEsito.avanzato === true);
 
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });

@@ -38,7 +38,8 @@ vttg2506/
 │   ├── 29-combat-memory.js             ← memoria di combattimento per il Master IA
 │   ├── 30-bg3-conditions.js            ← condizioni di stato: prono/stordito/avvelenato
 │   ├── 31-combat-view-autoswitch.js    ← torna alla griglia tattica a inizio combattimento
-│   └── 32-campaign-memory.js           ← diario di campagna a lungo termine per il Master IA
+│   ├── 32-campaign-memory.js           ← diario di campagna a lungo termine per il Master IA
+│   └── 33-enemy-ai.js                  ← IA dei nemici: al loro turno si avvicinano e attaccano
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -163,6 +164,32 @@ con fiancheggiamento ed elevazione secondo la stessa regola di sovrapposizione 5
 dedicato e icone sulla barra iniziativa per un colpo d'occhio su chi ha quali condizioni attive.
 Comandi IA: `{ command: "applyCondition", targetId, condition, rounds }` /
 `{ command: "clearCondition", targetId, condition }`.
+
+**IA dei nemici — `js/33-enemy-ai.js` (`UltimateVTTEnemyAI`).** Prima, al turno di un PNG **non
+succedeva nulla**: il nemico restava immobile e il giocatore doveva premere "Termina turno" al suo
+posto. Ora i nemici agiscono da soli: al proprio turno scelgono il PG vivo più vicino, si avvicinano
+sulla griglia (fino a ~6 celle, metrica Chebyshev, fermandosi su una cella adiacente) e, se a portata
+di mischia, lo attaccano davvero — tiro per colpire + danni reali via `UltimateVTTCombat.
+resolveAttackBetween` — poi concludono il turno. GM-autorevole (solo il Master, o il gioco in
+solitaria/hotseat dove `Sync` è assente, pilota i PNG, così in multiplayer non è ogni client a tirare
+dadi propri). Un'azione per tick con una pausa leggibile tra un nemico e l'altro; se il PG è a terra
+non manda i turni a vuoto (decide il Master). Coperto da unit test e da un check E2E in browser reale.
+
+Tre correzioni collegate al combattimento, tutte richieste dall'uso reale:
+- **Nessun nemico predefinito (`js/06`):** il tracker partiva con 3 PNG fissi (Goblin/Bandito/
+  Scheletro) *sempre* presenti — comparivano nell'iniziativa e nella HUD anche quando il Master, in
+  chat, stava facendo tutt'altro (andare al municipio, aprire una porta) senza aver evocato nemici,
+  dando l'impressione di un combattimento partito dal nulla. Ora il tracker parte **solo con il PG**:
+  i nemici esistono unicamente quando il Master li fa comparire (`VTTSpawn.spawn` → `addNpc`), che è
+  anche ciò che avvia il combattimento.
+- **L'attacco mostra i dadi (`js/06`+`js/23`):** il pulsante "Attacca" della HUD BG3 usava la
+  risoluzione *immediata* (`resolveAttack`, che calcola tutto in silenzio) — da qui il "clicco Attacca
+  e mi dice nemico sconfitto senza farmi lanciare i dadi". Ora usa il flusso a **due fasi con
+  animazione** (tiro per colpire → tiro per i danni), esposto come `resolveAttackAnimato`.
+- **Token dei nemici collegati ai combattenti (`js/16`):** i token generati (`token-extra-N`) non
+  erano mappati ai combattenti (`npc-N`) — l'euristica della FSM copre solo `token-npc-N`. Senza
+  questo collegamento l'IA dei nemici (e le azioni BG3 mirate: spinta, superfici, elevazione) non
+  trovavano la posizione del nemico sulla griglia. Ora lo spawn registra la mappatura esplicita.
 
 ## Memoria di combattimento per il Master IA
 

@@ -219,8 +219,17 @@
 
   function azioneAttacca() {
     var c = combat();
-    if (!c || typeof c.resolveAttack !== "function") { return; }
-    try { c.resolveAttack(); } catch (e) { /* ignora */ }
+    if (!c) { return; }
+    // Preferisci il flusso a DUE FASI con animazione dei dadi (tiro per colpire -> tiro per i
+    // danni): cosi' il giocatore vede davvero i dadi, invece di risolvere l'attacco in silenzio con
+    // il solo esito testuale (era la causa del "clicco Attacca e mi dice nemico sconfitto senza
+    // farmi lanciare i dadi"). Se non disponibile, ricade sulla risoluzione immediata.
+    if (typeof c.resolveAttackAnimato === "function") {
+      try { c.resolveAttackAnimato(false); render(true); return; } catch (e) { /* fallback sotto */ }
+    }
+    if (typeof c.resolveAttack === "function") {
+      try { c.resolveAttack(); } catch (e) { /* ignora */ }
+    }
     render(true);
   }
 

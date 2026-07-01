@@ -71,7 +71,17 @@ check("il totale del danno non e' mai negativo (clamp a 0)", conSequenza([0], ()
   return C.rollDamageFormula("-3d6", false).total;
 }) === 0);
 
+console.log("\n[Il tracker parte SOLO con il PG: nessun nemico finche' non viene evocato]");
+check("all'avvio c'e' esattamente 1 combattente (il PG), nessun PNG predefinito", (function () {
+  const cs = C.getState();
+  return cs.combatants.length === 1 && cs.combatants[0].kind === "pc";
+})());
+check("nessun bersaglio selezionato di default (non c'e' piu' 'npc-1' fantasma)", C.getState().selectedTargetId == null);
+
 console.log("\n[Applicazione danno/cura ai combattenti]");
+// Il PNG ora va creato esplicitamente (come farebbe VTTSpawn.spawn tramite addNpc).
+const npcCreato = C.addNpc("goblin");
+check("addNpc('goblin') crea un PNG dal bestiario", !!npcCreato && npcCreato.kind === "npc");
 const stato = C.getState();
 const pcId = stato.combatants.find(c => c.kind === "pc").id;
 const npcId = stato.combatants.find(c => c.kind === "npc").id;
