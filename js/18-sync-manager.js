@@ -35,6 +35,7 @@
     HP_AGGIORNATO: "CombatantHpEvent",
     NEMICO_GENERATO: "EnemySpawnedEvent",
     MAPPA_TOKEN: "TokenMappingEvent",
+    SUPERFICIE_CREATA: "SurfaceCreatedEvent",
     // Eventi di servizio.
     CONTROLLO_COMBATTIMENTO: "CombatControlEvent",
     NEBBIA_RIVELATA: "FogRevealedEvent",
@@ -165,6 +166,7 @@
       case TipiEvento.HP_AGGIORNATO:
       case TipiEvento.NEMICO_GENERATO:
       case TipiEvento.MAPPA_TOKEN:
+      case TipiEvento.SUPERFICIE_CREATA:
       case TipiEvento.SYNC_STATO:
         // Mutazioni dell'autorita': solo il Master.
         return ruoloAttore === Ruolo.MASTER;

@@ -51,6 +51,7 @@ const SOLO_MASTER = {
   CombatantHpEvent: true,
   EnemySpawnedEvent: true,
   TokenMappingEvent: true,
+  SurfaceCreatedEvent: true,
   StateSyncEvent: true
 };
 

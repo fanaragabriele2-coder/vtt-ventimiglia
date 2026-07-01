@@ -136,6 +136,19 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       document.querySelector(".vtt-sess-map-row select").value === "token-npc-2", null, { timeout: 6000 });
     check("Giocatore: mappatura del Master ricevuta e riflessa (token-npc-2)", true);
 
+    // Ripristina la mappatura di default: l'override sopra (token-npc-2 -> pc-local) ha gia'
+    // dimostrato la sincronizzazione GM->giocatore, ma se lasciato attivo rompe l'euristica
+    // token<->combattente per npc-2 nei test successivi (HUD, Spingi), che assumono la mappa
+    // di default. Il reset e' anch'esso GM-autorevole e si propaga allo stesso modo.
+    await gm.evaluate(() => window.UltimateVTTCombatFSM && window.UltimateVTTCombatFSM.impostaMappaCompleta({}));
+    // La riga 0 (pc-local) ricade sull'euristica di default, che risolve a "token-pc" (non vuota,
+    // perche' quel token esiste davvero): e' questo il segnale che l'override e' stato rimosso.
+    await pl.waitForFunction(() => {
+      const sel = document.querySelector(".vtt-sess-map-row select");
+      return sel && sel.value === "token-pc";
+    }, null, { timeout: 6000 });
+    check("mappatura ripristinata al default dopo il test (evita di contaminare i test successivi)", true);
+
     // --- HUD di combattimento stile BG3: compare a combattimento attivo, con la % di colpire ---
     const hudPrima = await gm.evaluate(() => { const h = document.querySelector(".bg3-hud"); return h ? h.hidden : null; });
     check("BG3 HUD: nascosta fuori dal combattimento", hudPrima === true);
@@ -223,6 +236,24 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       return t && t.cellX === 12 && t.cellY === 10;
     }, setup.tokBersaglio, { timeout: 6000 });
     check("sync Spingi: il Giocatore riceve la spinta del Master via rete (token a 12,10)", true);
+
+    // --- Superfici (modulo 27): il Master ne crea una via comando IA (createSurface), il
+    // Giocatore la riceve via rete (SurfaceCreatedEvent) e il tick del danno risolve solo sul Master. ---
+    const supSetup = await gm.evaluate(() => {
+      if (!window.UltimateVTTAIBridge || !window.UltimateVTTSurfaces) { return { ok: false }; }
+      const esito = window.UltimateVTTAIBridge.executeCommand({ command: "createSurface", type: "fuoco", cellX: 30, cellY: 30, radius: 1, rounds: 5 });
+      return { ok: Boolean(esito && esito.ok) };
+    });
+    check("Superfici: comando IA createSurface eseguito dal Master", supSetup.ok === true);
+    await pl.waitForFunction(() =>
+      window.UltimateVTTSurfaces && window.UltimateVTTSurfaces.elencoAttivo().some(s => s.cellX === 30 && s.cellY === 30 && s.tipo === "fuoco"),
+      null, { timeout: 6000 });
+    check("Superfici: il Giocatore riceve la superficie del Master via rete", true);
+    const raggioRicevuto = await pl.evaluate(() => {
+      const s = window.UltimateVTTSurfaces.elencoAttivo().find(x => x.cellX === 30 && x.cellY === 30);
+      return s ? s.raggio : null;
+    });
+    check("Superfici: i dati ricevuti dal Giocatore sono corretti (raggio 1)", raggioRicevuto === 1);
 
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });

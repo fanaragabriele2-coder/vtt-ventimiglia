@@ -13,6 +13,7 @@
         { command: "audioCue", cue: "spell" },
         { command: "moveToken", tokenId: "token-pc", cellX: 18, cellY: 12 },
         { command: "revealFog", cellX: 18, cellY: 12, radius: 4 },
+        { command: "createSurface", type: "fuoco", cellX: 20, cellY: 12, radius: 1, rounds: 3 },
         { command: "damage", targetId: "npc-1", amount: 5 },
         { command: "save", slot: "slot1" }
       ];
@@ -580,6 +581,21 @@
             window.UltimateVTTCanvas.revealCircle(clampNumber(command.cellX, 0, 999, 16), clampNumber(command.cellY, 0, 999, 12), clampNumber(command.radius, 0, 16, 3));
           }
           result.message = "Nebbia rivelata.";
+        } else if (name === "createSurface") {
+          if (window.UltimateVTTSurfaces && typeof window.UltimateVTTSurfaces.creaSuperficie === "function") {
+            var esitoSuperficie = window.UltimateVTTSurfaces.creaSuperficie(
+              command.type || "fuoco",
+              clampNumber(command.cellX, 0, 999, 16),
+              clampNumber(command.cellY, 0, 999, 12),
+              clampNumber(command.radius, 0, 16, 1),
+              clampNumber(command.rounds, 1, 20, 3)
+            );
+            result.ok = Boolean(esitoSuperficie && esitoSuperficie.ok);
+            result.message = (esitoSuperficie && esitoSuperficie.message) || (result.ok ? "Superficie creata." : "Superficie non creata.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo superfici non disponibile.";
+          }
         } else if (name === "hideFog") {
           if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.hideCircle) {
             window.UltimateVTTCanvas.hideCircle(clampNumber(command.cellX, 0, 999, 16), clampNumber(command.cellY, 0, 999, 12), clampNumber(command.radius, 0, 16, 3));

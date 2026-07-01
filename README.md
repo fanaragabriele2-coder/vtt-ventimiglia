@@ -32,7 +32,8 @@ vttg2506/
 │   ├── 23-bg3-combat-hud.js            ← HUD combattimento stile BG3 (iniziativa, % colpire, danno, azioni)
 │   ├── 24-bg3-reactions.js             ← attacchi di opportunità / reazioni (stile BG3)
 │   ├── 25-bg3-flanking.js              ← fiancheggiamento: vantaggio se il bersaglio è preso tra due fuochi
-│   └── 26-bg3-shove.js                 ← azione Spingi: prova contrapposta, spinge il bersaglio di una cella
+│   ├── 26-bg3-shove.js                 ← azione Spingi: prova contrapposta, spinge il bersaglio di una cella
+│   └── 27-bg3-surfaces.js              ← superfici fuoco/veleno: danno periodico ad area, GM-autorevoli
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -114,6 +115,19 @@ diversi. Entrambi i moduli controllano `isMasterOrSolo()` (stesso pattern del mo
 multiplayer solo il Master risolve; il danno si sincronizza da solo (il modulo 22 lo instrada in
 rete solo quando il Master lo applica), la spinta emette esplicitamente un `TokenMovedEvent` dopo
 il movimento. In single-player (nessun Sync connesso) risolve sempre il client locale.
+
+**Superfici (fuoco, veleno) — `js/27-bg3-surfaces.js` (`UltimateVTTSurfaces`).** Aree del campo di
+battaglia che infliggono danno periodico (una volta per round) a chi vi si trova, e scadono dopo un
+numero fisso di round. Progettato **GM-autorevole fin da subito** (a differenza di 24/26, corretti
+in un secondo momento): solo il Master crea le superfici (`SurfaceCreatedEvent`, propagato agli
+altri client) e applica il tick del danno; la scadenza è invece calcolabile da ogni client in modo
+sicuro perché dipende solo dal **round della FSM** (l'unico sincronizzato su tutti i ruoli — quello
+locale di `UltimateVTTCombat` non lo è per i client giocatore), non serve un evento di rete per
+rimuoverle. Overlay disegnato sul canvas (stesso pattern del raggio di movimento nel modulo 20).
+Comando IA drivabile via bridge (modulo 11): `{ command: "createSurface", type: "fuoco"|"veleno",
+cellX, cellY, radius, rounds }` — il Master IA può narrativamente incendiare una stanza. Ambito
+volutamente limitato al solo danno periodico: niente condizioni persistenti (il gioco non ha ancora
+uno stato "in fiamme"/"avvelenato") né propagazione dinamica delle superfici.
 
 ## Salvataggio e backup
 
