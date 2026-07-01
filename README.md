@@ -29,7 +29,8 @@ vttg2506/
 │   ├── 20-token-kinematics-network.js  ← Fase 2: throttle 10Hz, coordinate, raggio movimento
 │   ├── 21-session-panel.js             ← UI: pannello di sessione multiplayer
 │   ├── 22-network-game-events.js       ← routing di rete: HP/danni, nebbia, spawn nemici
-│   └── 23-bg3-combat-hud.js            ← HUD combattimento stile BG3 (iniziativa, % colpire, azioni)
+│   ├── 23-bg3-combat-hud.js            ← HUD combattimento stile BG3 (iniziativa, % colpire, danno, azioni)
+│   └── 24-bg3-reactions.js            ← attacchi di opportunità / reazioni (stile BG3)
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -70,11 +71,19 @@ modulo 05 action economy), **senza modificarli**. Compare solo a combattimento a
   su un nemico = lo seleziona come bersaglio).
 - **Anteprima della probabilità di colpire** il bersaglio (la "70%" di BG3), calcolata in 5e
   (`d20 + bonus ≥ CA`, 20/1 naturale) con **vantaggio/svantaggio** (`1-(1-p)²` / `p²`).
+- **Anteprima del danno previsto** (media della formula, es. `~10 danni (2d6+3)`).
 - **Economia delle azioni** del turno (azione / bonus / reazione) e **barra del movimento** residuo.
 - Selettore **Normale / Vantaggio / Svantaggio** e pulsanti **Attacca** / **Termina turno**.
 
-La matematica di colpire è esposta come funzioni pure testabili
-(`UltimateVTTBG3HUD.probColpire(...)`) e coperta da `tools/test/core-bg3-hud.js`.
+**Attacchi di opportunità / reazioni — `js/24-bg3-reactions.js` (`UltimateVTTReactions`).** Quando un
+combattente esce dalla portata in mischia (cella adiacente) di un nemico con la **reazione** ancora
+disponibile, quel nemico effettua un attacco di opportunità (tiro per colpire + danni). La reazione
+del PG passa per l'action economy del modulo 05; quella dei PNG è gestita internamente e si rinnova a
+ogni round. La logica decisionale è una funzione pura testabile (`attacchiOpportunita(...)`).
+
+La matematica di colpire/danno e la logica delle reazioni sono esposte come funzioni pure testabili
+(`UltimateVTTBG3HUD.probColpire/dannoMedio`, `UltimateVTTReactions.attacchiOpportunita`) e coperte da
+`tools/test/core-bg3-hud.js` e `tools/test/core-bg3-reactions.js`.
 
 ## Salvataggio e backup
 

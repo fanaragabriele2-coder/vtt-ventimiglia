@@ -162,6 +162,8 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     await gm.waitForFunction(() => { const e = document.querySelector(".bg3-hit-pct"); return e && /\d+%/.test(e.textContent); }, null, { timeout: 6000 });
     const pct = await gm.evaluate(() => document.querySelector(".bg3-hit-pct").textContent);
     check("BG3 HUD: mostra la percentuale di colpire sul bersaglio (" + pct + ")", /\d+%/.test(pct));
+    const dmg = await gm.evaluate(() => { const e = document.querySelector(".bg3-dmg"); return e ? e.textContent : ""; });
+    check("BG3 HUD: mostra l'anteprima del danno previsto (" + dmg + ")", /~\d+\s*danni/.test(dmg));
     const hasEnd = await gm.evaluate(() => Array.prototype.some.call(document.querySelectorAll(".bg3-btn"), b => /Termina turno/.test(b.textContent)));
     check("BG3 HUD: presente il pulsante 'Termina turno'", hasEnd === true);
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());

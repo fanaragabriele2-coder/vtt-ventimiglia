@@ -17,6 +17,7 @@ const suite = [
   ["Core: XP & loot / level-up (modulo 15)", "core-progression.js"],
   ["Core: backup scaricabile / ripristino (modulo 11)", "core-backup.js"],
   ["Core: HUD combattimento BG3 / probabilita' di colpire (modulo 23)", "core-bg3-hud.js"],
+  ["Core: attacchi di opportunita' / reazioni BG3 (modulo 24)", "core-bg3-reactions.js"],
   // Livello multiplayer real-time (Fasi 1-3 + hardening).
   ["Smoke moduli 18/19/20", "smoke.js"],
   ["Sync turni / hydration / interpolazione", "sync.js"],

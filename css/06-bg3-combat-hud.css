@@ -94,6 +94,7 @@
 .bg3-hit-pct.low { color: #e0603a; }
 .bg3-hit-pct.high { color: #7bd47b; }
 .bg3-hit-mode { font-size: 10px; color: #b8ab90; }
+.bg3-dmg { margin-top: 2px; font-size: 11px; color: #e0b88a; }
 .bg3-target-empty { color: #8a8378; font-size: 11px; }
 
 /* selettore modalità tiro */

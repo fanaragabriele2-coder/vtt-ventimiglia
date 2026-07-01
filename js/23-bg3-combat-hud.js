@@ -49,6 +49,27 @@
 
   function percento(p) { return Math.round(p * 100); }
 
+  // Danno medio atteso di una formula tipo "2d6+3": media di XdY = X*(Y+1)/2, piu' i modificatori
+  // fissi, con i segni. Serve all'anteprima del danno (come BG3 mostra accanto alla % di colpire).
+  function dannoMedio(formula) {
+    var norm = String(formula || "").replace(/\s+/g, "").toLowerCase();
+    var termini = norm.match(/[+-]?[^+-]+/g) || [];
+    var media = 0;
+    termini.forEach(function (t) {
+      var dado = t.match(/^([+-]?)(\d*)d(\d+)$/);
+      var fisso = t.match(/^([+-]?\d+)$/);
+      if (dado) {
+        var segno = dado[1] === "-" ? -1 : 1;
+        var conta = parseInt(dado[2] || "1", 10);
+        var facce = parseInt(dado[3], 10);
+        if (conta > 0 && facce > 0) { media += segno * conta * (facce + 1) / 2; }
+      } else if (fisso) {
+        media += parseInt(fisso[1], 10);
+      }
+    });
+    return Math.max(0, Math.round(media));
+  }
+
   // ---------------------------------------------------------------------------
   // Costruzione del DOM (una volta sola)
   // ---------------------------------------------------------------------------
@@ -110,6 +131,8 @@
     var hitMode = el("span", "bg3-hit-mode", "");
     hitRow.appendChild(hitPct); hitRow.appendChild(hitMode);
     bTarget.appendChild(hitRow);
+    var dmgLine = el("div", "bg3-dmg", "");
+    bTarget.appendChild(dmgLine);
     tray.appendChild(bTarget);
 
     // Blocco modalita' di tiro
@@ -141,7 +164,7 @@
       hud: hud, initiative: initiative, feed: feed,
       pipAzione: pipAzione, pipBonus: pipBonus, pipReazione: pipReazione,
       movVal: movVal, movFill: movFill,
-      targetName: targetName, hitPct: hitPct, hitMode: hitMode, targetBlock: bTarget,
+      targetName: targetName, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
       modi: { normal: mNorm, advantage: mAdv, disadvantage: mDis },
       btnAttacca: btnAttacca, btnEnd: btnEnd
     };
@@ -336,6 +359,7 @@
       rif.hitPct.textContent = "–";
       rif.hitPct.className = "bg3-hit-pct";
       rif.hitMode.textContent = "";
+      rif.dmgLine.textContent = "";
       return;
     }
     rif.targetName.className = "bg3-target-name";
@@ -349,6 +373,11 @@
     rif.hitPct.className = "bg3-hit-pct" + (pct <= 35 ? " low" : pct >= 70 ? " high" : "");
     var modeText = st.rollMode === "advantage" ? "vantaggio" : st.rollMode === "disadvantage" ? "svantaggio" : "";
     rif.hitMode.textContent = (modeText ? modeText + " · " : "") + "+" + bonus + " vs CA " + ca;
+
+    // Anteprima del danno previsto (media della formula del combattente di turno).
+    var formula = corrente.damageFormula || "";
+    var media = dannoMedio(formula);
+    rif.dmgLine.textContent = formula ? ("~" + media + " danni (" + formula + ")") : "";
   }
 
   function renderModalita(st) {
@@ -386,6 +415,7 @@
     probColpireDado: probColpireDado,
     probColpire: probColpire,
     percento: percento,
+    dannoMedio: dannoMedio,
     // controllo
     render: function () { render(true); },
     fermaAggiornamento: function () { if (timer) { clearInterval(timer); timer = null; } }

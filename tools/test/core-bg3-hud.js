@@ -93,6 +93,14 @@ check("percento(0.7975) = 80", H.percento(0.7975) === 80);
 check("percento(0.3025) = 30", H.percento(0.3025) === 30);
 check("percento(0.05) = 5", H.percento(0.05) === 5);
 
+console.log("\n[Anteprima danno medio]");
+check("2d6+3 -> media 10 (2*3.5 + 3)", H.dannoMedio("2d6+3") === 10);
+check("1d8 -> media 4.5 arrotondata a 5", H.dannoMedio("1d8") === 5);
+check("1d6+2 -> media 5.5 arrotondata a 6", H.dannoMedio("1d6+2") === 6);
+check("1d12+3 -> media 9.5 arrotondata a 10", H.dannoMedio("1d12+3") === 10);
+check("formula vuota -> 0", H.dannoMedio("") === 0);
+check("danno medio mai negativo", H.dannoMedio("-2d4") === 0);
+
 console.log("\n[HUD: visibilita' e rendering]");
 const hud = cercaClasse("bg3-hud")[0];
 check("la HUD viene costruita nel DOM", !!hud);
