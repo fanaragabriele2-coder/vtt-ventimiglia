@@ -241,6 +241,20 @@ comodamente su una GPU mobile come una RTX 4050 (6GB), costringendo Ollama a sca
 modello su CPU (molto più lento) mentre la stessa GPU deve anche renderizzare canvas, dadi 3D e
 tutto il resto. Cambiato in `llama3.1:8b` (~5GB in Q4), che lascia margine per il resto del rendering.
 
+**XP attribuita al vero autore del colpo, non a chi è attivo in hotseat (`js/15`).** Il tracker di
+combattimento (`js/06`) ha un solo slot per PG con id fisso `"pc-local"`: solo il *nome* viene
+risincronizzato a chi è attivo in hotseat, non l'id. `onEnemyDefeated` assegnava sempre l'XP a
+`activeId()` — il personaggio *attualmente mostrato* quando il polling (ogni 600ms) si accorge
+dell'uccisione. In hotseat, se il Master cambia personaggio attivo (es. per controllare l'inventario
+di un altro giocatore) prima che il polling registri l'uccisione appena fatta da un altro PG, l'XP
+finiva al personaggio sbagliato. Corretto risalendo a chi ha *davvero* sferrato il colpo tramite
+`combatState.lastRoll.title` (impostato da ogni risoluzione di attacco nel formato "Attaccante vs
+Bersaglio", path-agnostico come per il modulo 29) e risolvendo quel nome nel roster hotseat
+(`window.partyData`) — l'unico posto dove nome e id-di-progressione reale coesistono, dato che l'id
+del combattente stesso è sempre quello fantasma `"pc-local"`. Le ricompense dirette del Master
+(`completeQuest`, tag `[XP:n]` in chat) continuano ad andare a chi è attivo ora, comportamento
+corretto per una ricompensa indirizzata a chi si sta parlando in quel momento.
+
 ## Salvataggio e backup
 
 Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
