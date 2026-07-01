@@ -170,6 +170,7 @@
           tokenState: getModuleState("UltimateVTTTokenPhysics"),
           diceState: getModuleState("UltimateVTTDice3D"),
           audioVoiceState: getModuleState("UltimateVTTAudioVoice"),
+          coreGameplayState: getModuleState("UltimateVTTCoreGameplay"),
           ui: {
             notes: notesInput ? notesInput.value : "",
             aiCommandText: aiInput ? aiInput.value : ""
@@ -254,6 +255,13 @@
         return true;
       }
 
+      function applyCoreGameplaySnapshot(snapshot) {
+        if (snapshot.coreGameplayState && window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.hydrate) {
+          return window.UltimateVTTCoreGameplay.hydrate(snapshot.coreGameplayState);
+        }
+        return false;
+      }
+
       function applyUiSnapshot(snapshot) {
         if (!snapshot.ui) {
           return false;
@@ -285,7 +293,8 @@
           character: applyCharacterSnapshot(snapshot),
           canvas: applyCanvasSnapshot(snapshot),
           tokens: applyTokenSnapshot(snapshot),
-          ui: applyUiSnapshot(snapshot)
+          ui: applyUiSnapshot(snapshot),
+          coreGameplay: applyCoreGameplaySnapshot(snapshot)
         };
 
         if (window.UltimateVTTDice3D && window.UltimateVTTDice3D.clearDice) {

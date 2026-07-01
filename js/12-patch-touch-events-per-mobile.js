@@ -1450,6 +1450,33 @@
         },
         getUltimoRiepilogoCombattimento: function getUltimoRiepilogoCombattimentoSnapshot() {
           return ultimoRiepilogoCombattimento;
+        },
+        // Permettono al modulo di backup (js/11) di salvare/ripristinare la memoria del Master IA
+        // (cronologia Groq + riepilogo dell'ultimo combattimento) insieme al resto della partita:
+        // senza questo, ricaricare la pagina o importare un backup azzererebbe la memoria appena
+        // costruita dal modulo 29, vanificando la "ripartenza coerente" dopo un combattimento.
+        getState: function getState() {
+          return {
+            groqChatHistory: cloneData(groqChatHistory),
+            ultimoRiepilogoCombattimento: ultimoRiepilogoCombattimento
+          };
+        },
+        hydrate: function hydrate(snapshot) {
+          if (!snapshot) {
+            return false;
+          }
+          if (Array.isArray(snapshot.groqChatHistory)) {
+            groqChatHistory.length = 0;
+            snapshot.groqChatHistory.forEach(function pushEntry(entry) {
+              if (entry && typeof entry.role === "string" && typeof entry.content === "string") {
+                groqChatHistory.push({ role: entry.role, content: entry.content });
+              }
+            });
+          }
+          if (typeof snapshot.ultimoRiepilogoCombattimento === "string") {
+            ultimoRiepilogoCombattimento = snapshot.ultimoRiepilogoCombattimento;
+          }
+          return true;
         }
       };
 

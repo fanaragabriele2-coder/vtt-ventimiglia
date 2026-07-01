@@ -176,6 +176,13 @@ esposte da `js/12`:
 Il riepilogo viene anche postato in chat come messaggio di sistema, così il giocatore vede lo stesso
 debrief. Testato sia in isolamento sia in **integrazione con il vero `js/12`** (non solo mock).
 
+**Persistenza oltre la scheda del browser**: `UltimateVTTCoreGameplay` espone anche
+`getState()`/`hydrate()`, che il modulo di backup (`js/11`) salva e ripristina insieme al resto
+della partita (`coreGameplayState` nello snapshot esportabile). Senza questo, ricaricare la pagina o
+importare un backup avrebbe azzerato la cronologia Groq e il riepilogo dell'ultimo combattimento
+appena costruiti — vanificando la "ripartenza coerente" anche fra una sessione e l'altra. Gli
+snapshot più vecchi (senza `coreGameplayState`) restano importabili senza errori.
+
 ## Salvataggio e backup
 
 Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
