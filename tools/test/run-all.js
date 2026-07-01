@@ -19,6 +19,7 @@ const suite = [
   ["Core: HUD combattimento BG3 / probabilita' di colpire (modulo 23)", "core-bg3-hud.js"],
   ["Core: attacchi di opportunita' / reazioni BG3 (modulo 24)", "core-bg3-reactions.js"],
   ["Core: fiancheggiamento BG3 (modulo 25)", "core-bg3-flanking.js"],
+  ["Core: azione Spingi BG3 (modulo 26)", "core-bg3-shove.js"],
   // Livello multiplayer real-time (Fasi 1-3 + hardening).
   ["Smoke moduli 18/19/20", "smoke.js"],
   ["Sync turni / hydration / interpolazione", "sync.js"],

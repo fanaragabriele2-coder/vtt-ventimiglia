@@ -121,6 +121,7 @@
 .bg3-btn:disabled { opacity: .4; cursor: not-allowed; }
 .bg3-btn.attack { color: #ffe0d6; border-color: rgba(200,80,60,.8); background: linear-gradient(180deg, rgba(120,40,28,.9), rgba(60,16,10,.96)); }
 .bg3-btn.endturn { color: #cfe6c3; border-color: rgba(120,180,110,.6); background: linear-gradient(180deg, rgba(40,80,40,.9), rgba(15,40,18,.96)); }
+.bg3-btn.shove { color: #cfe4f0; border-color: rgba(91,155,183,.7); background: linear-gradient(180deg, rgba(28,60,80,.9), rgba(10,26,36,.96)); }
 
 /* feed dell'ultimo tiro */
 .bg3-feed {

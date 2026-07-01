@@ -31,7 +31,8 @@ vttg2506/
 │   ├── 22-network-game-events.js       ← routing di rete: HP/danni, nebbia, spawn nemici
 │   ├── 23-bg3-combat-hud.js            ← HUD combattimento stile BG3 (iniziativa, % colpire, danno, azioni)
 │   ├── 24-bg3-reactions.js             ← attacchi di opportunità / reazioni (stile BG3)
-│   └── 25-bg3-flanking.js              ← fiancheggiamento: vantaggio se il bersaglio è preso tra due fuochi
+│   ├── 25-bg3-flanking.js              ← fiancheggiamento: vantaggio se il bersaglio è preso tra due fuochi
+│   └── 26-bg3-shove.js                 ← azione Spingi: prova contrapposta, spinge il bersaglio di una cella
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -89,10 +90,21 @@ bersaglio), l'attacco ha **vantaggio** — regola 5e opzionale, sempre attiva in
 giocatore ha scelto manualmente svantaggio, come da regola 5e). Modulo di sola logica: la HUD (23)
 lo consulta se presente, ma funziona anche senza.
 
-La matematica di colpire/danno e la logica di reazioni/fiancheggiamento sono esposte come funzioni
-pure testabili (`UltimateVTTBG3HUD.probColpire/dannoMedio`, `UltimateVTTReactions.attacchiOpportunita`,
-`UltimateVTTFlanking.staFiancheggiando/trovaAlleatoFiancheggiante`) e coperte da
-`tools/test/core-bg3-hud.js`, `tools/test/core-bg3-reactions.js` e `tools/test/core-bg3-flanking.js`.
+**Spingi (shove) — `js/26-bg3-shove.js` (`UltimateVTTShove`).** Prova contrapposta 5e: Atletica
+dell'attaccante contro la migliore tra Atletica/Acrobazia del bersaglio (il bersaglio sceglie). Se
+l'attaccante vince, il bersaglio è spinto di una cella nella direzione opposta a lui (bloccato dal
+terreno impraticabile come qualsiasi altro movimento). Ambito volutamente limitato alla sola
+variante "spinta" della regola (non "atterra a terra": il gioco non ha ancora un sistema di
+condizioni/stati). I PNG non hanno punteggi di caratteristica nel catalogo: si usano euristiche
+ragionevoli (Atletica ≈ `attackBonus`, Acrobazia ≈ `initiativeBonus`); il PG usa le sue statistiche
+reali. Il pulsante **Spingi** si inserisce da solo nella barra azioni della HUD (23) se presente,
+ma la funzione `spingi()` funziona anche senza.
+
+La matematica di colpire/danno e la logica di reazioni/fiancheggiamento/spinta sono esposte come
+funzioni pure testabili (`UltimateVTTBG3HUD.probColpire/dannoMedio`,
+`UltimateVTTReactions.attacchiOpportunita`, `UltimateVTTFlanking.staFiancheggiando`,
+`UltimateVTTShove.esitoSpinta/celleSpinta`) e coperte da `tools/test/core-bg3-hud.js`,
+`tools/test/core-bg3-reactions.js`, `tools/test/core-bg3-flanking.js` e `tools/test/core-bg3-shove.js`.
 
 ## Salvataggio e backup
 

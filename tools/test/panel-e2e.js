@@ -166,6 +166,30 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("BG3 HUD: mostra l'anteprima del danno previsto (" + dmg + ")", /~\d+\s*danni/.test(dmg));
     const hasEnd = await gm.evaluate(() => Array.prototype.some.call(document.querySelectorAll(".bg3-btn"), b => /Termina turno/.test(b.textContent)));
     check("BG3 HUD: presente il pulsante 'Termina turno'", hasEnd === true);
+    await gm.waitForSelector("#bg3ShoveButton", { timeout: 6000 });
+    check("BG3 HUD: il modulo 26 inietta il pulsante 'Spingi'", true);
+    const primaCella = await gm.evaluate(() => {
+      const st = window.UltimateVTTCombat.getState();
+      const cur = st.combatants[st.currentTurnIndex];
+      const sel = document.getElementById("moduleFiveTargetSelect");
+      const other = st.combatants.find(c => c.id !== cur.id && !c.defeated);
+      if (sel && other) { sel.value = other.id; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      const tp = window.UltimateVTTTokenPhysics.getState();
+      const cellaBersaglio = tp.tokens.find(t => window.UltimateVTTCombatFSM.tokenACombattente(t.id) === other.id);
+      return cellaBersaglio ? { cellX: cellaBersaglio.cellX, cellY: cellaBersaglio.cellY } : null;
+    });
+    check("BG3 HUD: bersaglio selezionato per il test di Spingi", !!primaCella);
+    await gm.click("#bg3ShoveButton");
+    await sleep(300); // la risoluzione di spingi() e' sincrona ma lascia respirare il rendering
+    const esitoSpinta = await gm.evaluate(() => {
+      const st = window.UltimateVTTCombat.getState();
+      const cur = st.combatants[st.currentTurnIndex];
+      const other = st.combatants.find(c => c.id !== cur.id && !c.defeated);
+      const tp = window.UltimateVTTTokenPhysics.getState();
+      const t = tp.tokens.find(tk => window.UltimateVTTCombatFSM.tokenACombattente(tk.id) === other.id);
+      return t ? { cellX: t.cellX, cellY: t.cellY } : null;
+    });
+    check("BG3 HUD: Spingi si risolve senza errori di pagina (esito leggibile)", !!esitoSpinta);
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);
