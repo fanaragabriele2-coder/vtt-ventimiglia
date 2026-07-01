@@ -84,6 +84,20 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     await preparaPagina(gm);
     check("pannello: bottone di apertura presente", true);
 
+    // --- Modulo Campagna (esplorazione fullscreen di Ventimiglia): #campOverlay e i suoi pulsanti
+    // (Sprint, Esamina, Combatti, invia messaggio, "← VTT") sono definiti nell'HTML DOPO lo script
+    // che li collega — su una pagina reale, wireActionButtons() veniva chiamata una sola volta,
+    // troppo presto, quando quegli elementi non esistevano ancora: TUTTI i pulsanti restavano senza
+    // alcuna azione collegata, per sempre. Verifica diretta sulla pagina reale (non un mock DOM, che
+    // non riprodurrebbe l'ordine di parsing dell'HTML che causa il bug). ---
+    await gm.evaluate(() => { if (window.VTTCampagna) { window.VTTCampagna.activate(); } });
+    await gm.waitForSelector("#campOverlay.camp-active", { timeout: 6000 });
+    check("Campagna: la schermata di esplorazione si apre", true);
+    await gm.click("#campBackBtn");
+    await gm.waitForFunction(() =>
+      !document.getElementById("campOverlay").classList.contains("camp-active"), null, { timeout: 6000 });
+    check("Campagna: il pulsante '← VTT' chiude davvero la schermata (non restava senza azione collegata)", true);
+
     await connettiDaPannello(gm, { url: URL_RELAY, ruolo: "gm", id: "test-gm" });
     await gm.waitForFunction(() =>
       /Connesso/.test(document.querySelector(".vtt-sess-status-text").textContent), null, { timeout: 6000 });

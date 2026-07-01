@@ -3474,6 +3474,18 @@
         var sprintBtn = el("campSprintBtn");
         var examBtn   = el("campExamBtn");
         var fightBtn  = el("campFightBtn");
+        var sendBtnCheck = el("campDmSend"), inpCheck = el("campDmInput");
+        var backBtnCheck = el("campBackBtn");
+        // #campOverlay (con TUTTI questi pulsanti) e' definito nell'HTML DOPO questo script: alla
+        // primissima chiamata (sincrona, subito dopo aver trovato campLaunchBtn in wireLaunchBtn)
+        // questi elementi non esistono ancora nel DOM. A differenza di campLaunchBtn (che ha gia' un
+        // suo retry in wireLaunchBtn), qui non c'era alcun retry: gli "if (bottone) ..." sottostanti
+        // fallivano silenziosamente UNA SOLA VOLTA e per sempre, lasciando "← VTT", Sprint, Esamina,
+        // Combatti e l'invio del messaggio completamente senza alcuna azione collegata, ogni volta.
+        if (!sprintBtn || !examBtn || !fightBtn || !sendBtnCheck || !inpCheck || !backBtnCheck) {
+          setTimeout(wireActionButtons, 200);
+          return;
+        }
         if (sprintBtn) sprintBtn.addEventListener("click", function() {
           state.sprint = !state.sprint;
           sprintBtn.classList.toggle("on", state.sprint);

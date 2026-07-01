@@ -275,6 +275,19 @@ solo se il party è ancora vuoto (nessun "AGGIUNGI AL PARTY" cliccato) — il cl
 un solo eroe resta invariato, ma un party già composto esplicitamente parte con **esattamente** i
 personaggi scelti. Prima suite di test per questo modulo (nessuna esisteva).
 
+**Modalità Campagna: tutti i pulsanti erano senza alcuna azione collegata (`js/12`).** La schermata
+di esplorazione fullscreen (`#campOverlay`: Sprint, Esamina, Combatti, invio messaggio, "← VTT")
+è definita nell'HTML **dopo** lo script che dovrebbe collegare quei pulsanti ai loro comportamenti.
+`wireActionButtons()` veniva chiamata una sola volta, in modo sincrono, subito dopo aver trovato il
+pulsante che *apre* la modalità (che invece esiste prima nello script e quindi già disponibile) —
+in quel momento gli altri pulsanti non esistevano ancora nel DOM, e a differenza del pulsante di
+apertura (che ha un suo meccanismo di retry) questi venivano cercati una volta sola: risultato,
+**tutti** restavano permanentemente senza alcuna azione collegata, ogni volta, al 100%. Diagnosticato
+con un browser reale (non un mock: l'ordine di parsing dell'HTML è essenziale per riprodurre il bug)
+e corretto con lo stesso meccanismo di retry già usato per il pulsante di apertura. Nuovo check nel
+pannello E2E (`panel-e2e.js`) che apre la modalità Campagna e verifica che "← VTT" chiuda davvero la
+schermata — verificato che fallisce (timeout) contro il codice pre-fix.
+
 ## Salvataggio e backup
 
 Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
