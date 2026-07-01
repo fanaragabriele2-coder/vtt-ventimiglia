@@ -19,6 +19,13 @@
   function fsm() { return window.UltimateVTTCombatFSM || null; }
   function inventory() { return window.UltimateVTTInventory || null; }
 
+  // In multiplayer, solo il Master risolve gli attacchi di opportunita' automatici: altrimenti
+  // OGNI client connesso (GM + ciascun giocatore) rileverebbe indipendentemente lo stesso movimento
+  // e tirerebbe i propri dadi (Math.random non e' sincronizzato), producendo esiti diversi su schermi
+  // diversi. Il danno applicato dal Master si sincronizza gia' da solo (il modulo 22 lo instrada in
+  // rete solo quando il chiamante e' il Master). In single-player (Sync assente) resta sempre attivo.
+  function isMasterOrSolo() { return !window.UltimateVTTSync || window.UltimateVTTSync.isMaster(); }
+
   function log(m) {
     if (window.UltimateVTT && typeof window.UltimateVTT.appendSystemLog === "function") {
       try { window.UltimateVTT.appendSystemLog(m); } catch (e) { /* ignora */ }
@@ -202,7 +209,7 @@
       if (riposo.cellX === corrente.cellX && riposo.cellY === corrente.cellY) { return; } // fermo
 
       // Il token si e' spostato da 'riposo' a 'corrente'.
-      if (abilitato && attivo) { valutaMovimento(t.id, riposo, corrente, stCmb, stTok); }
+      if (abilitato && attivo && isMasterOrSolo()) { valutaMovimento(t.id, riposo, corrente, stCmb, stTok); }
       cellaRiposo[t.id] = corrente;
     });
   }
@@ -253,12 +260,16 @@
     impostaAbilitato: function (v) { abilitato = Boolean(v); },
     eAbilitato: function () { return abilitato; },
     reazioneDisponibile: reazioneDisponibile,
+    isMasterOrSolo: isMasterOrSolo,
     fermaSampler: function () { if (timer) { clearInterval(timer); timer = null; } },
-    // utile ai test: forza una valutazione manuale
+    // utile ai test: forza una valutazione manuale (bypassa il gate Master/solo: per testare
+    // la logica di risoluzione isolata dalla policy multiplayer)
     _valutaMovimento: function (tokenId, partenza, arrivo) {
       var stCmb = statoCombat(), stTok = statoToken();
       if (stCmb && stTok) { valutaMovimento(tokenId, partenza, arrivo, stCmb, stTok); }
-    }
+    },
+    // utile ai test: esegue un ciclo di polling reale (rispetta il gate Master/solo)
+    _tick: function () { tick(); }
   };
 
   if (document.readyState === "loading") {

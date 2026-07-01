@@ -19,6 +19,12 @@
   function physics() { return window.UltimateVTTTokenPhysics || null; }
   function fsm() { return window.UltimateVTTCombatFSM || null; }
 
+  // In multiplayer, solo il Master risolve la spinta: la chiamata diretta a moveTokenToCell qui
+  // sotto NON passa dal livello cinematico di rete (modulo 20), quindi da un client giocatore
+  // resterebbe visibile solo sul suo schermo. Il Master, dopo aver mosso il token in locale, emette
+  // esplicitamente l'evento (vedi spingi()); in single-player (Sync assente) risolve sempre lui.
+  function isMasterOrSolo() { return !window.UltimateVTTSync || window.UltimateVTTSync.isMaster(); }
+
   function log(m) {
     if (window.UltimateVTT && typeof window.UltimateVTT.appendSystemLog === "function") {
       try { window.UltimateVTT.appendSystemLog(m); } catch (e) { /* ignora */ }
@@ -138,6 +144,11 @@
   }
 
   function spingi() {
+    if (!isMasterOrSolo()) {
+      var msgSoloMaster = "Solo il Master può risolvere un'azione Spingi in una sessione multiplayer.";
+      annuncia("🤼 " + msgSoloMaster);
+      return { ok: false, message: msgSoloMaster };
+    }
     var C = combat();
     if (!C || typeof C.getState !== "function") { return { ok: false, message: "Combattimento non disponibile." }; }
     var st = C.getState();
@@ -171,13 +182,29 @@
     }
 
     var P = physics();
+    var tokenBersaglio = combAToken(bersaglio.id);
     var spostato = false;
     if (P && typeof P.moveTokenToCell === "function") {
-      try { spostato = P.moveTokenToCell(combAToken(bersaglio.id), destinazione.cellX, destinazione.cellY, true); } catch (e) { spostato = false; }
+      try { spostato = P.moveTokenToCell(tokenBersaglio, destinazione.cellX, destinazione.cellY, true); } catch (e) { spostato = false; }
     }
     annuncia("🤼 " + attaccante.name + " spinge " + bersaglio.name +
       " (" + esito.totaleAttaccante + " vs " + esito.totaleBersaglio + "): RIUSCITO" +
       (spostato ? "." : " (ma la cella di arrivo è bloccata: resta al suo posto)."));
+
+    // Propaga il movimento agli altri client connessi (il Master e' sempre autorizzato a muovere
+    // qualsiasi token). In single-player e' un no-op che ritorna true (gia' applicato in locale).
+    if (spostato) {
+      var s = window.UltimateVTTSync;
+      if (s && typeof s.emetti === "function" && typeof s.creaEventoTokenMosso === "function") {
+        try {
+          s.emetti(s.creaEventoTokenMosso(tokenBersaglio, destinazione.cellX, destinazione.cellY, {
+            anteprima: false, cellaPrecedenteX: cellaBer.cellX, cellaPrecedenteY: cellaBer.cellY
+          }), function annullaSpinta() {
+            try { P.moveTokenToCell(tokenBersaglio, cellaBer.cellX, cellaBer.cellY, true); } catch (e) { /* ignora */ }
+          });
+        } catch (e) { /* la spinta resta comunque valida in locale */ }
+      }
+    }
 
     return { ok: true, successo: true, esito: esito, spostato: spostato, destinazione: destinazione };
   }
@@ -225,6 +252,7 @@
     // comando
     spingi: spingi,
     // controllo (utile ai test)
+    isMasterOrSolo: isMasterOrSolo,
     fermaAggiornamento: function () { if (timer) { clearInterval(timer); timer = null; } }
   };
 

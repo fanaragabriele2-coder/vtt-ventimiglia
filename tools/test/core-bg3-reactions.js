@@ -137,6 +137,45 @@ R._valutaMovimento("token-npc-1", { cellX: 5, cellY: 6 }, { cellX: 9, cellY: 6 }
 check("il PG reagisce alla fuga del nemico (danno applicato al PNG)", dannoApplicato.length === 1 && dannoApplicato[0].id === "npc-1");
 check("la reazione del PG e' consumata via action economy (modulo 05)", reactionSpesa === 1);
 
+console.log("\n[Multiplayer: solo il Master risolve gli attacchi di opportunita' automatici]");
+// Sul path REALE del polling (_tick, non _valutaMovimento): un client non-Master rileva il
+// movimento ma NON deve risolvere la reazione (eviterebbe dadi indipendenti su ogni client).
+combatState = { active: true, round: 1,
+  combatants: [
+    { id: "pc-local", kind: "pc", name: "Eroe", armorClass: 14, attackBonus: 5, damageFormula: "1d8+3", hitPoints: 20, maxHitPoints: 20, defeated: false },
+    { id: "npc-1", kind: "npc", name: "Goblin", armorClass: 13, attackBonus: 5, damageFormula: "1d6+2", hitPoints: 7, maxHitPoints: 7, defeated: false }
+  ] };
+window.UltimateVTTCombat = {
+  getState: () => JSON.parse(JSON.stringify(combatState)),
+  rollD20WithMode: () => ({ chosen: 15, rolls: [15], naturalOne: false, naturalTwenty: false }),
+  rollDamageFormula: () => ({ total: 6 }),
+  applyDamageToCombatant: (id, amount) => { dannoApplicato.push({ id, amount }); return true; }
+};
+const tokenStatoTick = { dragTokenId: null, tokens: [
+  { id: "token-pc", cellX: 5, cellY: 5 }, { id: "token-npc-1", cellX: 5, cellY: 6 }
+] };
+window.UltimateVTTTokenPhysics = { getState: () => JSON.parse(JSON.stringify(tokenStatoTick)) };
+dannoApplicato = [];
+
+window.UltimateVTTSync = { isMaster: () => false }; // client GIOCATORE (non Master)
+check("isMasterOrSolo() e' false su un client giocatore", R.isMasterOrSolo() === false);
+R._tick(); // inizializza le celle di riposo (nessun innesco: e' la prima osservazione)
+tokenStatoTick.tokens[0].cellX = 5; tokenStatoTick.tokens[0].cellY = 8; // il PG esce dalla portata del Goblin
+R._tick();
+check("client giocatore: il movimento e' rilevato ma la reazione NON si risolve (nessun danno)", dannoApplicato.length === 0);
+
+tokenStatoTick.tokens[0].cellX = 5; tokenStatoTick.tokens[0].cellY = 7; // rientra in portata (non innesca: e' un ingresso, non un'uscita)
+R._tick();
+check("nessun danno anche rientrando in portata (non e' un'uscita dalla mischia)", dannoApplicato.length === 0);
+
+window.UltimateVTTSync = { isMaster: () => true }; // ora il client E' il Master
+check("isMasterOrSolo() e' true sul client Master", R.isMasterOrSolo() === true);
+tokenStatoTick.tokens[0].cellX = 5; tokenStatoTick.tokens[0].cellY = 11; // esce di nuovo dalla portata: ora deve risolvere
+R._tick();
+check("sul client Master la stessa uscita dalla portata risolve la reazione (danno applicato)", dannoApplicato.length === 1 && dannoApplicato[0].id === "pc-local");
+
+delete window.UltimateVTTSync; // torna a single-player per il resto della suite
+
 R.fermaSampler();
 console.log("\nRisultato core-bg3-reactions: " + passati + " passati, " + falliti + " falliti.");
 process.exit(falliti === 0 ? 0 : 1);

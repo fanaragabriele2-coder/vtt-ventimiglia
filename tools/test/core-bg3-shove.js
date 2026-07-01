@@ -118,5 +118,41 @@ window.UltimateVTTTokenPhysics.getState = () => ({ tokens: [
 r = H.spingi();
 check("bersaglio fuori portata -> ok:false (non lancia)", r.ok === false);
 
+console.log("\n[Multiplayer: solo il Master risolve la spinta]");
+// La chiamata diretta a moveTokenToCell non passa dal livello cinematico di rete: da un client
+// giocatore resterebbe visibile solo sul suo schermo. Va quindi rifiutata, non risolta in locale.
+window.UltimateVTTTokenPhysics.getState = () => ({ tokens: [
+  { id: "token-pc", cellX: 5, cellY: 5 }, { id: "token-npc-1", cellX: 6, cellY: 5 }
+] });
+mosseApplicate = [];
+tiriInStack = [18, 4]; // successo garantito, se venisse risolta
+window.UltimateVTTSync = { isMaster: () => false }; // client GIOCATORE (non Master)
+check("isMasterOrSolo() e' false su un client giocatore", H.isMasterOrSolo() === false);
+r = H.spingi();
+check("client giocatore: spingi() e' rifiutata (ok:false)", r.ok === false);
+check("il messaggio indica che serve il Master", /Master/.test(r.message));
+check("nessun movimento applicato quando rifiutata", mosseApplicate.length === 0);
+
+console.log("\n[Multiplayer: il Master propaga la spinta con un TokenMovedEvent]");
+let eventiEmessi = [];
+window.UltimateVTTSync = {
+  isMaster: () => true,
+  creaEventoTokenMosso: (tokenId, cellX, cellY, opzioni) => ({ tipo: "TokenMovedEvent", payload: { tokenId, cellX, cellY, opzioni } }),
+  emetti: (evento, undo) => { eventiEmessi.push(evento); return true; }
+};
+mosseApplicate = [];
+tiriInStack = [18, 4];
+r = H.spingi();
+check("sul client Master la spinta si risolve normalmente", r.ok === true && r.successo === true);
+check("il Master emette un TokenMovedEvent per propagare la spinta agli altri client", eventiEmessi.length === 1 && eventiEmessi[0].tipo === "TokenMovedEvent");
+check("l'evento porta la cella di destinazione corretta", eventiEmessi[0].payload.tokenId === "token-npc-1" && eventiEmessi[0].payload.cellX === 7 && eventiEmessi[0].payload.cellY === 5);
+
+console.log("\n[Single-player: nessun Sync presente, nessun tentativo di emissione (non lancia)]");
+delete window.UltimateVTTSync;
+mosseApplicate = [];
+tiriInStack = [18, 4];
+r = H.spingi();
+check("senza alcun modulo Sync la spinta si risolve comunque (single-player)", r.ok === true && r.successo === true && mosseApplicate.length === 1);
+
 console.log("\nRisultato core-bg3-shove: " + passati + " passati, " + falliti + " falliti.");
 process.exit(falliti === 0 ? 0 : 1);

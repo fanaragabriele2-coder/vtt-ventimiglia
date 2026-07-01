@@ -190,6 +190,40 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       return t ? { cellX: t.cellX, cellY: t.cellY } : null;
     });
     check("BG3 HUD: Spingi si risolve senza errori di pagina (esito leggibile)", !!esitoSpinta);
+
+    // --- Sincronizzazione multiplayer di Spingi: il Master spinge, il Giocatore vede il token
+    // muoversi sul suo schermo (verifica il fix del guard isMasterOrSolo + emissione dell'evento).
+    // La prova contrapposta resta genuinamente casuale: si ritenta invece di manipolare
+    // rollD20WithMode, che e' condivisa col modulo 24 (reazioni) e non va falsata globalmente. ---
+    const setup = await gm.evaluate(() => {
+      const st = window.UltimateVTTCombat.getState();
+      const cur = st.combatants[st.currentTurnIndex];
+      const nemico = st.combatants.find(c => c.kind !== cur.kind && !c.defeated);
+      if (!nemico) return { ok: false };
+      const tokAttaccante = window.UltimateVTTCombatFSM.combattenteAToken(cur.id);
+      const tokBersaglio = window.UltimateVTTCombatFSM.combattenteAToken(nemico.id);
+      const sel = document.getElementById("moduleFiveTargetSelect");
+      if (sel) { sel.value = nemico.id; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      let esito = null;
+      for (let i = 0; i < 10 && (!esito || !esito.successo); i++) {
+        // Riposiziona adiacenti (attaccante in (10,10), bersaglio in (11,10)) prima di ogni tentativo.
+        window.UltimateVTTTokenPhysics.moveTokenToCell(tokAttaccante, 10, 10, false);
+        window.UltimateVTTTokenPhysics.moveTokenToCell(tokBersaglio, 11, 10, false);
+        esito = window.UltimateVTTShove.spingi();
+      }
+      return { ok: true, tokBersaglio: tokBersaglio, successo: Boolean(esito && esito.successo) };
+    });
+    check("sync Spingi: la prova contrapposta riesce entro pochi tentativi", setup.ok === true && setup.successo === true);
+
+    // Il Giocatore deve vedere il token del bersaglio arrivare alla cella (12,10) (spinto di 1 oltre),
+    // ricevuto via TokenMovedEvent attraverso il relay reale, non via stato condiviso in-process.
+    await pl.waitForFunction((tokId) => {
+      const tp = window.UltimateVTTTokenPhysics.getState();
+      const t = tp.tokens.find(tk => tk.id === tokId);
+      return t && t.cellX === 12 && t.cellY === 10;
+    }, setup.tokBersaglio, { timeout: 6000 });
+    check("sync Spingi: il Giocatore riceve la spinta del Master via rete (token a 12,10)", true);
+
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);

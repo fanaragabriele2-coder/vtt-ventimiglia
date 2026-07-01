@@ -106,6 +106,15 @@ funzioni pure testabili (`UltimateVTTBG3HUD.probColpire/dannoMedio`,
 `UltimateVTTShove.esitoSpinta/celleSpinta`) e coperte da `tools/test/core-bg3-hud.js`,
 `tools/test/core-bg3-reactions.js`, `tools/test/core-bg3-flanking.js` e `tools/test/core-bg3-shove.js`.
 
+**Multiplayer: solo il Master risolve le reazioni e la spinta.** Attacchi di opportunità (24) e
+Spingi (26) applicano danno/movimento con chiamate dirette alle primitive locali (non passano dal
+livello cinematico di rete del modulo 20). Se ogni client connesso li risolvesse in autonomia,
+ciascuno tirerebbe dadi propri (`Math.random` non è sincronizzato) con esiti diversi su schermi
+diversi. Entrambi i moduli controllano `isMasterOrSolo()` (stesso pattern del modulo 19): in
+multiplayer solo il Master risolve; il danno si sincronizza da solo (il modulo 22 lo instrada in
+rete solo quando il Master lo applica), la spinta emette esplicitamente un `TokenMovedEvent` dopo
+il movimento. In single-player (nessun Sync connesso) risolve sempre il client locale.
+
 ## Salvataggio e backup
 
 Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
