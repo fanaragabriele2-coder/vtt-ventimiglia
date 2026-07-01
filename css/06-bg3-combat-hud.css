@@ -94,6 +94,13 @@
   color: #2a1c02; background: #f0d472; border-radius: 5px; letter-spacing: .02em;
 }
 .bg3-flank-badge[hidden] { display: none; }
+.bg3-elev-badge {
+  display: inline-block; margin-top: 2px; margin-left: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+  border-radius: 5px; letter-spacing: .02em;
+}
+.bg3-elev-badge.high { color: #2a1c02; background: #f0d472; }
+.bg3-elev-badge.low { color: #eaf3fb; background: rgba(91,140,183,.85); }
+.bg3-elev-badge[hidden] { display: none; }
 .bg3-hit { display: flex; align-items: baseline; gap: 6px; }
 .bg3-hit-pct { font-size: 22px; font-weight: 800; line-height: 1; color: #f0d472; }
 .bg3-hit-pct.low { color: #e0603a; }

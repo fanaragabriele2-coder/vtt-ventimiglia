@@ -14,6 +14,7 @@
         { command: "moveToken", tokenId: "token-pc", cellX: 18, cellY: 12 },
         { command: "revealFog", cellX: 18, cellY: 12, radius: 4 },
         { command: "createSurface", type: "fuoco", cellX: 20, cellY: 12, radius: 1, rounds: 3 },
+        { command: "setElevation", cellX: 22, cellY: 10, radius: 2, level: 1 },
         { command: "damage", targetId: "npc-1", amount: 5 },
         { command: "save", slot: "slot1" }
       ];
@@ -595,6 +596,20 @@
           } else {
             result.ok = false;
             result.message = "Modulo superfici non disponibile.";
+          }
+        } else if (name === "setElevation") {
+          if (window.UltimateVTTElevation && typeof window.UltimateVTTElevation.impostaElevazioneArea === "function") {
+            var esitoElevazione = window.UltimateVTTElevation.impostaElevazioneArea(
+              clampNumber(command.cellX, 0, 999, 16),
+              clampNumber(command.cellY, 0, 999, 12),
+              clampNumber(command.radius, 0, 16, 1),
+              clampNumber(command.level, -5, 5, 1)
+            );
+            result.ok = Boolean(esitoElevazione && esitoElevazione.ok);
+            result.message = (esitoElevazione && esitoElevazione.message) || (result.ok ? "Quota impostata." : "Quota non impostata.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo elevazione non disponibile.";
           }
         } else if (name === "hideFog") {
           if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.hideCircle) {

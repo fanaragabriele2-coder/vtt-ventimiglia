@@ -36,6 +36,7 @@
     NEMICO_GENERATO: "EnemySpawnedEvent",
     MAPPA_TOKEN: "TokenMappingEvent",
     SUPERFICIE_CREATA: "SurfaceCreatedEvent",
+    ELEVAZIONE_IMPOSTATA: "ElevationSetEvent",
     // Eventi di servizio.
     CONTROLLO_COMBATTIMENTO: "CombatControlEvent",
     NEBBIA_RIVELATA: "FogRevealedEvent",
@@ -167,6 +168,7 @@
       case TipiEvento.NEMICO_GENERATO:
       case TipiEvento.MAPPA_TOKEN:
       case TipiEvento.SUPERFICIE_CREATA:
+      case TipiEvento.ELEVAZIONE_IMPOSTATA:
       case TipiEvento.SYNC_STATO:
         // Mutazioni dell'autorita': solo il Master.
         return ruoloAttore === Ruolo.MASTER;

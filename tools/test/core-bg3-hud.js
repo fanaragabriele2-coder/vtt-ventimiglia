@@ -136,6 +136,38 @@ delete window.UltimateVTTFlanking;
 H.render();
 check("senza il modulo 25 il badge torna nascosto e la % torna quella base (55%)", flankBadge.hidden === true && hitPct.textContent === "55%");
 
+console.log("\n[Integrazione con l'elevazione (modulo 28, opzionale)]");
+const elevBadge = cercaClasse("bg3-elev-badge")[0];
+check("il badge di elevazione esiste ma e' nascosto senza il modulo 28", elevBadge && elevBadge.hidden === true);
+
+window.UltimateVTTElevation = {
+  valutaElevazione: () => "advantage",
+  componiModalita: (scelta, vant, svant) => (vant && svant) ? "normal" : vant ? "advantage" : svant ? "disadvantage" : scelta
+};
+H.render();
+check("con il modulo 28 presente e terreno favorevole il badge 'alto' compare", elevBadge.hidden === false && elevBadge.className.includes("high"));
+check("il terreno sopraelevato eleva la % di colpire (55% -> 80%)", hitPct.textContent === "80%");
+
+window.UltimateVTTElevation.valutaElevazione = () => "disadvantage";
+H.render();
+check("con terreno sfavorevole il badge 'basso' compare", elevBadge.hidden === false && elevBadge.className.includes("low"));
+check("lo svantaggio di quota abbassa la % di colpire (55% -> 30%)", hitPct.textContent === "30%");
+
+console.log("\n[Fiancheggiamento + elevazione insieme: regola di sovrapposizione 5e]");
+window.UltimateVTTFlanking = {
+  valutaFiancheggiamento: () => ({ fiancheggiato: true, alleatoId: "pc-2" }),
+  modalitaEffettiva: (scelta, fiancheggiato) => (fiancheggiato ? "advantage" : scelta)
+};
+// fiancheggiamento (vantaggio) + terreno sfavorevole (svantaggio) impostato sopra -> si annullano.
+H.render();
+check("vantaggio da fiancheggiamento + svantaggio di quota si annullano (torna 55%, non 30% ne' 80%)", hitPct.textContent === "55%");
+check("entrambi i badge sono visibili anche se l'effetto netto e' 'normale'", flankBadge.hidden === false && elevBadge.hidden === false);
+
+delete window.UltimateVTTFlanking;
+delete window.UltimateVTTElevation;
+H.render();
+check("senza ne' fiancheggiamento ne' elevazione entrambi i badge tornano nascosti e la % torna base", flankBadge.hidden === true && elevBadge.hidden === true && hitPct.textContent === "55%");
+
 // Barra iniziativa: una card per combattente. Si contano i figli VIVI del contenitore
 // (il registro globale del mini-DOM accumula le card di ogni render: non e' affidabile contarlo).
 const initBar = cercaClasse("bg3-initiative")[0];

@@ -52,6 +52,7 @@ const SOLO_MASTER = {
   EnemySpawnedEvent: true,
   TokenMappingEvent: true,
   SurfaceCreatedEvent: true,
+  ElevationSetEvent: true,
   StateSyncEvent: true
 };
 

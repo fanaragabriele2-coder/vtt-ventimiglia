@@ -129,6 +129,9 @@
     var flankBadge = el("div", "bg3-flank-badge", "🗡 Fiancheggiato");
     flankBadge.hidden = true;
     bTarget.appendChild(flankBadge);
+    var elevBadge = el("div", "bg3-elev-badge", "");
+    elevBadge.hidden = true;
+    bTarget.appendChild(elevBadge);
     var hitRow = el("div", "bg3-hit");
     var hitPct = el("span", "bg3-hit-pct", "–");
     var hitMode = el("span", "bg3-hit-mode", "");
@@ -167,7 +170,7 @@
       hud: hud, initiative: initiative, feed: feed,
       pipAzione: pipAzione, pipBonus: pipBonus, pipReazione: pipReazione,
       movVal: movVal, movFill: movFill,
-      targetName: targetName, flankBadge: flankBadge, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
+      targetName: targetName, flankBadge: flankBadge, elevBadge: elevBadge, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
       modi: { normal: mNorm, advantage: mAdv, disadvantage: mDis },
       btnAttacca: btnAttacca, btnEnd: btnEnd
     };
@@ -355,13 +358,42 @@
   }
 
   // Consulta il modulo 25 (se caricato) per sapere se il bersaglio e' fiancheggiato dall'attaccante
-  // di turno: in tal caso il tiro ha vantaggio (regola 5e opzionale, sempre attiva in BG3), che si
-  // annulla con uno svantaggio gia' scelto. Se il modulo non e' presente, nessun effetto (fallback).
+  // di turno: in tal caso il tiro ha vantaggio (regola 5e opzionale, sempre attiva in BG3). Se il
+  // modulo non e' presente, nessun effetto (fallback).
   function fiancheggiamento(attaccanteId, bersaglioId) {
     var F = window.UltimateVTTFlanking;
     if (!F || typeof F.valutaFiancheggiamento !== "function") { return { fiancheggiato: false, alleatoId: null }; }
     try { return F.valutaFiancheggiamento(attaccanteId, bersaglioId) || { fiancheggiato: false, alleatoId: null }; }
     catch (e) { return { fiancheggiato: false, alleatoId: null }; }
+  }
+
+  // Consulta il modulo 28 (se caricato) per sapere se l'attaccante e' su un terreno piu' alto o piu'
+  // basso di quello del bersaglio: "advantage"/"disadvantage"/"normal". Se il modulo non e' presente,
+  // nessun effetto (fallback "normal").
+  function elevazione(attaccanteId, bersaglioId) {
+    var E = window.UltimateVTTElevation;
+    if (!E || typeof E.valutaElevazione !== "function") { return "normal"; }
+    try { return E.valutaElevazione(attaccanteId, bersaglioId) || "normal"; }
+    catch (e) { return "normal"; }
+  }
+
+  // Compone TUTTE le fonti di vantaggio/svantaggio disponibili (fiancheggiamento + elevazione, e la
+  // scelta manuale del giocatore) secondo la regola 5e: se c'e' almeno una fonte di ciascun segno,
+  // si annullano (torna "normale"). Usa il modulo 28 come combinatore se presente (stessa logica),
+  // altrimenti la replica qui in locale come fallback minimale.
+  function componiModalitaEffettiva(modalitaScelta, fiancheggiato, esitoElevazione) {
+    var E = window.UltimateVTTElevation;
+    var haVantaggioExtra = Boolean(fiancheggiato) || esitoElevazione === "advantage";
+    var haSvantaggioExtra = esitoElevazione === "disadvantage";
+    if (E && typeof E.componiModalita === "function") {
+      try { return E.componiModalita(modalitaScelta, haVantaggioExtra, haSvantaggioExtra); } catch (e) { /* fallback sotto */ }
+    }
+    var vantaggio = haVantaggioExtra || modalitaScelta === "advantage";
+    var svantaggio = haSvantaggioExtra || modalitaScelta === "disadvantage";
+    if (vantaggio && svantaggio) { return "normal"; }
+    if (vantaggio) { return "advantage"; }
+    if (svantaggio) { return "disadvantage"; }
+    return "normal";
   }
 
   function renderBersaglioEColpo(st, corrente, bersaglio) {
@@ -370,6 +402,7 @@
       rif.targetName.className = "bg3-target-name";
       if (!bersaglio) { rif.targetName.textContent = "Nessun bersaglio"; rif.targetName.className = "bg3-target-empty"; }
       rif.flankBadge.hidden = true;
+      rif.elevBadge.hidden = true;
       rif.hitPct.textContent = "–";
       rif.hitPct.className = "bg3-hit-pct";
       rif.hitMode.textContent = "";
@@ -382,18 +415,25 @@
     var fl = fiancheggiamento(corrente.id, bersaglio.id);
     rif.flankBadge.hidden = !fl.fiancheggiato;
 
+    var esitoElev = elevazione(corrente.id, bersaglio.id);
+    rif.elevBadge.hidden = esitoElev === "normal";
+    if (esitoElev === "advantage") { rif.elevBadge.textContent = "⛰ Terreno sopraelevato"; rif.elevBadge.className = "bg3-elev-badge high"; }
+    else if (esitoElev === "disadvantage") { rif.elevBadge.textContent = "⬇ Svantaggio di quota"; rif.elevBadge.className = "bg3-elev-badge low"; }
+
     var bonus = typeof corrente.attackBonus === "number" ? corrente.attackBonus : 0;
     var ca = typeof bersaglio.armorClass === "number" ? bersaglio.armorClass : 10;
     var modalitaScelta = st.rollMode || "normal";
-    var F = window.UltimateVTTFlanking;
-    var modalitaEff = (fl.fiancheggiato && F && typeof F.modalitaEffettiva === "function")
-      ? F.modalitaEffettiva(modalitaScelta, true) : modalitaScelta;
+    var modalitaEff = componiModalitaEffettiva(modalitaScelta, fl.fiancheggiato, esitoElev);
     var p = probColpire(bonus, ca, modalitaEff);
     var pct = percento(p);
     rif.hitPct.textContent = pct + "%";
     rif.hitPct.className = "bg3-hit-pct" + (pct <= 35 ? " low" : pct >= 70 ? " high" : "");
     var modeText = modalitaEff === "advantage" ? "vantaggio" : modalitaEff === "disadvantage" ? "svantaggio" : "";
-    rif.hitMode.textContent = (modeText ? modeText + (fl.fiancheggiato && modalitaEff === "advantage" ? " (fiancheggiamento)" : "") + " · " : "") + "+" + bonus + " vs CA " + ca;
+    var fonti = [];
+    if (fl.fiancheggiato) { fonti.push("fiancheggiamento"); }
+    if (esitoElev === "advantage") { fonti.push("terreno"); }
+    if (esitoElev === "disadvantage") { fonti.push("svantaggio di quota"); }
+    rif.hitMode.textContent = (modeText ? modeText + (fonti.length ? " (" + fonti.join(", ") + ")" : "") + " · " : "") + "+" + bonus + " vs CA " + ca;
 
     // Anteprima del danno previsto (media della formula del combattente di turno).
     var formula = corrente.damageFormula || "";

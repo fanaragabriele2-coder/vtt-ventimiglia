@@ -33,7 +33,8 @@ vttg2506/
 │   ├── 24-bg3-reactions.js             ← attacchi di opportunità / reazioni (stile BG3)
 │   ├── 25-bg3-flanking.js              ← fiancheggiamento: vantaggio se il bersaglio è preso tra due fuochi
 │   ├── 26-bg3-shove.js                 ← azione Spingi: prova contrapposta, spinge il bersaglio di una cella
-│   └── 27-bg3-surfaces.js              ← superfici fuoco/veleno: danno periodico ad area, GM-autorevoli
+│   ├── 27-bg3-surfaces.js              ← superfici fuoco/veleno: danno periodico ad area, GM-autorevoli
+│   └── 28-bg3-elevation.js             ← terreno sopraelevato: vantaggio/svantaggio dalla quota
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -128,6 +129,20 @@ Comando IA drivabile via bridge (modulo 11): `{ command: "createSurface", type: 
 cellX, cellY, radius, rounds }` — il Master IA può narrativamente incendiare una stanza. Ambito
 volutamente limitato al solo danno periodico: niente condizioni persistenti (il gioco non ha ancora
 uno stato "in fiamme"/"avvelenato") né propagazione dinamica delle superfici.
+
+**Terreno sopraelevato (elevation) — `js/28-bg3-elevation.js` (`UltimateVTTElevation`).** Estende la
+mappa con una **quota per cella** (intero, 0 = normale). Attaccare da una quota più alta di quella
+del bersaglio dà **vantaggio**; attaccare da più in basso dà **svantaggio** — la lettura "terreno
+sopraelevato" più riconoscibile di BG3, qui semplificata a un confronto diretto di quota (nessuna
+linea di vista: fuori ambito). GM-autorevole fin da subito, come le superfici: solo il Master dipinge
+un'area (`ElevationSetEvent`, propagato); la lettura è sicura su ogni client perché non muta nulla.
+
+Poiché sia il fiancheggiamento (25) sia il terreno possono essere attivi insieme, la HUD (23) li
+**compone** secondo la regola 5e generalizzata a più fonti: se c'è almeno una fonte di vantaggio e
+almeno una di svantaggio, si annullano (torna "normale"), altrimenti vince quella presente — con due
+badge indipendenti (**🗡 Fiancheggiato** e **⛰ Terreno sopraelevato** / **⬇ Svantaggio di quota**)
+mostrati anche quando l'effetto netto è "normale", così il giocatore capisce perché si annullano.
+Comando IA: `{ command: "setElevation", cellX, cellY, radius, level }`.
 
 ## Salvataggio e backup
 

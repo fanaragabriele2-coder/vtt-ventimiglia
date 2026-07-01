@@ -255,6 +255,19 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     });
     check("Superfici: i dati ricevuti dal Giocatore sono corretti (raggio 1)", raggioRicevuto === 1);
 
+    // --- Elevazione (modulo 28): il Master ne dipinge un'area via comando IA (setElevation), il
+    // Giocatore la riceve via rete (ElevationSetEvent). Verifica anche la lettura live sul GM. ---
+    const elevSetup = await gm.evaluate(() => {
+      if (!window.UltimateVTTAIBridge || !window.UltimateVTTElevation) { return { ok: false }; }
+      const esito = window.UltimateVTTAIBridge.executeCommand({ command: "setElevation", cellX: 40, cellY: 40, radius: 1, level: 2 });
+      return { ok: Boolean(esito && esito.ok) };
+    });
+    check("Elevazione: comando IA setElevation eseguito dal Master", elevSetup.ok === true);
+    await pl.waitForFunction(() => window.UltimateVTTElevation && window.UltimateVTTElevation.quotaDi(40, 40) === 2, null, { timeout: 6000 });
+    check("Elevazione: il Giocatore riceve la quota del Master via rete", true);
+    const quotaAdiacente = await pl.evaluate(() => window.UltimateVTTElevation.quotaDi(41, 40));
+    check("Elevazione: l'area dipinta (raggio 1) e' sincronizzata per intero", quotaAdiacente === 2);
+
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);
