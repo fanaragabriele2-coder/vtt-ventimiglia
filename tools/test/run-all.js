@@ -22,6 +22,7 @@ const suite = [
   ["Core: azione Spingi BG3 (modulo 26)", "core-bg3-shove.js"],
   ["Core: superfici fuoco/veleno BG3 (modulo 27)", "core-bg3-surfaces.js"],
   ["Core: terreno sopraelevato BG3 (modulo 28)", "core-bg3-elevation.js"],
+  ["Core: condizioni di stato BG3 (modulo 30)", "core-bg3-conditions.js"],
   ["Core: memoria di combattimento per il Master IA (modulo 29)", "core-combat-memory.js"],
   ["Core: integrazione memoria Master IA con il vero js/12", "core-master-memory-integration.js"],
   ["Core: memoria Master IA sopravvive a backup/ripristino (js/11 + js/12)", "core-backup-master-memory.js"],

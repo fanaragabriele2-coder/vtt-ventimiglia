@@ -15,6 +15,8 @@
         { command: "revealFog", cellX: 18, cellY: 12, radius: 4 },
         { command: "createSurface", type: "fuoco", cellX: 20, cellY: 12, radius: 1, rounds: 3 },
         { command: "setElevation", cellX: 22, cellY: 10, radius: 2, level: 1 },
+        { command: "applyCondition", targetId: "npc-1", condition: "prono", rounds: 1 },
+        { command: "clearCondition", targetId: "npc-1", condition: "prono" },
         { command: "damage", targetId: "npc-1", amount: 5 },
         { command: "save", slot: "slot1" }
       ];
@@ -619,6 +621,28 @@
           } else {
             result.ok = false;
             result.message = "Modulo elevazione non disponibile.";
+          }
+        } else if (name === "applyCondition") {
+          if (window.UltimateVTTConditions && typeof window.UltimateVTTConditions.applicaCondizione === "function") {
+            var esitoCondizione = window.UltimateVTTConditions.applicaCondizione(
+              command.targetId || "pc-local",
+              command.condition || "",
+              clampNumber(command.rounds, 1, 20, 1)
+            );
+            result.ok = Boolean(esitoCondizione && esitoCondizione.ok);
+            result.message = (esitoCondizione && esitoCondizione.message) || (result.ok ? "Condizione applicata." : "Condizione non applicata.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo condizioni non disponibile.";
+          }
+        } else if (name === "clearCondition") {
+          if (window.UltimateVTTConditions && typeof window.UltimateVTTConditions.rimuoviCondizione === "function") {
+            var esitoRimozione = window.UltimateVTTConditions.rimuoviCondizione(command.targetId || "pc-local", command.condition || "");
+            result.ok = Boolean(esitoRimozione && esitoRimozione.ok);
+            result.message = (esitoRimozione && esitoRimozione.message) || (result.ok ? "Condizione rimossa." : "Condizione non rimossa.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo condizioni non disponibile.";
           }
         } else if (name === "hideFog") {
           if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.hideCircle) {

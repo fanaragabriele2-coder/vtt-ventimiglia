@@ -268,6 +268,32 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     const quotaAdiacente = await pl.evaluate(() => window.UltimateVTTElevation.quotaDi(41, 40));
     check("Elevazione: l'area dipinta (raggio 1) e' sincronizzata per intero", quotaAdiacente === 2);
 
+    // --- Condizioni di stato (modulo 30): il Master ne applica una via comando IA (applyCondition),
+    // il Giocatore la riceve via rete (ConditionSetEvent), poi il Master la rimuove (clearCondition)
+    // e la rimozione si propaga a sua volta (ConditionClearedEvent). ---
+    const condBersaglio = await gm.evaluate(() => {
+      const st = window.UltimateVTTCombat.getState();
+      const nemico = st.combatants.find(c => c.kind === "npc" && !c.defeated);
+      return nemico ? nemico.id : null;
+    });
+    check("Condizioni: trovato un bersaglio nemico per il test", !!condBersaglio);
+    const condSetup = await gm.evaluate((id) => {
+      if (!window.UltimateVTTAIBridge || !window.UltimateVTTConditions) { return { ok: false }; }
+      const esito = window.UltimateVTTAIBridge.executeCommand({ command: "applyCondition", targetId: id, condition: "prono", rounds: 3 });
+      return { ok: Boolean(esito && esito.ok) };
+    }, condBersaglio);
+    check("Condizioni: comando IA applyCondition eseguito dal Master", condSetup.ok === true);
+    await pl.waitForFunction((id) => window.UltimateVTTConditions && window.UltimateVTTConditions.haCondizione(id, "prono"), condBersaglio, { timeout: 6000 });
+    check("Condizioni: il Giocatore riceve la condizione del Master via rete", true);
+
+    const condRimozione = await gm.evaluate((id) => {
+      const esito = window.UltimateVTTAIBridge.executeCommand({ command: "clearCondition", targetId: id, condition: "prono" });
+      return { ok: Boolean(esito && esito.ok) };
+    }, condBersaglio);
+    check("Condizioni: comando IA clearCondition eseguito dal Master", condRimozione.ok === true);
+    await pl.waitForFunction((id) => window.UltimateVTTConditions && !window.UltimateVTTConditions.haCondizione(id, "prono"), condBersaglio, { timeout: 6000 });
+    check("Condizioni: la rimozione si propaga al Giocatore via rete", true);
+
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);

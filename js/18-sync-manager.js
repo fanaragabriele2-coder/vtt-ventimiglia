@@ -37,6 +37,8 @@
     MAPPA_TOKEN: "TokenMappingEvent",
     SUPERFICIE_CREATA: "SurfaceCreatedEvent",
     ELEVAZIONE_IMPOSTATA: "ElevationSetEvent",
+    CONDIZIONE_IMPOSTATA: "ConditionSetEvent",
+    CONDIZIONE_RIMOSSA: "ConditionClearedEvent",
     // Eventi di servizio.
     CONTROLLO_COMBATTIMENTO: "CombatControlEvent",
     NEBBIA_RIVELATA: "FogRevealedEvent",
@@ -169,6 +171,8 @@
       case TipiEvento.MAPPA_TOKEN:
       case TipiEvento.SUPERFICIE_CREATA:
       case TipiEvento.ELEVAZIONE_IMPOSTATA:
+      case TipiEvento.CONDIZIONE_IMPOSTATA:
+      case TipiEvento.CONDIZIONE_RIMOSSA:
       case TipiEvento.SYNC_STATO:
         // Mutazioni dell'autorita': solo il Master.
         return ruoloAttore === Ruolo.MASTER;

@@ -168,12 +168,59 @@ delete window.UltimateVTTElevation;
 H.render();
 check("senza ne' fiancheggiamento ne' elevazione entrambi i badge tornano nascosti e la % torna base", flankBadge.hidden === true && elevBadge.hidden === true && hitPct.textContent === "55%");
 
+console.log("\n[Integrazione con le condizioni di stato (modulo 30, opzionale)]");
+const condBadge = cercaClasse("bg3-cond-badge")[0];
+check("il badge di condizione esiste ma e' nascosto senza il modulo 30", condBadge && condBadge.hidden === true);
+
+window.UltimateVTTConditions = {
+  Icone: { prono: "🩹", stordito: "💫", avvelenato: "☠️" },
+  Etichette: { prono: "Prono", stordito: "Stordito", avvelenato: "Avvelenato" },
+  valutaCondizioni: () => ({ vantaggio: true, svantaggio: false, condizioniBersaglio: ["prono"], condizioniAttaccante: [] }),
+  condizioniDi: () => []
+};
+H.render();
+check("con il modulo 30 presente e il bersaglio prono il badge compare (boost)", condBadge.hidden === false && condBadge.className.includes("boost"));
+check("il bersaglio prono eleva la % di colpire come un vantaggio (55% -> 80%)", hitPct.textContent === "80%");
+
+window.UltimateVTTConditions.valutaCondizioni = () => ({ vantaggio: false, svantaggio: true, condizioniBersaglio: [], condizioniAttaccante: ["avvelenato"] });
+H.render();
+check("con una condizione propria (svantaggio) il badge compare (hinder)", condBadge.hidden === false && condBadge.className.includes("hinder"));
+check("la propria condizione abbassa la % di colpire (55% -> 30%)", hitPct.textContent === "30%");
+
+console.log("\n[Fiancheggiamento + condizione propria: stesso principio di sovrapposizione 5e]");
+window.UltimateVTTFlanking = {
+  valutaFiancheggiamento: () => ({ fiancheggiato: true, alleatoId: "pc-2" }),
+  modalitaEffettiva: (scelta, fiancheggiato) => (fiancheggiato ? "advantage" : scelta)
+};
+// fiancheggiamento (vantaggio) + condizione propria avvelenato (svantaggio, impostata sopra) -> si annullano.
+H.render();
+check("vantaggio da fiancheggiamento + propria condizione (svantaggio) si annullano (torna 55%)", hitPct.textContent === "55%");
+delete window.UltimateVTTFlanking;
+
+delete window.UltimateVTTConditions;
+H.render();
+check("senza il modulo 30 il badge torna nascosto e la % torna quella base (55%)", condBadge.hidden === true && hitPct.textContent === "55%");
+
 // Barra iniziativa: una card per combattente. Si contano i figli VIVI del contenitore
 // (il registro globale del mini-DOM accumula le card di ogni render: non e' affidabile contarlo).
 const initBar = cercaClasse("bg3-initiative")[0];
 const cards = initBar.children;
 check("la barra iniziativa ha una card per combattente", cards.length === 2);
 check("la card del turno corrente e' evidenziata", cards.some(function (c) { return c.classList.contains("is-turn"); }));
+
+console.log("\n[Icone di condizione sulla barra iniziativa (modulo 30, opzionale)]");
+window.UltimateVTTConditions = {
+  Icone: { prono: "🩹" }, Etichette: { prono: "Prono" },
+  valutaCondizioni: () => ({ vantaggio: false, svantaggio: false, condizioniBersaglio: [], condizioniAttaccante: [] }),
+  condizioniDi: (id) => (id === "npc-1" ? [{ chiave: "prono", scadeAlRound: 5 }] : [])
+};
+H.render();
+const cardGoblinCond = initBar.children.find(function (c) { return c.classList.contains("is-enemy"); });
+const iconaCond = cardGoblinCond.children.find(function (ch) { return ch._class && ch._class.indexOf("bg3-init-cond") !== -1; });
+check("la card del Goblin (prono) mostra l'icona della condizione", !!iconaCond && iconaCond.textContent === "🩹");
+const cardEroeCond = initBar.children.find(function (c) { return c.classList.contains("is-pc"); });
+check("la card dell'Eroe (nessuna condizione) non mostra icone", !cardEroeCond.children.some(function (ch) { return ch._class && ch._class.indexOf("bg3-init-cond") !== -1; }));
+delete window.UltimateVTTConditions;
 
 // Click su un nemico nella barra => imposta il bersaglio via il select del combat.
 const sel = nuovoElemento("select"); sel.id = "moduleFiveTargetSelect";

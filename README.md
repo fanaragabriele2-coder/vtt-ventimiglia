@@ -35,7 +35,8 @@ vttg2506/
 │   ├── 26-bg3-shove.js                 ← azione Spingi: prova contrapposta, spinge il bersaglio di una cella
 │   ├── 27-bg3-surfaces.js              ← superfici fuoco/veleno: danno periodico ad area, GM-autorevoli
 │   ├── 28-bg3-elevation.js             ← terreno sopraelevato: vantaggio/svantaggio dalla quota
-│   └── 29-combat-memory.js             ← memoria di combattimento per il Master IA
+│   ├── 29-combat-memory.js             ← memoria di combattimento per il Master IA
+│   └── 30-bg3-conditions.js            ← condizioni di stato: prono/stordito/avvelenato
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -144,6 +145,22 @@ almeno una di svantaggio, si annullano (torna "normale"), altrimenti vince quell
 badge indipendenti (**🗡 Fiancheggiato** e **⛰ Terreno sopraelevato** / **⬇ Svantaggio di quota**)
 mostrati anche quando l'effetto netto è "normale", così il giocatore capisce perché si annullano.
 Comando IA: `{ command: "setElevation", cellX, cellY, radius, level }`.
+
+**Condizioni di stato (prono, stordito, avvelenato) — `js/30-bg3-conditions.js`
+(`UltimateVTTConditions`).** I moduli 26 (Spingi) e 27 (Superfici) segnalavano esplicitamente questa
+lacuna nei loro stessi commenti ("il gioco non ha ancora un sistema di condizioni/stati"): questo
+modulo la colma con un sottoinsieme volutamente ristretto delle condizioni 5e più riconoscibili in
+combattimento — **🩹 Prono** (chi lo subisce viene colpito con vantaggio; i suoi attacchi hanno
+svantaggio, semplificato senza la distinzione mischia/gittata della regola completa), **💫 Stordito**
+(chi lo subisce viene colpito con vantaggio) e **☠️ Avvelenato** (svantaggio sui propri attacchi).
+Ogni condizione ha una durata in round sul **round sincronizzato della FSM** (stesso pattern delle
+superfici) e scade automaticamente, in modo calcolabile da ogni client senza bisogno di un evento di
+rete per la rimozione. GM-autorevole fin da subito: solo il Master applica/rimuove una condizione
+(`ConditionSetEvent`/`ConditionClearedEvent`, propagati agli altri client). La HUD (23) la compone
+con fiancheggiamento ed elevazione secondo la stessa regola di sovrapposizione 5e, con un terzo badge
+dedicato e icone sulla barra iniziativa per un colpo d'occhio su chi ha quali condizioni attive.
+Comandi IA: `{ command: "applyCondition", targetId, condition, rounds }` /
+`{ command: "clearCondition", targetId, condition }`.
 
 ## Memoria di combattimento per il Master IA
 

@@ -49,6 +49,7 @@
 .bg3-init-hpfill { height: 100%; background: linear-gradient(90deg, #b23b2e, #e0603a); transition: width .25s; }
 .bg3-init-card.is-pc .bg3-init-hpfill { background: linear-gradient(90deg, #3f8f4f, #6fcf6f); }
 .bg3-init-hptext { display: block; margin-top: 2px; font-size: 10px; color: #b8ab90; text-align: right; }
+.bg3-init-cond { display: inline-block; margin-top: 1px; font-size: 11px; letter-spacing: 1px; }
 
 /* ---- Tray azioni in basso al centro ---- */
 .bg3-tray {
@@ -101,6 +102,13 @@
 .bg3-elev-badge.high { color: #2a1c02; background: #f0d472; }
 .bg3-elev-badge.low { color: #eaf3fb; background: rgba(91,140,183,.85); }
 .bg3-elev-badge[hidden] { display: none; }
+.bg3-cond-badge {
+  display: inline-block; margin-top: 2px; margin-left: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+  border-radius: 5px; letter-spacing: .02em;
+}
+.bg3-cond-badge.boost { color: #2a1c02; background: #f0d472; }
+.bg3-cond-badge.hinder { color: #eaf3fb; background: rgba(178,59,46,.85); }
+.bg3-cond-badge[hidden] { display: none; }
 .bg3-hit { display: flex; align-items: baseline; gap: 6px; }
 .bg3-hit-pct { font-size: 22px; font-weight: 800; line-height: 1; color: #f0d472; }
 .bg3-hit-pct.low { color: #e0603a; }

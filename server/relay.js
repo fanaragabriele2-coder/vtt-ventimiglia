@@ -53,6 +53,8 @@ const SOLO_MASTER = {
   TokenMappingEvent: true,
   SurfaceCreatedEvent: true,
   ElevationSetEvent: true,
+  ConditionSetEvent: true,
+  ConditionClearedEvent: true,
   StateSyncEvent: true
 };
 

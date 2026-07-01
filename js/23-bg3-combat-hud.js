@@ -132,6 +132,9 @@
     var elevBadge = el("div", "bg3-elev-badge", "");
     elevBadge.hidden = true;
     bTarget.appendChild(elevBadge);
+    var condBadge = el("div", "bg3-cond-badge", "");
+    condBadge.hidden = true;
+    bTarget.appendChild(condBadge);
     var hitRow = el("div", "bg3-hit");
     var hitPct = el("span", "bg3-hit-pct", "–");
     var hitMode = el("span", "bg3-hit-mode", "");
@@ -170,7 +173,7 @@
       hud: hud, initiative: initiative, feed: feed,
       pipAzione: pipAzione, pipBonus: pipBonus, pipReazione: pipReazione,
       movVal: movVal, movFill: movFill,
-      targetName: targetName, flankBadge: flankBadge, elevBadge: elevBadge, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
+      targetName: targetName, flankBadge: flankBadge, elevBadge: elevBadge, condBadge: condBadge, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
       modi: { normal: mNorm, advantage: mAdv, disadvantage: mDis },
       btnAttacca: btnAttacca, btnEnd: btnEnd
     };
@@ -299,6 +302,8 @@
 
       card.appendChild(el("span", "bg3-init-name", c.name || c.id));
       if (typeof c.initiative === "number" && c.initiative > 0) { card.appendChild(el("span", "bg3-init-init", String(c.initiative))); }
+      var iconeCondizioni = testoIconeCondizioni(c.id);
+      if (iconeCondizioni) { card.appendChild(el("span", "bg3-init-cond", iconeCondizioni)); }
 
       var track = el("div", "bg3-init-hptrack");
       var fill = el("div", "bg3-init-hpfill");
@@ -377,14 +382,39 @@
     catch (e) { return "normal"; }
   }
 
-  // Compone TUTTE le fonti di vantaggio/svantaggio disponibili (fiancheggiamento + elevazione, e la
-  // scelta manuale del giocatore) secondo la regola 5e: se c'e' almeno una fonte di ciascun segno,
-  // si annullano (torna "normale"). Usa il modulo 28 come combinatore se presente (stessa logica),
-  // altrimenti la replica qui in locale come fallback minimale.
-  function componiModalitaEffettiva(modalitaScelta, fiancheggiato, esitoElevazione) {
+  // Consulta il modulo 30 (se caricato) per le condizioni di stato attive (prono/stordito/
+  // avvelenato) su attaccante e bersaglio. Se il modulo non e' presente, nessun effetto (fallback).
+  var CONDIZIONI_VUOTE = { vantaggio: false, svantaggio: false, condizioniAttaccante: [], condizioniBersaglio: [] };
+  function condizioniCombattimento(attaccanteId, bersaglioId) {
+    var CN = window.UltimateVTTConditions;
+    if (!CN || typeof CN.valutaCondizioni !== "function") { return CONDIZIONI_VUOTE; }
+    try { return CN.valutaCondizioni(attaccanteId, bersaglioId) || CONDIZIONI_VUOTE; }
+    catch (e) { return CONDIZIONI_VUOTE; }
+  }
+
+  function testoCondizioni(chiavi) {
+    var CN = window.UltimateVTTConditions;
+    var icone = (CN && CN.Icone) || {};
+    var etichette = (CN && CN.Etichette) || {};
+    return (chiavi || []).map(function (k) { return (icone[k] || "") + " " + (etichette[k] || k); }).join(", ");
+  }
+
+  function testoIconeCondizioni(combattenteId) {
+    var CN = window.UltimateVTTConditions;
+    if (!CN || typeof CN.condizioniDi !== "function") { return ""; }
+    var attive; try { attive = CN.condizioniDi(combattenteId) || []; } catch (e) { attive = []; }
+    var icone = CN.Icone || {};
+    return attive.map(function (x) { return icone[x.chiave] || ""; }).join("");
+  }
+
+  // Compone TUTTE le fonti di vantaggio/svantaggio disponibili (fiancheggiamento + elevazione +
+  // condizioni di stato, e la scelta manuale del giocatore) secondo la regola 5e: se c'e' almeno
+  // una fonte di ciascun segno, si annullano (torna "normale"). Usa il modulo 28 come combinatore
+  // se presente (stessa logica), altrimenti la replica qui in locale come fallback minimale.
+  function componiModalitaEffettiva(modalitaScelta, fiancheggiato, esitoElevazione, condVantaggio, condSvantaggio) {
     var E = window.UltimateVTTElevation;
-    var haVantaggioExtra = Boolean(fiancheggiato) || esitoElevazione === "advantage";
-    var haSvantaggioExtra = esitoElevazione === "disadvantage";
+    var haVantaggioExtra = Boolean(fiancheggiato) || esitoElevazione === "advantage" || Boolean(condVantaggio);
+    var haSvantaggioExtra = esitoElevazione === "disadvantage" || Boolean(condSvantaggio);
     if (E && typeof E.componiModalita === "function") {
       try { return E.componiModalita(modalitaScelta, haVantaggioExtra, haSvantaggioExtra); } catch (e) { /* fallback sotto */ }
     }
@@ -403,6 +433,7 @@
       if (!bersaglio) { rif.targetName.textContent = "Nessun bersaglio"; rif.targetName.className = "bg3-target-empty"; }
       rif.flankBadge.hidden = true;
       rif.elevBadge.hidden = true;
+      rif.condBadge.hidden = true;
       rif.hitPct.textContent = "–";
       rif.hitPct.className = "bg3-hit-pct";
       rif.hitMode.textContent = "";
@@ -420,10 +451,23 @@
     if (esitoElev === "advantage") { rif.elevBadge.textContent = "⛰ Terreno sopraelevato"; rif.elevBadge.className = "bg3-elev-badge high"; }
     else if (esitoElev === "disadvantage") { rif.elevBadge.textContent = "⬇ Svantaggio di quota"; rif.elevBadge.className = "bg3-elev-badge low"; }
 
+    var cond = condizioniCombattimento(corrente.id, bersaglio.id);
+    if (cond.condizioniBersaglio.length) {
+      rif.condBadge.hidden = false;
+      rif.condBadge.textContent = testoCondizioni(cond.condizioniBersaglio);
+      rif.condBadge.className = "bg3-cond-badge boost";
+    } else if (cond.condizioniAttaccante.length) {
+      rif.condBadge.hidden = false;
+      rif.condBadge.textContent = testoCondizioni(cond.condizioniAttaccante) + " (tu)";
+      rif.condBadge.className = "bg3-cond-badge hinder";
+    } else {
+      rif.condBadge.hidden = true;
+    }
+
     var bonus = typeof corrente.attackBonus === "number" ? corrente.attackBonus : 0;
     var ca = typeof bersaglio.armorClass === "number" ? bersaglio.armorClass : 10;
     var modalitaScelta = st.rollMode || "normal";
-    var modalitaEff = componiModalitaEffettiva(modalitaScelta, fl.fiancheggiato, esitoElev);
+    var modalitaEff = componiModalitaEffettiva(modalitaScelta, fl.fiancheggiato, esitoElev, cond.vantaggio, cond.svantaggio);
     var p = probColpire(bonus, ca, modalitaEff);
     var pct = percento(p);
     rif.hitPct.textContent = pct + "%";
@@ -433,6 +477,8 @@
     if (fl.fiancheggiato) { fonti.push("fiancheggiamento"); }
     if (esitoElev === "advantage") { fonti.push("terreno"); }
     if (esitoElev === "disadvantage") { fonti.push("svantaggio di quota"); }
+    if (cond.vantaggio) { fonti.push("condizione bersaglio"); }
+    if (cond.svantaggio) { fonti.push("tua condizione"); }
     rif.hitMode.textContent = (modeText ? modeText + (fonti.length ? " (" + fonti.join(", ") + ")" : "") + " · " : "") + "+" + bonus + " vs CA " + ca;
 
     // Anteprima del danno previsto (media della formula del combattente di turno).
