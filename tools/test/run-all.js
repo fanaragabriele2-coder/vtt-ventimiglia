@@ -22,6 +22,8 @@ const suite = [
   ["Core: azione Spingi BG3 (modulo 26)", "core-bg3-shove.js"],
   ["Core: superfici fuoco/veleno BG3 (modulo 27)", "core-bg3-surfaces.js"],
   ["Core: terreno sopraelevato BG3 (modulo 28)", "core-bg3-elevation.js"],
+  ["Core: memoria di combattimento per il Master IA (modulo 29)", "core-combat-memory.js"],
+  ["Core: integrazione memoria Master IA con il vero js/12", "core-master-memory-integration.js"],
   // Livello multiplayer real-time (Fasi 1-3 + hardening).
   ["Smoke moduli 18/19/20", "smoke.js"],
   ["Sync turni / hydration / interpolazione", "sync.js"],

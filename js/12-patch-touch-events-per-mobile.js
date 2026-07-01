@@ -107,6 +107,20 @@
         lastError: ""
       };
       const groqChatHistory = [];
+      // Riepilogo dell'ultimo combattimento concluso (impostato dal modulo 29, "memoria di
+      // combattimento"): persiste oltre la finestra scorrevole di groqChatHistory (16 messaggi),
+      // cosi' il Master non lo "dimentica" dopo qualche scambio, e viene incluso anche nel prompt
+      // di Ollama, che altrimenti e' del tutto stateless (nessuna cronologia tra una chiamata e l'altra).
+      let ultimoRiepilogoCombattimento = "";
+
+      // Inietta un evento nella memoria REALE dell'IA (non solo nella chat visibile): stesso
+      // pattern gia' usato da passTurn() per la notifica di cambio turno, generalizzato per essere
+      // richiamabile da qualunque modulo tramite window.UltimateVTTCoreGameplay.notifyMasterMemory.
+      function pushSystemMemoria(text) {
+        if (groqMasterState.enabled && text) {
+          groqChatHistory.push({ role: "system", content: String(text) });
+        }
+      }
       const GROQ_HISTORY_LIMIT = 16;
 
       function getElement(id) {
@@ -305,6 +319,9 @@
           "Sei il Master di un gioco di ruolo fantasy in italiano, stile Baldur's Gate 3.",
           "Rispondi sempre in italiano con 1-3 frasi narrative, in prima persona come Master.",
           "Giocatore attivo: " + activeName + ".",
+          ultimoRiepilogoCombattimento
+            ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo): " + ultimoRiepilogoCombattimento.replace(/\n/g, " ")
+            : "",
           suggestionText,
           "Se riesci, rispondi con JSON valido: {\"reply\":\"testo narrativo\",\"roll\":null} oppure {\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}.",
           "Aggiungi \"teleportCity\":\"nome_luogo\" al JSON se il PG viaggia in citta. Aggiungi \"moveToken\":\"flee\" se fugge in modo tattico.",
@@ -539,6 +556,10 @@
           "",
           "SCHEDE DEI PERSONAGGI DEL PARTY (gia note):",
           buildPartySheetContext(),
+          "",
+          ultimoRiepilogoCombattimento
+            ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo, non chiedere cosa e' successo):\n" + ultimoRiepilogoCombattimento
+            : "",
           "",
           diceHint,
           "",
@@ -1419,6 +1440,16 @@
         },
         getDiceLockState: function getDiceLockState() {
           return cloneData(diceLockState);
+        },
+        // Iniettano un evento nella memoria REALE dell'IA (groqChatHistory), non solo nella chat
+        // visibile: usati dal modulo 29 (memoria di combattimento) per notificare al Master IA
+        // cosa e' successo in battaglia, cosi' puo' riprendere la narrazione in modo coerente.
+        notifyMasterMemory: pushSystemMemoria,
+        setUltimoRiepilogoCombattimento: function setUltimoRiepilogoCombattimento(testo) {
+          ultimoRiepilogoCombattimento = String(testo || "");
+        },
+        getUltimoRiepilogoCombattimento: function getUltimoRiepilogoCombattimentoSnapshot() {
+          return ultimoRiepilogoCombattimento;
         }
       };
 

@@ -34,7 +34,8 @@ vttg2506/
 │   ├── 25-bg3-flanking.js              ← fiancheggiamento: vantaggio se il bersaglio è preso tra due fuochi
 │   ├── 26-bg3-shove.js                 ← azione Spingi: prova contrapposta, spinge il bersaglio di una cella
 │   ├── 27-bg3-surfaces.js              ← superfici fuoco/veleno: danno periodico ad area, GM-autorevoli
-│   └── 28-bg3-elevation.js             ← terreno sopraelevato: vantaggio/svantaggio dalla quota
+│   ├── 28-bg3-elevation.js             ← terreno sopraelevato: vantaggio/svantaggio dalla quota
+│   └── 29-combat-memory.js             ← memoria di combattimento per il Master IA
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -143,6 +144,37 @@ almeno una di svantaggio, si annullano (torna "normale"), altrimenti vince quell
 badge indipendenti (**🗡 Fiancheggiato** e **⛰ Terreno sopraelevato** / **⬇ Svantaggio di quota**)
 mostrati anche quando l'effetto netto è "normale", così il giocatore capisce perché si annullano.
 Comando IA: `{ command: "setElevation", cellX, cellY, radius, level }`.
+
+## Memoria di combattimento per il Master IA
+
+Il Master IA (Groq/Ollama, `js/12`) **non riceveva mai** gli eventi di combattimento: attacchi,
+danni, sconfitte, loot, XP, reazioni, spinte, superfici ed elevazione venivano narrati solo nella
+chat **visibile** al giocatore, senza mai entrare nella cronologia (`groqChatHistory`) inviata
+all'IA — che quindi non "sapeva" cosa fosse successo in battaglia e non poteva riprendere la
+narrazione in modo coerente a scontro finito (poteva persino ignorare che ci fosse stato un
+combattimento).
+
+`js/29-combat-memory.js` (`UltimateVTTCombatMemory`) osserva per polling tutto ciò che accade
+durante un combattimento — via due percorsi complementari, per non perdere nulla indipendentemente
+dal pulsante/percorso UI usato:
+- **`combatState.lastEvent`**: cattura ogni attacco/danno/cura, sia dal tracker classico a due fasi
+  sia dalla HUD stile BG3, entrambi scrivono lì.
+- **Wrapping di `appendChatMessage`**: bufferizza la narrazione già prodotta da XP/loot (15), spawn
+  (16), reazioni (24), spinte (26), superfici (27) ed elevazione (28) mentre il combattimento è attivo.
+- **Rete di sicurezza sulle sconfitte**: confronta lo stato dei combattenti tick per tick, cosicché
+  una sconfitta viene rilevata indipendentemente da come sia stata causata (anche da un comando IA o
+  dal pannello GM, che non passano per gli altri due canali).
+
+Alla fine del combattimento, costruisce un **riepilogo conciso** (esito, round, sconfitti, HP finale
+del party, guadagni di XP/oro) e lo inietta nella **memoria reale** dell'IA tramite due nuove funzioni
+esposte da `js/12`:
+- `UltimateVTTCoreGameplay.notifyMasterMemory(testo)` — entra nella cronologia inviata a Groq.
+- `UltimateVTTCoreGameplay.setUltimoRiepilogoCombattimento(testo)` — resta disponibile anche oltre la
+  finestra scorrevole della cronologia (16 messaggi) ed è incluso nel **prompt di sistema** sia di
+  Groq sia di **Ollama** (altrimenti del tutto stateless, senza cronologia tra una chiamata e l'altra).
+
+Il riepilogo viene anche postato in chat come messaggio di sistema, così il giocatore vede lo stesso
+debrief. Testato sia in isolamento sia in **integrazione con il vero `js/12`** (non solo mock).
 
 ## Salvataggio e backup
 

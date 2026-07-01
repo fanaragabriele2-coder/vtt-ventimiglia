@@ -272,6 +272,16 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);
 
+    // --- Memoria di combattimento per il Master IA (modulo 29): a fine scontro il riepilogo deve
+    // raggiungere davvero il canale della memoria del Master IA nell'app reale (js/12), non solo
+    // nei test isolati in Node. ---
+    await gm.waitForFunction(() =>
+      window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.getUltimoRiepilogoCombattimento() !== "",
+      null, { timeout: 6000 });
+    const riepilogoReale = await gm.evaluate(() => window.UltimateVTTCoreGameplay.getUltimoRiepilogoCombattimento());
+    check("Memoria Master IA: il riepilogo di fine combattimento raggiunge davvero js/12", /RIEPILOGO DEL COMBATTIMENTO/.test(riepilogoReale));
+    check("Memoria Master IA: il riepilogo riporta un esito riconoscibile", /vittoria del party|sconfitta del party|combattimento interrotto/.test(riepilogoReale));
+
     // Disconnessione del giocatore -> il roster del GM torna a 1.
     await pl.click(".vtt-sess-btn:has-text('Disconnetti')");
     await gm.waitForFunction(() =>
