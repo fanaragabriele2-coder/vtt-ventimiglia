@@ -13,6 +13,7 @@ const suite = [
   // Moduli core (1-17): nessuna dipendenza dal livello multiplayer.
   ["Core: state manager PG (modulo 04)", "core-state.js"],
   ["Core: action economy / inventario (modulo 05)", "core-inventory.js"],
+  ["Core: inventario per-PG in hotseat (modulo 17)", "core-per-pg-inventory.js"],
   ["Core: combat tracker / dadi / danni (modulo 06)", "core-combat.js"],
   ["Core: XP & loot / level-up (modulo 15)", "core-progression.js"],
   ["Core: backup scaricabile / ripristino (modulo 11)", "core-backup.js"],

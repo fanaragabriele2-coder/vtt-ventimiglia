@@ -255,6 +255,16 @@ del combattente stesso è sempre quello fantasma `"pc-local"`. Le ricompense dir
 (`completeQuest`, tag `[XP:n]` in chat) continuano ad andare a chi è attivo ora, comportamento
 corretto per una ricompensa indirizzata a chi si sta parlando in quel momento.
 
+**Inventario per-PG: niente più zaini scambiati in hotseat (`js/17`).** Al cambio di personaggio
+attivo, `restoreFor(id)` ripristina l'inventario salvato del PG entrante o, se ha un "build" da
+creazione personaggio, applica il kit di classe — ma per un PG aggiunto al volo in hotseat
+("+ Aggiungi giocatore", `js/12`), che non passa da nessuno dei due percorsi, la funzione non faceva
+letteralmente nulla: lo zaino del PG **uscente** restava visibile e modificabile sotto l'identità del
+PG **entrante**. Corretto catturando all'avvio un kit di partenza di riferimento (lo stato iniziale
+di `UltimateVTTInventory`, prima di qualunque hydrate) e usandolo come fallback per chi non ha né
+inventario salvato né build — invece di ereditare in silenzio lo zaino di qualcun altro, un PG mai
+visto prima riparte da un kit pulito. Prima suite di test per questo modulo (nessuna esisteva).
+
 ## Salvataggio e backup
 
 Oltre al salvataggio in 3 slot su `localStorage` (pulsanti **Save**/**Load**), la toolbar
