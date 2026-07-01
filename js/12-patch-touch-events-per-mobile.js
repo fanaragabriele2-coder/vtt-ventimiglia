@@ -99,6 +99,11 @@
       };
 
       const groqMasterStorageKey = "ultimate-vtt-groq-api-key";
+      // Resta VUOTA nel sorgente del repository (nessun segreto in chiaro nel codice condiviso su
+      // GitHub): usata solo come fallback quando localStorage non ha ancora una chiave salvata, cosi'
+      // una copia locale/personale del file (mai committata) puo' avere una chiave pre-impostata
+      // senza dover toccare il meccanismo di attivazione/salvataggio, che resta identico.
+      const DEFAULT_GROQ_API_KEY = "";
       const groqMasterConfig = {
         endpoint: "https://api.groq.com/openai/v1/chat/completions",
         model: "llama-3.3-70b-versatile",
@@ -466,7 +471,7 @@
       }
 
       function readGroqApiKey() {
-        try { return window.localStorage.getItem(groqMasterStorageKey) || ""; } catch (e) { return ""; }
+        try { return window.localStorage.getItem(groqMasterStorageKey) || DEFAULT_GROQ_API_KEY || ""; } catch (e) { return DEFAULT_GROQ_API_KEY || ""; }
       }
 
       function writeGroqApiKey(key) {
