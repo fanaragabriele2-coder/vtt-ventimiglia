@@ -24,6 +24,8 @@ const suite = [
   ["Core: terreno sopraelevato BG3 (modulo 28)", "core-bg3-elevation.js"],
   ["Core: condizioni di stato BG3 (modulo 30)", "core-bg3-conditions.js"],
   ["Core: memoria di combattimento per il Master IA (modulo 29)", "core-combat-memory.js"],
+  ["Core: cambio automatico alla griglia tattica a inizio combattimento (modulo 31)", "core-combat-view-autoswitch.js"],
+  ["Core: diario di campagna a lungo termine per il Master IA (modulo 32)", "core-campaign-memory.js"],
   ["Core: integrazione memoria Master IA con il vero js/12", "core-master-memory-integration.js"],
   ["Core: memoria Master IA sopravvive a backup/ripristino (js/11 + js/12)", "core-backup-master-memory.js"],
   // Livello multiplayer real-time (Fasi 1-3 + hardening).

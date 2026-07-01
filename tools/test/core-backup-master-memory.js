@@ -99,10 +99,12 @@ CG.hydrate({
     { role: "user", content: "Attacco lo scheletro." },
     { role: "assistant", content: "Il colpo affonda nell'osso: lo scheletro crolla." }
   ],
-  ultimoRiepilogoCombattimento: "📋 RIEPILOGO DEL COMBATTIMENTO APPENA CONCLUSO:\nEsito: vittoria del party dopo 2 round.\nSconfitti: Scheletro."
+  ultimoRiepilogoCombattimento: "📋 RIEPILOGO DEL COMBATTIMENTO APPENA CONCLUSO:\nEsito: vittoria del party dopo 2 round.\nSconfitti: Scheletro.",
+  diarioDiCampagna: ["⚔️ Combattimento concluso — vittoria del party dopo 2 round.", "🧭 Il gruppo si sposta verso Porto Turistico."]
 });
 check("la cronologia impostata via hydrate e' visibile via getState", CG.getState().groqChatHistory.length === 2);
 check("il riepilogo impostato via hydrate e' visibile via getUltimoRiepilogoCombattimento", /vittoria del party dopo 2 round/.test(CG.getUltimoRiepilogoCombattimento()));
+check("il diario impostato via hydrate e' visibile via getDiarioCampagna", CG.getDiarioCampagna().length === 2);
 
 console.log("\n[Export su file: lo snapshot include la memoria del Master IA]");
 const esportato = B.exportSnapshotToFile();
@@ -110,11 +112,12 @@ check("exportSnapshotToFile ritorna ok:true", esportato.ok === true);
 check("lo snapshot esportato include coreGameplayState", !!esportato.snapshot.coreGameplayState);
 check("lo snapshot esportato include la cronologia Groq completa", esportato.snapshot.coreGameplayState.groqChatHistory.length === 2);
 check("lo snapshot esportato include il riepilogo dell'ultimo combattimento", /vittoria del party dopo 2 round/.test(esportato.snapshot.coreGameplayState.ultimoRiepilogoCombattimento));
+check("lo snapshot esportato include il diario di campagna completo", esportato.snapshot.coreGameplayState.diarioDiCampagna.length === 2);
 
 console.log("\n[Import da file: la memoria del Master IA viene ripristinata dopo essere stata azzerata]");
 // Simula un "ricaricamento della pagina": la memoria viene azzerata (nuovo stato in-memory).
-CG.hydrate({ groqChatHistory: [], ultimoRiepilogoCombattimento: "" });
-check("la memoria e' stata azzerata prima dell'import", CG.getState().groqChatHistory.length === 0 && CG.getUltimoRiepilogoCombattimento() === "");
+CG.hydrate({ groqChatHistory: [], ultimoRiepilogoCombattimento: "", diarioDiCampagna: [] });
+check("la memoria e' stata azzerata prima dell'import", CG.getState().groqChatHistory.length === 0 && CG.getUltimoRiepilogoCombattimento() === "" && CG.getDiarioCampagna().length === 0);
 
 const contenutoValido = JSON.stringify(esportato.snapshot);
 B.importSnapshotFromFile({ __content: contenutoValido }).then(function (risultato) {
@@ -123,6 +126,7 @@ B.importSnapshotFromFile({ __content: contenutoValido }).then(function (risultat
   check("dopo l'import la cronologia Groq e' di nuovo presente (2 voci)", CG.getState().groqChatHistory.length === 2);
   check("dopo l'import il riepilogo dell'ultimo combattimento e' di nuovo presente", /vittoria del party dopo 2 round/.test(CG.getUltimoRiepilogoCombattimento()));
   check("dopo l'import il contenuto della cronologia e' fedele all'originale", CG.getState().groqChatHistory[1].content === "Il colpo affonda nell'osso: lo scheletro crolla.");
+  check("dopo l'import il diario di campagna e' di nuovo presente (2 voci, fedeli)", CG.getDiarioCampagna().length === 2 && CG.getDiarioCampagna()[1] === "🧭 Il gruppo si sposta verso Porto Turistico.");
 
   console.log("\n[Import di uno snapshot senza memoria del Master IA (retrocompatibilita')]");
   const snapshotSenzaMemoria = Object.assign({}, esportato.snapshot);

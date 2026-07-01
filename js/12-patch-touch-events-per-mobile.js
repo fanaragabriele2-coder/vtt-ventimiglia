@@ -75,10 +75,14 @@
           defaultReply: "Il Master lascia correre la scena per un respiro, poi riporta l'attenzione su di te."
         }
       ];
+      // Modello scelto per stare comodo in ~6GB di VRAM (es. laptop con GPU mobile RTX 4050): un
+      // 12B come mistral-nemo in Q4 richiede piu' di 6GB solo per i pesi e sforerebbe, costringendo
+      // Ollama a scaricare parte del modello su CPU (molto piu' lento). llama3.1:8b in Q4 sta
+      // intorno ai 5GB e lascia margine per il resto del rendering (canvas, dadi 3D) sulla stessa GPU.
       const ollamaMasterConfig = {
         tagsEndpoint: "http://127.0.0.1:11434/api/tags",
         endpoint: "http://127.0.0.1:11434/api/chat",
-        model: "mistral-nemo:12b",
+        model: "llama3.1:8b",
         pingTimeoutMs: 2500,
         timeoutMs: 45000
       };
@@ -112,6 +116,23 @@
       // cosi' il Master non lo "dimentica" dopo qualche scambio, e viene incluso anche nel prompt
       // di Ollama, che altrimenti e' del tutto stateless (nessuna cronologia tra una chiamata e l'altra).
       let ultimoRiepilogoCombattimento = "";
+
+      // Diario di campagna a lungo termine (alimentato dal modulo 32, "memoria di campagna"): a
+      // differenza di ultimoRiepilogoCombattimento (un solo scontro, sovrascritto), qui si accumulano
+      // eventi chiave dell'INTERA sessione (combattimenti, spostamenti tra luoghi di Ventimiglia,
+      // level-up) — cosi' il Master resta coerente anche dopo ore di gioco, quando la cronologia
+      // scorrevole di Groq (16 messaggi) ha gia' fatto uscire scambi di molto tempo prima. Capato a
+      // un numero massimo di voci per non far esplodere il prompt (soprattutto verso Ollama locale,
+      // dove un prompt enorme rallenta molto su una GPU da laptop).
+      let diarioDiCampagna = [];
+      const DIARIO_CAMPAGNA_MAX_VOCI = 50;
+      function pushDiarioCampagna(testo) {
+        if (!testo) { return; }
+        diarioDiCampagna.push(String(testo));
+        if (diarioDiCampagna.length > DIARIO_CAMPAGNA_MAX_VOCI) {
+          diarioDiCampagna = diarioDiCampagna.slice(-DIARIO_CAMPAGNA_MAX_VOCI);
+        }
+      }
 
       // Inietta un evento nella memoria REALE dell'IA (non solo nella chat visibile): stesso
       // pattern gia' usato da passTurn() per la notifica di cambio turno, generalizzato per essere
@@ -319,6 +340,9 @@
           "Sei il Master di un gioco di ruolo fantasy in italiano, stile Baldur's Gate 3.",
           "Rispondi sempre in italiano con 1-3 frasi narrative, in prima persona come Master.",
           "Giocatore attivo: " + activeName + ".",
+          diarioDiCampagna.length
+            ? "DIARIO DI CAMPAGNA (eventi chiave di questa sessione, in ordine cronologico, tienine conto anche se lontani nella conversazione): " + diarioDiCampagna.join(" | ")
+            : "",
           ultimoRiepilogoCombattimento
             ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo): " + ultimoRiepilogoCombattimento.replace(/\n/g, " ")
             : "",
@@ -556,6 +580,10 @@
           "",
           "SCHEDE DEI PERSONAGGI DEL PARTY (gia note):",
           buildPartySheetContext(),
+          "",
+          diarioDiCampagna.length
+            ? "DIARIO DI CAMPAGNA (eventi chiave dell'INTERA sessione, in ordine cronologico — tienine conto per restare coerente anche dopo molti scambi, non solo con gli ultimi messaggi):\n" + diarioDiCampagna.map(function (voce) { return "- " + voce; }).join("\n")
+            : "",
           "",
           ultimoRiepilogoCombattimento
             ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo, non chiedere cosa e' successo):\n" + ultimoRiepilogoCombattimento
@@ -1451,14 +1479,22 @@
         getUltimoRiepilogoCombattimento: function getUltimoRiepilogoCombattimentoSnapshot() {
           return ultimoRiepilogoCombattimento;
         },
+        // Diario di campagna a lungo termine (usato dal modulo 32, "memoria di campagna"): eventi
+        // chiave dell'intera sessione (combattimenti, spostamenti, level-up), cosi' il Master resta
+        // coerente anche dopo ore di gioco e molti scambi, oltre la finestra scorrevole di Groq.
+        appendDiarioCampagna: pushDiarioCampagna,
+        getDiarioCampagna: function getDiarioCampagnaSnapshot() {
+          return diarioDiCampagna.slice();
+        },
         // Permettono al modulo di backup (js/11) di salvare/ripristinare la memoria del Master IA
-        // (cronologia Groq + riepilogo dell'ultimo combattimento) insieme al resto della partita:
-        // senza questo, ricaricare la pagina o importare un backup azzererebbe la memoria appena
-        // costruita dal modulo 29, vanificando la "ripartenza coerente" dopo un combattimento.
+        // (cronologia Groq, riepilogo dell'ultimo combattimento, diario di campagna) insieme al
+        // resto della partita: senza questo, ricaricare la pagina o importare un backup
+        // azzererebbe la memoria costruita dai moduli 29/32, vanificando la "ripartenza coerente".
         getState: function getState() {
           return {
             groqChatHistory: cloneData(groqChatHistory),
-            ultimoRiepilogoCombattimento: ultimoRiepilogoCombattimento
+            ultimoRiepilogoCombattimento: ultimoRiepilogoCombattimento,
+            diarioDiCampagna: diarioDiCampagna.slice()
           };
         },
         hydrate: function hydrate(snapshot) {
@@ -1475,6 +1511,11 @@
           }
           if (typeof snapshot.ultimoRiepilogoCombattimento === "string") {
             ultimoRiepilogoCombattimento = snapshot.ultimoRiepilogoCombattimento;
+          }
+          if (Array.isArray(snapshot.diarioDiCampagna)) {
+            diarioDiCampagna = snapshot.diarioDiCampagna
+              .filter(function (voce) { return typeof voce === "string"; })
+              .slice(-DIARIO_CAMPAGNA_MAX_VOCI);
           }
           return true;
         }

@@ -36,7 +36,9 @@ vttg2506/
 │   ├── 27-bg3-surfaces.js              ← superfici fuoco/veleno: danno periodico ad area, GM-autorevoli
 │   ├── 28-bg3-elevation.js             ← terreno sopraelevato: vantaggio/svantaggio dalla quota
 │   ├── 29-combat-memory.js             ← memoria di combattimento per il Master IA
-│   └── 30-bg3-conditions.js            ← condizioni di stato: prono/stordito/avvelenato
+│   ├── 30-bg3-conditions.js            ← condizioni di stato: prono/stordito/avvelenato
+│   ├── 31-combat-view-autoswitch.js    ← torna alla griglia tattica a inizio combattimento
+│   └── 32-campaign-memory.js           ← diario di campagna a lungo termine per il Master IA
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -199,6 +201,45 @@ della partita (`coreGameplayState` nello snapshot esportabile). Senza questo, ri
 importare un backup avrebbe azzerato la cronologia Groq e il riepilogo dell'ultimo combattimento
 appena costruiti — vanificando la "ripartenza coerente" anche fra una sessione e l'altra. Gli
 snapshot più vecchi (senza `coreGameplayState`) restano importabili senza errori.
+
+## Sessioni lunghe su un solo laptop: griglia tattica, memoria a lungo termine, modello locale
+
+Pensato per l'uso reale del tavolo: **un solo laptop** (Master + tutti i giocatori in hotseat sullo
+stesso browser, nessuna rete), sessioni che durano **ore**, sulla **mappa reale di Ventimiglia**.
+
+**`js/31-combat-view-autoswitch.js` (`UltimateVTTCombatViewSwitch`).** Il gioco ha tre superfici
+visive indipendenti, commutate SOLO a mano da un pulsante: la mappa reale di Ventimiglia
+(Leaflet/OSM, `window.VentimigliaMap`), l'esplorazione fullscreen "Campagna"
+(`window.VTTCampagna`) e la griglia tattica di combattimento (`UltimateVTTCanvas`, dietro `#vttCanvas`).
+`UltimateVTTCombat.startCombat()` non ne tocca nessuna — quindi se il Master sta guardando la mappa
+di Ventimiglia quando parte un combattimento (es. innescato automaticamente da uno spawn nemico,
+`js/16`), la griglia coi token e **tutti gli overlay BG3** (elevazione, superfici, condizioni,
+fiancheggiamento) restava invisibile dietro un div nascosto. Questo modulo osserva per polling la
+transizione "combattimento assente → attivo" e forza il ritorno alla griglia chiamando
+`deactivate()` sulle altre due superfici, se presenti. Non fa nulla alla fine del combattimento: il
+Master resta libero di tornare all'esplorazione quando vuole.
+
+**`js/32-campaign-memory.js` (`UltimateVTTCampaignMemory`).** Il modulo 29 risolve la memoria di UN
+combattimento, ma la cronologia inviata a Groq resta una finestra scorrevole di 16 messaggi: dopo
+ore di gioco (molti combattimenti, molti spostamenti) gli eventi più vecchi ne escono e il Master
+può "dimenticarli". Questo modulo accumula gli eventi chiave dell'**intera sessione** in un diario
+persistente e capato (max 50 voci), catturati per wrapping non invasivo su tre canali:
+- **Combattimenti conclusi**: intercetta `setUltimoRiepilogoCombattimento` (chiamata dal modulo 29)
+  e ne condensa solo la riga dell'esito, per non duplicare l'intero digest granulare nel diario.
+- **Level-up**: filtra i soli messaggi di sistema con prefisso `⭐ LIVELLO` (modulo 15).
+- **Spostamenti**: intercetta `VentimigliaMap.goTo`/`VTTCampagna.goToPlace`, così il Master ricorda
+  dove si trova/è stato il party anche dopo ore, non solo nell'ultimo scambio.
+
+Il diario viene iniettato nel prompt di sistema di **entrambi** Groq e Ollama (oltre al riepilogo
+dell'ultimo combattimento, che resta anche come riferimento rapido separato) e persiste tramite lo
+stesso `getState()`/`hydrate()` di `UltimateVTTCoreGameplay` — sopravvive quindi a ricarica pagina e
+backup/ripristino esattamente come la cronologia Groq.
+
+**Modello Ollama locale dimensionato per una GPU da laptop.** Il modello locale predefinito era
+`mistral-nemo:12b`, che in quantizzazione Q4 richiede più di 6GB di VRAM solo per i pesi — non sta
+comodamente su una GPU mobile come una RTX 4050 (6GB), costringendo Ollama a scaricare parte del
+modello su CPU (molto più lento) mentre la stessa GPU deve anche renderizzare canvas, dadi 3D e
+tutto il resto. Cambiato in `llama3.1:8b` (~5GB in Q4), che lascia margine per il resto del rendering.
 
 ## Salvataggio e backup
 

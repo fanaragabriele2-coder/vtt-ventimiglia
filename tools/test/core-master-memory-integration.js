@@ -129,6 +129,25 @@ check("dopo un combattimento reale, il riepilogo nel VERO js/12 e' stato aggiorn
 check("il nuovo riepilogo riporta la vittoria del party", /vittoria del party/.test(riepilogoFinale));
 check("il nuovo riepilogo menziona lo Scheletro sconfitto", /Scheletro/.test(riepilogoFinale) && /sconfitt/i.test(riepilogoFinale));
 
+console.log("\n[Diario di campagna a lungo termine (modulo 32): il ponte funziona nel vero js/12]");
+check("appendDiarioCampagna e' una funzione reale (non un mock)", typeof CG.appendDiarioCampagna === "function");
+check("getDiarioCampagna e' una funzione reale", typeof CG.getDiarioCampagna === "function");
+check("all'avvio il diario e' vuoto", CG.getDiarioCampagna().length === 0);
+
+carica("js/32-campaign-memory.js");
+const CM = window.UltimateVTTCampaignMemory;
+check("il modulo 32 si carica sopra il vero js/12 senza eccezioni", !!CM);
+CM._tick(); // avvolge setUltimoRiepilogoCombattimento/appendChatMessage sul vero js/12
+
+// Il combattimento simulato sopra ha gia' chiamato CG.setUltimoRiepilogoCombattimento (via modulo 29):
+// dato che il wrap del modulo 32 e' avvenuto DOPO, quella chiamata non e' stata intercettata (corretto:
+// rispecchia l'ordine reale di caricamento in index.html, 29 prima di 32). Se ne simula una nuova.
+CG.setUltimoRiepilogoCombattimento("Esito: vittoria del party dopo 5 round; sconfitti: Bandito.\nAltri dettagli qui.");
+check("il diario riceve una voce condensata dopo un nuovo riepilogo di combattimento", CG.getDiarioCampagna().some(v => /vittoria del party dopo 5 round/.test(v)));
+
+CG.appendChatMessage("system", "⭐ LIVELLO 2! Eroe sale di livello: +8 HP max, competenza +1.");
+check("il diario riceve una voce dopo un level-up reale", CG.getDiarioCampagna().some(v => /LIVELLO 2/.test(v)));
+
 M.fermaSampler();
 console.log("\nRisultato core-master-memory-integration: " + passati + " passati, " + falliti + " falliti.");
 process.exit(falliti === 0 ? 0 : 1);
