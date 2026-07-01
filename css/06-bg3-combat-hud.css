@@ -89,6 +89,11 @@
 /* bersaglio + percentuale di colpire (la "70%" di BG3) */
 .bg3-target { min-width: 150px; }
 .bg3-target-name { font-weight: 700; color: #ffb9a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.bg3-flank-badge {
+  display: inline-block; margin-top: 2px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+  color: #2a1c02; background: #f0d472; border-radius: 5px; letter-spacing: .02em;
+}
+.bg3-flank-badge[hidden] { display: none; }
 .bg3-hit { display: flex; align-items: baseline; gap: 6px; }
 .bg3-hit-pct { font-size: 22px; font-weight: 800; line-height: 1; color: #f0d472; }
 .bg3-hit-pct.low { color: #e0603a; }

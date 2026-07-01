@@ -126,6 +126,9 @@
     bTarget.appendChild(el("div", "bg3-block-label", "Bersaglio"));
     var targetName = el("div", "bg3-target-name", "");
     bTarget.appendChild(targetName);
+    var flankBadge = el("div", "bg3-flank-badge", "🗡 Fiancheggiato");
+    flankBadge.hidden = true;
+    bTarget.appendChild(flankBadge);
     var hitRow = el("div", "bg3-hit");
     var hitPct = el("span", "bg3-hit-pct", "–");
     var hitMode = el("span", "bg3-hit-mode", "");
@@ -164,7 +167,7 @@
       hud: hud, initiative: initiative, feed: feed,
       pipAzione: pipAzione, pipBonus: pipBonus, pipReazione: pipReazione,
       movVal: movVal, movFill: movFill,
-      targetName: targetName, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
+      targetName: targetName, flankBadge: flankBadge, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
       modi: { normal: mNorm, advantage: mAdv, disadvantage: mDis },
       btnAttacca: btnAttacca, btnEnd: btnEnd
     };
@@ -351,11 +354,22 @@
     if (acceso) { pip.root.classList.add("on"); } else { pip.root.classList.remove("on"); }
   }
 
+  // Consulta il modulo 25 (se caricato) per sapere se il bersaglio e' fiancheggiato dall'attaccante
+  // di turno: in tal caso il tiro ha vantaggio (regola 5e opzionale, sempre attiva in BG3), che si
+  // annulla con uno svantaggio gia' scelto. Se il modulo non e' presente, nessun effetto (fallback).
+  function fiancheggiamento(attaccanteId, bersaglioId) {
+    var F = window.UltimateVTTFlanking;
+    if (!F || typeof F.valutaFiancheggiamento !== "function") { return { fiancheggiato: false, alleatoId: null }; }
+    try { return F.valutaFiancheggiamento(attaccanteId, bersaglioId) || { fiancheggiato: false, alleatoId: null }; }
+    catch (e) { return { fiancheggiato: false, alleatoId: null }; }
+  }
+
   function renderBersaglioEColpo(st, corrente, bersaglio) {
     if (!corrente || !bersaglio || bersaglio.id === corrente.id || bersaglio.defeated) {
       rif.targetName.textContent = bersaglio ? (bersaglio.name || bersaglio.id) : "";
       rif.targetName.className = "bg3-target-name";
       if (!bersaglio) { rif.targetName.textContent = "Nessun bersaglio"; rif.targetName.className = "bg3-target-empty"; }
+      rif.flankBadge.hidden = true;
       rif.hitPct.textContent = "–";
       rif.hitPct.className = "bg3-hit-pct";
       rif.hitMode.textContent = "";
@@ -365,14 +379,21 @@
     rif.targetName.className = "bg3-target-name";
     rif.targetName.textContent = (bersaglio.name || bersaglio.id) + "  " + Math.max(0, bersaglio.hitPoints) + "/" + (bersaglio.maxHitPoints || bersaglio.hitPoints);
 
+    var fl = fiancheggiamento(corrente.id, bersaglio.id);
+    rif.flankBadge.hidden = !fl.fiancheggiato;
+
     var bonus = typeof corrente.attackBonus === "number" ? corrente.attackBonus : 0;
     var ca = typeof bersaglio.armorClass === "number" ? bersaglio.armorClass : 10;
-    var p = probColpire(bonus, ca, st.rollMode || "normal");
+    var modalitaScelta = st.rollMode || "normal";
+    var F = window.UltimateVTTFlanking;
+    var modalitaEff = (fl.fiancheggiato && F && typeof F.modalitaEffettiva === "function")
+      ? F.modalitaEffettiva(modalitaScelta, true) : modalitaScelta;
+    var p = probColpire(bonus, ca, modalitaEff);
     var pct = percento(p);
     rif.hitPct.textContent = pct + "%";
     rif.hitPct.className = "bg3-hit-pct" + (pct <= 35 ? " low" : pct >= 70 ? " high" : "");
-    var modeText = st.rollMode === "advantage" ? "vantaggio" : st.rollMode === "disadvantage" ? "svantaggio" : "";
-    rif.hitMode.textContent = (modeText ? modeText + " · " : "") + "+" + bonus + " vs CA " + ca;
+    var modeText = modalitaEff === "advantage" ? "vantaggio" : modalitaEff === "disadvantage" ? "svantaggio" : "";
+    rif.hitMode.textContent = (modeText ? modeText + (fl.fiancheggiato && modalitaEff === "advantage" ? " (fiancheggiamento)" : "") + " · " : "") + "+" + bonus + " vs CA " + ca;
 
     // Anteprima del danno previsto (media della formula del combattente di turno).
     var formula = corrente.damageFormula || "";

@@ -30,7 +30,8 @@ vttg2506/
 │   ├── 21-session-panel.js             ← UI: pannello di sessione multiplayer
 │   ├── 22-network-game-events.js       ← routing di rete: HP/danni, nebbia, spawn nemici
 │   ├── 23-bg3-combat-hud.js            ← HUD combattimento stile BG3 (iniziativa, % colpire, danno, azioni)
-│   └── 24-bg3-reactions.js            ← attacchi di opportunità / reazioni (stile BG3)
+│   ├── 24-bg3-reactions.js             ← attacchi di opportunità / reazioni (stile BG3)
+│   └── 25-bg3-flanking.js              ← fiancheggiamento: vantaggio se il bersaglio è preso tra due fuochi
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -81,9 +82,17 @@ disponibile, quel nemico effettua un attacco di opportunità (tiro per colpire +
 del PG passa per l'action economy del modulo 05; quella dei PNG è gestita internamente e si rinnova a
 ogni round. La logica decisionale è una funzione pura testabile (`attacchiOpportunita(...)`).
 
-La matematica di colpire/danno e la logica delle reazioni sono esposte come funzioni pure testabili
-(`UltimateVTTBG3HUD.probColpire/dannoMedio`, `UltimateVTTReactions.attacchiOpportunita`) e coperte da
-`tools/test/core-bg3-hud.js` e `tools/test/core-bg3-reactions.js`.
+**Fiancheggiamento (flanking) — `js/25-bg3-flanking.js` (`UltimateVTTFlanking`).** Se un alleato
+dell'attaccante occupa la cella opposta al bersaglio (lato o angolo opposto, entrambi adiacenti al
+bersaglio), l'attacco ha **vantaggio** — regola 5e opzionale, sempre attiva in BG3. Un badge
+**🗡 Fiancheggiato** compare nella HUD e la % di colpire riflette il vantaggio (si annulla se il
+giocatore ha scelto manualmente svantaggio, come da regola 5e). Modulo di sola logica: la HUD (23)
+lo consulta se presente, ma funziona anche senza.
+
+La matematica di colpire/danno e la logica di reazioni/fiancheggiamento sono esposte come funzioni
+pure testabili (`UltimateVTTBG3HUD.probColpire/dannoMedio`, `UltimateVTTReactions.attacchiOpportunita`,
+`UltimateVTTFlanking.staFiancheggiando/trovaAlleatoFiancheggiante`) e coperte da
+`tools/test/core-bg3-hud.js`, `tools/test/core-bg3-reactions.js` e `tools/test/core-bg3-flanking.js`.
 
 ## Salvataggio e backup
 

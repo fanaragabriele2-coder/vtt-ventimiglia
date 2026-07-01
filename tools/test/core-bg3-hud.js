@@ -117,6 +117,24 @@ check("il pannello mostra la percentuale di colpire del PG sul bersaglio (55%)",
 combat.rollMode = "advantage";
 H.render();
 check("con vantaggio la percentuale mostrata sale (80%)", hitPct.textContent === "80%");
+combat.rollMode = "normal";
+
+console.log("\n[Integrazione con il fiancheggiamento (modulo 25, opzionale)]");
+const flankBadge = cercaClasse("bg3-flank-badge")[0];
+check("il badge di fiancheggiamento esiste ma e' nascosto senza il modulo 25", flankBadge && flankBadge.hidden === true);
+
+// Simula il modulo 25 presente e che segnali fiancheggiamento (come farebbe con 2 alleati opposti).
+window.UltimateVTTFlanking = {
+  valutaFiancheggiamento: () => ({ fiancheggiato: true, alleatoId: "pc-2" }),
+  modalitaEffettiva: (scelta, fiancheggiato) => (fiancheggiato ? "advantage" : scelta)
+};
+H.render();
+check("con il modulo 25 presente il badge di fiancheggiamento compare", flankBadge.hidden === false);
+check("il fiancheggiamento eleva la % di colpire come un vantaggio (55% -> 80%) pur con tiro Normale", hitPct.textContent === "80%");
+
+delete window.UltimateVTTFlanking;
+H.render();
+check("senza il modulo 25 il badge torna nascosto e la % torna quella base (55%)", flankBadge.hidden === true && hitPct.textContent === "55%");
 
 // Barra iniziativa: una card per combattente. Si contano i figli VIVI del contenitore
 // (il registro globale del mini-DOM accumula le card di ogni render: non e' affidabile contarlo).
