@@ -98,11 +98,24 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Azione del nemico di turno: avvicinati e attacca, poi concludi il turno.
+  // Azione del nemico di turno: avvicinati e attacca, poi concludi il turno. L'attacco preferisce
+  // la versione ANIMATA (stessa HUD dei dadi del giocatore: "Eldon, sai quanti danni ti fa il
+  // Goblin?" — ora si vede), il cui completamento e' un evento esplicito (onComplete), non un
+  // ritardo indovinato: il turno del nemico prosegue SOLO quando l'animazione e' davvero finita.
   // ---------------------------------------------------------------------------
   function terminaTurno() {
     var C = combat();
     if (C && typeof C.nextTurn === "function") { try { C.nextTurn(); } catch (e) { /* ignora */ } }
+    inCorso = false;
+  }
+
+  function risolviAttaccoNemico(C, attaccanteId, bersaglioId) {
+    if (C && typeof C.resolveAttackAnimatoTra === "function") {
+      C.resolveAttackAnimatoTra(attaccanteId, bersaglioId, "normal", terminaTurno);
+      return; // terminaTurno() arrivera' come callback a fine animazione
+    }
+    if (C && typeof C.resolveAttackBetween === "function") { C.resolveAttackBetween(attaccanteId, bersaglioId, "normal"); }
+    terminaTurno();
   }
 
   function agisciNemico(stato, cur) {
@@ -129,16 +142,15 @@
         dist = (npcCell && pcCell) ? chebyshev(npcCell, pcCell) : 999;
       }
       if (dist <= 1) {
-        if (C && typeof C.resolveAttackBetween === "function") { C.resolveAttackBetween(cur.id, bersaglio.id, "normal"); }
+        risolviAttaccoNemico(C, cur.id, bersaglio.id);
       } else {
         annuncia("🛡 " + cur.name + " non riesce a raggiungere " + bersaglio.name + " e resta in guardia.");
+        terminaTurno();
       }
     } else {
       // Nessuna posizione nota (nessuna griglia/token): il PNG attacca comunque in mischia.
-      if (C && typeof C.resolveAttackBetween === "function") { C.resolveAttackBetween(cur.id, bersaglio.id, "normal"); }
+      risolviAttaccoNemico(C, cur.id, bersaglio.id);
     }
-
-    terminaTurno();
   }
 
   // ---------------------------------------------------------------------------
@@ -169,8 +181,15 @@
     if (chiave === ultimaChiaveTurno) { return; }
     ultimaChiaveTurno = chiave;
 
+    // inCorso resta true finche' il turno non e' DAVVERO concluso: con l'attacco animato questo
+    // puo' succedere in modo asincrono (a fine animazione dadi, via terminaTurno come callback),
+    // non subito al ritorno di agisciNemico — altrimenti il tick successivo (300ms dopo) potrebbe
+    // far ripartire l'IA su un turno gia' "in volo". terminaTurno() e' l'UNICO punto che rimette
+    // inCorso a false (sia nel percorso sincrono sia in quello animato); qui si resetta solo se
+    // agisciNemico lancia un'eccezione PRIMA di programmare l'animazione (altrimenti resterebbe
+    // bloccato per sempre).
     inCorso = true;
-    try { agisciNemico(stato, cur); } catch (e) { /* non bloccare il loop */ } finally { inCorso = false; }
+    try { agisciNemico(stato, cur); } catch (e) { inCorso = false; /* non bloccare il loop */ }
   }
 
   // ---------------------------------------------------------------------------

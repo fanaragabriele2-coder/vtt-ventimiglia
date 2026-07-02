@@ -170,11 +170,24 @@ Comandi IA: `{ command: "applyCondition", targetId, condition, rounds }` /
 succedeva nulla**: il nemico restava immobile e il giocatore doveva premere "Termina turno" al suo
 posto. Ora i nemici agiscono da soli: al proprio turno scelgono il PG vivo più vicino, si avvicinano
 sulla griglia (fino a ~6 celle, metrica Chebyshev, fermandosi su una cella adiacente) e, se a portata
-di mischia, lo attaccano davvero — tiro per colpire + danni reali via `UltimateVTTCombat.
-resolveAttackBetween` — poi concludono il turno. GM-autorevole (solo il Master, o il gioco in
-solitaria/hotseat dove `Sync` è assente, pilota i PNG, così in multiplayer non è ogni client a tirare
-dadi propri). Un'azione per tick con una pausa leggibile tra un nemico e l'altro; se il PG è a terra
-non manda i turni a vuoto (decide il Master). Coperto da unit test e da un check E2E in browser reale.
+di mischia, lo attaccano davvero — tiro per colpire + danni reali — poi concludono il turno.
+GM-autorevole (solo il Master, o il gioco in solitaria/hotseat dove `Sync` è assente, pilota i PNG,
+così in multiplayer non è ogni client a tirare dadi propri). Un'azione per tick con una pausa
+leggibile tra un nemico e l'altro; se il PG è a terra non manda i turni a vuoto (decide il Master).
+Coperto da unit test e da un check E2E in browser reale.
+
+**L'attacco dei nemici mostra i dadi (`js/06` + `js/33`).** Prima l'attacco di un PNG si risolveva
+in silenzio (`resolveAttackBetween`): il giocatore vedeva solo l'esito nel log, senza capire quanto
+danno stesse subendo né come fosse stato calcolato. Ora l'IA usa la stessa HUD animata a due fasi del
+giocatore (`resolveAttackAnimatoTra`, in `js/06`): tiro per colpire con dado che gira, poi — se
+colpisce — tiro per i danni, entrambi con lo stesso pannello `#attackPhaseHud` usato per gli attacchi
+del PG. Il turno del PNG **non avanza finché l'animazione non è davvero conclusa**: l'avanzamento
+(`nextTurn`) è agganciato a un callback esplicito (`onComplete`), non a un timer indovinato scollegato
+dallo stato reale dell'HUD — così non può succedere che l'IA riparta su un turno "ancora in volo" se
+un tick arriva mentre i dadi stanno ancora animando. Verificato sia nei test isolati (mock di
+`resolveAttackAnimatoTra` che trattiene `onComplete` per simulare l'animazione in corso) sia in
+browser reale (E2E: l'HUD compare durante il turno del PNG, il turno avanza solo a fine animazione, e
+l'HUD si richiude da sola).
 
 Tre correzioni collegate al combattimento, tutte richieste dall'uso reale:
 - **Nessun nemico predefinito (`js/06`):** il tracker partiva con 3 PNG fissi (Goblin/Bandito/

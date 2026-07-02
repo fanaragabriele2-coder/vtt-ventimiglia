@@ -332,9 +332,11 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
 
     // --- IA dei nemici (modulo 33): al turno di un PNG, sul Master, il nemico agisce da solo. Con
     // il campionamento fermato all'inizio, si invoca _tick() in modo deterministico: si porta il
-    // turno su un PNG vivo, si registrano gli HP del PG, si esegue un tick e si verifica che il
-    // nemico abbia agito (il turno e' avanzato; e/o il PG ha subito danni se il nemico era a portata). ---
-    const aiEsito = await gm.evaluate(() => {
+    // turno su un PNG vivo e si esegue un tick. L'attacco ora usa l'HUD dadi ANIMATA (stessa del
+    // giocatore, cosi' si vede quanti danni fa il nemico): il turno del PNG avanza solo a fine
+    // animazione, in modo asincrono, quindi si attende con waitForFunction invece di leggere lo
+    // stato subito dopo _tick(). ---
+    const aiSetup = await gm.evaluate(() => {
       const C = window.UltimateVTTCombat;
       // Avvicina un goblin al PG cosi' l'attacco e' a portata, e porta il turno a quel goblin.
       const st = C.getState();
@@ -350,12 +352,29 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       while (guard++ < 12) { const s = C.getState(); if (s.combatants[s.currentTurnIndex] && s.combatants[s.currentTurnIndex].id === goblin.id) break; C.nextTurn(); }
       const roundPrima = C.getState().round;
       const idxPrima = C.getState().currentTurnIndex;
-      // Un tick reale dell'IA: il goblin deve agire e concludere il turno.
+      // Un tick reale dell'IA: il goblin deve iniziare ad agire (attacco animato in corso).
       window.UltimateVTTEnemyAI._tick();
-      const dopo = C.getState();
-      return { ok: true, avanzato: (dopo.currentTurnIndex !== idxPrima) || (dopo.round !== roundPrima) };
+      return { ok: true, roundPrima, idxPrima };
     });
-    check("IA nemici: al turno di un PNG il nemico agisce e conclude il turno (turno avanzato)", aiEsito.ok === true && aiEsito.avanzato === true);
+    check("IA nemici: setup del turno del PNG riuscito", aiSetup.ok === true);
+
+    await gm.waitForFunction(() => {
+      const hud = document.getElementById("attackPhaseHud");
+      return hud && hud.classList.contains("is-visible");
+    }, null, { timeout: 4000 });
+    check("IA nemici: l'attacco del PNG mostra l'HUD dadi animata (si vedono i danni che infligge)", true);
+
+    await gm.waitForFunction(([roundPrima, idxPrima]) => {
+      const s = window.UltimateVTTCombat.getState();
+      return s.currentTurnIndex !== idxPrima || s.round !== roundPrima;
+    }, [aiSetup.roundPrima, aiSetup.idxPrima], { timeout: 6000 });
+    check("IA nemici: a fine animazione il turno del PNG avanza davvero (nextTurn via onComplete)", true);
+
+    const hudChiusa = await gm.evaluate(() => {
+      const hud = document.getElementById("attackPhaseHud");
+      return !hud || !hud.classList.contains("is-visible");
+    });
+    check("IA nemici: l'HUD dadi si richiude da sola a fine animazione", hudChiusa === true);
 
     await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });

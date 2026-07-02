@@ -881,6 +881,99 @@
         }, 42);
       }
 
+      /* ---- Attacco animato tra due combattenti SPECIFICI (usato dall'IA nemici, modulo 33): stessa
+         HUD dei dadi del giocatore (tiro per colpire -> tiro per i danni), ma pilotata per id invece
+         che dal turno corrente/dai campi del form, e senza bisogno di click per proseguire tra le
+         fasi — al termine (colpito o mancato) chiama onComplete(), cosi' chi la invoca (l'IA) sa
+         quando puo' passare al turno successivo invece di indovinare un ritardo fisso scollegato
+         dall'animazione vera. Un pulsante "Chiudi" resta disponibile per chi vuole saltare l'attesa. ---- */
+      var PAUSA_TRA_FASI_MS = 650;
+      var PAUSA_RISULTATO_MS = 1100;
+
+      function resolveAttackAnimatoTra(attackerId, targetId, mode, onComplete) {
+        var attacker = getCombatant(attackerId);
+        var target = getCombatant(targetId);
+        var chiuso = false;
+        function fine() {
+          if (chiuso) { return; }
+          chiuso = true;
+          closeAttackHud();
+          if (typeof onComplete === "function") { onComplete(); }
+        }
+        if (!attacker || !target) { fine(); return; }
+
+        var rollMode = (mode === "advantage" || mode === "disadvantage") ? mode : "normal";
+        openAttackHud(attacker.name + " attacca " + target.name + "!");
+        var attackRoll = rollD20WithMode(rollMode);
+        var attackBonus = attacker.attackBonus || 0;
+        var attackTotal = attackRoll.chosen + attackBonus;
+        var critical = Boolean(attackRoll.naturalTwenty);
+        var automaticMiss = attackRoll.naturalOne;
+        var targetAc = typeof target.armorClass === "number" ? target.armorClass : 10;
+        var hit = !automaticMiss && (critical || attackTotal >= targetAc);
+        var modeText = rollMode === "normal" ? "" :
+                       rollMode === "advantage" ? " [Vant. " + attackRoll.rolls.join("/") + "]" :
+                       " [Svant. " + attackRoll.rolls.join("/") + "]";
+
+        spinAphudDie(20, attackRoll.chosen, function () {
+          var rollLine = "d20 " + attackRoll.chosen + modeText + " + " + attackBonus +
+                         " = <span class='big'>" + attackTotal + "</span> vs CA " + targetAc;
+          var resultLine = critical
+            ? "<span class='crit'>✦ COLPO CRITICO!</span>"
+            : automaticMiss
+              ? "<span class='miss'>✕ Fallimento critico</span>"
+              : hit
+                ? "<span class='hit'>✔ Colpito!</span>"
+                : "<span class='miss'>✗ Mancato (CA " + targetAc + ")</span>";
+          aphudLines("<b>" + attacker.name + "</b> → <b>" + target.name + "</b><br>" + rollLine + "<br>" + resultLine);
+          aphudBtn("Chiudi", "style='opacity:.6'", fine);
+
+          if (!hit) {
+            combatState.lastRoll.title = attacker.name + " vs " + target.name;
+            combatState.lastRoll.detail = "d20 " + attackRoll.chosen + "+" + attackBonus + "=" + attackTotal + " vs CA " + targetAc + ": mancato.";
+            combatState.lastEvent = combatState.lastRoll.detail;
+            appendLog(combatState.lastRoll.detail);
+            renderCombat();
+            window.setTimeout(fine, PAUSA_RISULTATO_MS);
+            return;
+          }
+
+          window.setTimeout(function () {
+            if (chiuso) { return; } // gia' chiuso (es. click su "Chiudi" durante la pausa)
+            openAttackHud("Tiro per i danni" + (critical ? " — CRITICO" : ""));
+            var damageRoll = rollDamageFormula(attacker.damageFormula || "1d4", critical);
+            var firstDie = (String(attacker.damageFormula || "1d4").match(/d(\d+)/) || [null, "6"])[1];
+            var firstRoll = damageRoll.details[0] && damageRoll.details[0].rolls
+                            ? damageRoll.details[0].rolls[0] : damageRoll.total;
+
+            spinAphudDie(parseInt(firstDie, 10) || 6, firstRoll, function () {
+              applyDamageToCombatant(target.id, damageRoll.total);
+
+              var dmgDesc = describeDamageRoll(damageRoll);
+              var targetNow = getCombatant(target.id);
+              var hpText = targetNow ? targetNow.hitPoints + " / " + targetNow.maxHitPoints + " HP" : "";
+              var defeatedText = targetNow && targetNow.defeated ? " — <span class='crit'>SCONFITTO</span>" : "";
+
+              aphudLines(
+                (critical ? "<span class='crit'>✦ Dadi raddoppiati!</span><br>" : "") +
+                "Danni: <span class='big dmg'>" + damageRoll.total + "</span><br>" +
+                "<span style='font-size:11px;opacity:.75'>" + dmgDesc + "</span><br>" +
+                "<b>" + target.name + "</b>: " + hpText + defeatedText
+              );
+              aphudBtn("Chiudi", "", fine);
+
+              combatState.lastRoll.title = attacker.name + " vs " + target.name;
+              combatState.lastRoll.detail = "COLPITO! Danni: " + damageRoll.total + " (" + dmgDesc + ")." + (critical ? " CRITICO!" : "");
+              combatState.lastEvent = combatState.lastRoll.detail;
+              appendLog(combatState.lastRoll.detail);
+              setTargetFromCombatant(target.id);
+              renderCombat();
+              window.setTimeout(fine, PAUSA_RISULTATO_MS);
+            });
+          }, PAUSA_TRA_FASI_MS);
+        });
+      }
+
       /* FASE 1: tiro per colpire */
       function resolveAttackStep1(forceCritical) {
         syncPlayerCombatantFromState();
@@ -1370,8 +1463,11 @@
         // flusso che mostra davvero i dadi al giocatore. La HUD BG3 (modulo 23) lo usa se presente,
         // cosi' cliccare "Attacca" fa vedere il tiro invece di risolvere tutto in silenzio.
         resolveAttackAnimato: resolveAttackStep1,
-        // Attacco diretto tra due combattenti (usato dall'IA nemici, modulo 33).
+        // Attacco diretto tra due combattenti (usato dall'IA nemici, modulo 33): risoluzione
+        // immediata (senza HUD, per test/automazioni) e versione animata con la stessa HUD dei
+        // dadi del giocatore, che avvisa onComplete() quando l'animazione e' davvero finita.
         resolveAttackBetween: resolveAttackBetween,
+        resolveAttackAnimatoTra: resolveAttackAnimatoTra,
         // Incoscienza/rialzo dei PG e chiusura forzata (TPK) — Regola 5.
         reviveCombatant: reviveCombatant,
         resetCombat: resetCombat,

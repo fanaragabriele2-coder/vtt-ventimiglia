@@ -137,6 +137,34 @@ AI._tick();
 check("un client giocatore (non Master) non fa agire i nemici", attacchiRisolti.length === 0 && turniAvanzati === 0);
 window.UltimateVTTSync = undefined;
 
+// ---------------------------------------------------------------------------
+// Attacco ANIMATO (HUD dadi): il turno del nemico deve avanzare SOLO quando
+// l'animazione segnala davvero la fine (onComplete), non subito al rientro
+// della funzione — altrimenti un tick successivo potrebbe far ripartire l'IA
+// su un turno gia' "in volo" (VINCOLO NEGATIVO 2: niente timer ciechi).
+// ---------------------------------------------------------------------------
+console.log("\n[Attacco animato: il turno resta 'in volo' finche' l'animazione non chiama onComplete]");
+resetStato();
+tokens = [{ id: "token-pc", cellX: 10, cellY: 10 }, { id: "token-npc-1", cellX: 11, cellY: 10 }]; // gia' adiacente
+let onCompletePendente = null;
+window.UltimateVTTCombat.resolveAttackAnimatoTra = (attId, tgtId, mode, onComplete) => {
+  attacchiRisolti.push({ attId, tgtId, animato: true });
+  onCompletePendente = onComplete; // NON chiamato subito: simula l'animazione ancora in corso
+};
+AI._reset();
+AI._tick();
+check("l'attacco animato e' stato invocato", attacchiRisolti.length === 1 && attacchiRisolti[0].animato === true);
+check("il turno NON e' ancora avanzato: l'animazione e' ancora in corso", turniAvanzati === 0);
+
+AI._tick(); // un tick arriva mentre l'animazione e' ancora in volo
+check("un tick durante l'animazione non fa ripartire l'IA (nessun nuovo attacco)", attacchiRisolti.length === 1);
+check("il turno resta 'in volo': ancora nessun avanzamento", turniAvanzati === 0);
+
+onCompletePendente(); // l'animazione dei dadi finisce davvero ora
+check("solo ORA, a fine animazione, il turno avanza (nextTurn chiamato)", turniAvanzati === 1);
+
+delete window.UltimateVTTCombat.resolveAttackAnimatoTra;
+
 AI.fermaSampler();
 console.log("\nRisultato core-enemy-ai: " + passati + " passati, " + falliti + " falliti.");
 process.exit(falliti === 0 ? 0 : 1);
