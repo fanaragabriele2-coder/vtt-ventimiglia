@@ -354,6 +354,7 @@
           suggestionText,
           "Se riesci, rispondi con JSON valido: {\"reply\":\"testo narrativo\",\"roll\":null} oppure {\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}.",
           "Aggiungi \"teleportCity\":\"nome_luogo\" al JSON se il PG viaggia in citta. Aggiungi \"moveToken\":\"flee\" se fugge in modo tattico.",
+          "Se compaiono nemici o inizia uno scontro, aggiungi \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] al JSON (bestiario: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin). NON risolvere tu gli attacchi ne' contare gli HP: il combattimento lo gestisce il gioco.",
           "Se non riesci col JSON, scrivi solo il testo narrativo della risposta, senza nient'altro.",
           "Usa il campo roll solo quando l'azione del giocatore ha un rischio reale. Stat consentite: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco."
         ].filter(Boolean).join("\n");
@@ -608,7 +609,8 @@
           "{\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}",
           "SPOSTAMENTO SULLA MAPPA: quando il party si reca o arriva in un luogo preciso di Ventimiglia, aggiungi al JSON \"moveTo\":\"nome esatto del luogo\". Il token del PG si spostera' in QUEL punto della mappa reale. Usa SOLO questi luoghi: " + ((window.VTTCampagna && window.VTTCampagna.places) ? window.VTTCampagna.places().join(", ") : "Stazione FS, Citta Alta, Porto Turistico, Forte dell'Annunziata") + ".",
           "Aggiungi \"moveToken\":\"flee\" se il PG fugge in modo tattico.",
-          "QUANDO COMPAIONO NEMICI: aggiungi al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] elencando i nemici che appaiono nella scena. I nemici compariranno sulla mappa vicino al party e nel tracker di combattimento.",
+          "QUANDO COMPAIONO NEMICI O INIZIA UNO SCONTRO: aggiungi SEMPRE al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] con i nemici della scena. Il gioco li fara' comparire sulla griglia tattica e avviera' il combattimento a turni (iniziativa, dadi, HUD stile Baldur's Gate 3).",
+          "IN COMBATTIMENTO NON risolvere MAI tu gli attacchi e NON inventare o tenere il conto degli HP: tiri per colpire, danni, iniziativa e turni li gestisce il sistema di combattimento del gioco. Tu descrivi solo la scena e le intenzioni dei nemici, e riprendi la narrazione quando il sistema ti riporta l'esito dello scontro.",
           "Bestiario disponibile per spawn: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin.",
           "Stat valide: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco"
         ].join("\n");

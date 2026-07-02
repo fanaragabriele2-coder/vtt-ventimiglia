@@ -363,6 +363,19 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       document.querySelectorAll(".vtt-sess-peer").length === 1, null, { timeout: 6000 });
     check("GM roster: dopo disconnessione del Giocatore torna a 1", true);
 
+    // --- Ponte chat->combattimento (modulo 34): se il Master IA narra uno scontro SENZA emettere
+    // il campo JSON "spawn" (caso reale osservato: "Goblin 1: 5/5 HP * Goblin 2..." con Combat: off),
+    // il combat system deve attivarsi comunque, con i nemici giusti. Eseguito per ULTIMO: lo spawn
+    // fa avanzare i contatori degli id di combattenti/token, e farlo prima della connessione del
+    // Giocatore desincronizzerebbe gli id generati sulle due pagine (i test di rete assumono che
+    // entrambe partano dagli stessi contatori). ---
+    const primaDelPonte = await gm.evaluate(() => window.UltimateVTTCombat.getState().combatants.filter(c => c.kind === "npc").length);
+    await gm.evaluate(() =>
+      window.UltimateVTTCoreGameplay.appendChatMessage("master", "Un'imboscata! Tre goblin sbucano dai vicoli e vi attaccano: tirate l'iniziativa!"));
+    await gm.waitForFunction(() => window.UltimateVTTCombat.getState().active === true, null, { timeout: 4000 });
+    const dopoIlPonte = await gm.evaluate(() => window.UltimateVTTCombat.getState().combatants.filter(c => c.kind === "npc").length);
+    check("Ponte chat→combattimento: la narrazione del Master attiva il combat system con 3 goblin", dopoIlPonte - primaDelPonte === 3);
+
     codice = falliti === 0 ? 0 : 1;
   } catch (e) {
     console.log("  ECCEZIONE: " + (e && e.message));

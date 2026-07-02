@@ -39,7 +39,8 @@ vttg2506/
 │   ├── 30-bg3-conditions.js            ← condizioni di stato: prono/stordito/avvelenato
 │   ├── 31-combat-view-autoswitch.js    ← torna alla griglia tattica a inizio combattimento
 │   ├── 32-campaign-memory.js           ← diario di campagna a lungo termine per il Master IA
-│   └── 33-enemy-ai.js                  ← IA dei nemici: al loro turno si avvicinano e attaccano
+│   ├── 33-enemy-ai.js                  ← IA dei nemici: al loro turno si avvicinano e attaccano
+│   └── 34-chat-combat-bridge.js        ← ponte chat Master → combat system (spawn dalla narrazione)
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -190,6 +191,25 @@ Tre correzioni collegate al combattimento, tutte richieste dall'uso reale:
   erano mappati ai combattenti (`npc-N`) — l'euristica della FSM copre solo `token-npc-N`. Senza
   questo collegamento l'IA dei nemici (e le azioni BG3 mirate: spinta, superfici, elevazione) non
   trovavano la posizione del nemico sulla griglia. Ora lo spawn registra la mappatura esplicita.
+
+**Ponte chat Master → combat system — `js/34-chat-combat-bridge.js`
+(`UltimateVTTChatCombatBridge`).** Caso reale osservato in partita: il Master IA narrava un intero
+combattimento in prosa ("Il combattimento è iniziato! Goblin 1: 5/5 HP * Goblin 2..." con attacchi
+risolti a parole e HP inventati) **senza** emettere il campo JSON `spawn` — così il vero combat
+system restava spento ("Combat: off") mentre la chat raccontava una battaglia che il gioco non
+stava giocando. Il problema è attaccato da due lati:
+- **Lato IA (`js/12`):** il prompt di sistema di Groq e Ollama ora impone di emettere **sempre**
+  `spawn` quando compaiono nemici e di **non risolvere mai** gli attacchi né tenere il conto degli
+  HP in prosa — tiri, danni, iniziativa e turni sono del motore di gioco (che a fine scontro gli
+  riporta l'esito, via modulo 29).
+- **Lato motore (`js/34`):** rete di sicurezza — osserva ogni risposta del Master (wrapping di
+  `appendChatMessage`, stesso pattern dei moduli 29/32) e, se a combattimento spento il testo
+  annuncia uno scontro con creature note del bestiario ("tre goblin vi attaccano!", elenchi
+  "Goblin 1… Goblin 4", numeri in cifra o parola), fa comparire **davvero** quei nemici via
+  `VTTSpawn.spawn` — che avvia combattimento, HUD BG3, iniziativa e IA dei nemici. L'elaborazione è
+  ritardata di ~350ms: se il campo JSON `spawn` c'era, al momento del controllo il combattimento è
+  già attivo e il ponte non duplica nulla. GM-autorevole (`isMasterOrSolo`), nessun falso positivo
+  su menzioni pacifiche (serve una parola di scontro oltre al nome della creatura).
 
 ## Memoria di combattimento per il Master IA
 

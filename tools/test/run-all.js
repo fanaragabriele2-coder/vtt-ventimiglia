@@ -26,6 +26,7 @@ const suite = [
   ["Core: terreno sopraelevato BG3 (modulo 28)", "core-bg3-elevation.js"],
   ["Core: condizioni di stato BG3 (modulo 30)", "core-bg3-conditions.js"],
   ["Core: IA dei nemici / turno automatico PNG (modulo 33)", "core-enemy-ai.js"],
+  ["Core: ponte chat Master -> combat system (modulo 34)", "core-chat-combat-bridge.js"],
   ["Core: memoria di combattimento per il Master IA (modulo 29)", "core-combat-memory.js"],
   ["Core: cambio automatico alla griglia tattica a inizio combattimento (modulo 31)", "core-combat-view-autoswitch.js"],
   ["Core: diario di campagna a lungo termine per il Master IA (modulo 32)", "core-campaign-memory.js"],
