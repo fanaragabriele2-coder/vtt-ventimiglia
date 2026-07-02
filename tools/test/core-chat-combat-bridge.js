@@ -64,8 +64,12 @@ check("'hobgoblin' NON viene contato anche come 'goblin' (word boundary)", (func
 check("menzione pacifica senza parole di scontro -> null (nessun falso positivo)", B.rilevaNemiciDaTesto("Un goblin mercante vi saluta cordialmente e vi offre della frutta.") === null);
 check("parole di scontro ma nessuna creatura nota -> null", B.rilevaNemiciDaTesto("Il combattimento tra le due fazioni infuria in lontananza.") === null);
 check("testo vuoto/assente -> null, non lancia", B.rilevaNemiciDaTesto("") === null && B.rilevaNemiciDaTesto(null) === null);
-check("il conteggio e' capato a 8 ('venti goblin' via elenco numerato 'Goblin 20')", (function () {
-  const l = B.rilevaNemiciDaTesto("Vi attaccano! Goblin 20 guida l'orda.");
+check("UNA sola menzione 'goblin 8' e' il NOME di un nemico, NON un conteggio di 8 (caso reale: 'attacco goblin 8' rievocava un'orda)", (function () {
+  const l = B.rilevaNemiciDaTesto("Eldon, il tuo attacco contro goblin 8 va a segno ma i Goblin si preparano a contrattaccare!");
+  return l && l[0].name === "Goblin" && l[0].count === 1;
+})());
+check("un vero elenco numerato (almeno 2 indici distinti) resta un conteggio, capato a 8", (function () {
+  const l = B.rilevaNemiciDaTesto("Vi attaccano! Goblin 1 apre la marcia e Goblin 20 guida l'orda.");
   return l && l[0].count === 8;
 })());
 

@@ -60,11 +60,14 @@
   // FUNZIONI PURE (testabili)
   // ---------------------------------------------------------------------------
   function contaCreatura(testo, voce) {
-    // 1) "Goblin 1 ... Goblin 4" (elenchi numerati): il massimo indice e' il conteggio.
+    // 1) "Goblin 1 ... Goblin 4" (elenchi numerati): il massimo indice e' il conteggio — ma SOLO
+    // se gli indici distinti sono almeno DUE (un vero elenco). Una singola menzione "goblin 8"
+    // e' quasi sempre il NOME di un nemico gia' esistente ("attacco goblin 8"), non un conteggio:
+    // interpretarla come 8 creature evocava un'orda a ogni messaggio che citava quel nemico.
     var reIndice = new RegExp("\\b" + voce.singolare + "\\s+(\\d{1,2})\\b", "gi");
-    var max = 0, m;
-    while ((m = reIndice.exec(testo))) { max = Math.max(max, parseInt(m[1], 10)); }
-    if (max > 0) { return Math.min(8, max); }
+    var indici = {}, max = 0, m;
+    while ((m = reIndice.exec(testo))) { var idx = parseInt(m[1], 10); indici[idx] = true; max = Math.max(max, idx); }
+    if (Object.keys(indici).length >= 2) { return Math.min(8, max); }
     // 2) "tre goblin", "4 banditi": numero (cifra o parola) davanti al nome.
     var reNumero = new RegExp("\\b(\\d{1,2}|un|uno|una|due|tre|quattro|cinque|sei|sette|otto)\\s+(?:" + voce.singolare + "|" + voce.plurale + ")\\b", "i");
     m = reNumero.exec(testo);

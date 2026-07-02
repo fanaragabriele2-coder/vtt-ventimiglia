@@ -209,7 +209,24 @@ stava giocando. Il problema è attaccato da due lati:
   `VTTSpawn.spawn` — che avvia combattimento, HUD BG3, iniziativa e IA dei nemici. L'elaborazione è
   ritardata di ~350ms: se il campo JSON `spawn` c'era, al momento del controllo il combattimento è
   già attivo e il ponte non duplica nulla. GM-autorevole (`isMasterOrSolo`), nessun falso positivo
-  su menzioni pacifiche (serve una parola di scontro oltre al nome della creatura).
+  su menzioni pacifiche (serve una parola di scontro oltre al nome della creatura); una singola
+  menzione "goblin 8" è il **nome** di un nemico, non un conteggio (serve un vero elenco con almeno
+  due indici distinti).
+
+**In combattimento comanda SOLO l'interfaccia di combattimento.** Tre regole che tengono chat e
+motore ognuno al proprio posto durante uno scontro:
+- **La chat del Master è in pausa (`js/12`):** a combattimento attivo `handlePlayerPrompt` blocca
+  l'invio con un messaggio-guida ("gestisci lo scontro dall'interfaccia: bersaglio, Attacca,
+  Termina turno") e si riattiva da sola a scontro finito — quando il Master riceve il riepilogo
+  (modulo 29) e riprende la narrazione da lì. Senza questa pausa il Master risolveva gli attacchi
+  in prosa in parallelo al motore (HP inventati, dadi chiesti in chat) e ogni sua risposta
+  rischiava di rievocare nemici.
+- **Lo spawn è ignorato a combattimento già attivo (`js/16`):** il Master IA, istruito a emettere
+  `spawn` quando compaiono nemici, tendeva a ripeterlo in ogni risposta sullo scontro in corso —
+  ogni messaggio aggiungeva un'altra ondata di goblin duplicati. I nemici si evocano solo
+  all'inizio dello scontro.
+- **Annuncio raggruppato:** "⚔️ Nemici comparsi: 3× Goblin, 1× Orco!" invece del nome ripetuto per
+  ogni copia.
 
 ## Memoria di combattimento per il Master IA
 

@@ -1078,6 +1078,19 @@
       }
 
       async function handlePlayerPrompt(text, isAutoRoll) {
+        // ⚔️ Durante un combattimento la chat del Master e' IN PAUSA: lo scontro si gioca solo
+        // nell'interfaccia di combattimento (HUD BG3: bersaglio, Attacca, Termina turno), i turni
+        // dei nemici li gioca l'IA (modulo 33) e a scontro finito il Master riceve il riepilogo
+        // (modulo 29) e riprende la narrazione da li'. Senza questa pausa il Master risolveva gli
+        // attacchi in prosa in parallelo al motore (HP inventati, dadi chiesti in chat) e ogni sua
+        // risposta rischiava di rievocare nemici, mandando in conflitto chat e combat system.
+        try {
+          var statoCombattimento = window.UltimateVTTCombat && window.UltimateVTTCombat.getState && window.UltimateVTTCombat.getState();
+          if (statoCombattimento && statoCombattimento.active) {
+            appendMasterChatMessage("system", "⚔️ Combattimento in corso: la chat del Master è in pausa. Gestisci lo scontro dall'interfaccia di combattimento (clicca un nemico per bersagliarlo, poi Attacca / Spingi / Termina turno). Il Master riprenderà la narrazione a scontro finito.");
+            return;
+          }
+        } catch (errorePausaCombattimento) { /* in dubbio, non bloccare la chat */ }
         const request = isAutoRoll ? null : inferMasterRollRequest(text);
 
         if (!isAutoRoll) {

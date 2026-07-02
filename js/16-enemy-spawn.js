@@ -33,6 +33,13 @@
     var Combat = window.UltimateVTTCombat, TP = window.UltimateVTTTokenPhysics;
     if (!Combat || !Combat.addNpc) return;
 
+    // A combattimento GIA' attivo lo spawn viene IGNORATO: il Master IA, istruito a emettere
+    // "spawn" quando compaiono nemici, tendeva a ripeterlo in OGNI risposta sullo scontro in corso
+    // (non sa che sono gia' comparsi) — ogni messaggio aggiungeva un'altra ondata di goblin
+    // duplicati al tracker. I nemici si evocano SOLO all'inizio dello scontro; a scontro finito
+    // il Master puo' evocarne di nuovi per un nuovo combattimento.
+    try { if (Combat.getState && Combat.getState().active) return; } catch (eAttivo) {}
+
     var base = pcCell();
     var offsets = [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[1,1],[-1,1],[1,-1],[-1,-1],[2,1],[-2,-1]];
     var k = 0, names = [];
@@ -69,7 +76,11 @@
 
     // Avvia il combattimento (con l'iniziativa che ora include i nemici) solo se non e' gia' attivo.
     try { var cs = Combat.getState(); if (!cs.active && Combat.startCombat) Combat.startCombat(); } catch (e) {}
-    try { if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) window.UltimateVTTCoreGameplay.appendChatMessage("system", "⚔️ Nemici comparsi: " + names.join(", ") + "! Apri FIGHT per il combattimento."); } catch (e) {}
+    // Annuncio raggruppato ("3× Goblin, 1× Orco"), non un nome ripetuto per ogni copia.
+    var perNome = {};
+    names.forEach(function(n){ perNome[n] = (perNome[n] || 0) + 1; });
+    var annuncio = Object.keys(perNome).map(function(n){ return perNome[n] + "× " + n; }).join(", ");
+    try { if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) window.UltimateVTTCoreGameplay.appendChatMessage("system", "⚔️ Nemici comparsi: " + annuncio + "! Il combattimento ha inizio."); } catch (e) {}
     try { if (window.VTTCampagna && window.VTTCampagna.isActive && window.VTTCampagna.isActive() && window.VTTCampagna.spawnEnemyNearPg) window.VTTCampagna.spawnEnemyNearPg(names); } catch (e) {}
     return names;
   }
