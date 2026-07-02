@@ -1,0 +1,149 @@
+/* --- HUD di combattimento stile Baldur's Gate 3 (modulo 23) --- */
+/* Classi prefissate .bg3- per non collidere col resto dell'app. Visibile solo in combattimento. */
+
+.bg3-hud[hidden] { display: none !important; }
+
+/* ---- Barra iniziativa in alto al centro ---- */
+.bg3-initiative {
+  position: fixed;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8000;
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  max-width: 86vw;
+  overflow-x: auto;
+  background: linear-gradient(180deg, rgba(18, 14, 10, .82), rgba(9, 7, 6, .9));
+  border: 1px solid rgba(200, 155, 60, .45);
+  border-radius: 10px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .5);
+  font: 12px/1.2 system-ui, sans-serif;
+}
+.bg3-init-card {
+  position: relative;
+  min-width: 86px;
+  padding: 5px 7px 6px;
+  border-radius: 8px;
+  background: rgba(36, 32, 28, .7);
+  border: 1px solid rgba(255, 255, 255, .08);
+  cursor: default;
+  flex: 0 0 auto;
+}
+.bg3-init-card.is-enemy { cursor: pointer; }
+.bg3-init-card.is-enemy:hover { border-color: rgba(255, 120, 90, .7); }
+.bg3-init-card.is-turn { border-color: #f0d472; box-shadow: 0 0 0 1px #f0d472, 0 0 14px rgba(240, 212, 114, .35); }
+.bg3-init-card.is-target { outline: 2px solid #ff7a5a; outline-offset: 1px; }
+.bg3-init-card.is-down { opacity: .4; filter: grayscale(1); }
+.bg3-init-name {
+  display: block; font-weight: 700; color: #ecdfc2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px;
+}
+.bg3-init-card.is-pc .bg3-init-name { color: #9fd0ff; }
+.bg3-init-card.is-enemy .bg3-init-name { color: #ffb9a8; }
+.bg3-init-init {
+  position: absolute; top: 3px; right: 5px; font-size: 10px; color: #c89b3c; font-weight: 700;
+}
+.bg3-init-hptrack { height: 6px; margin-top: 4px; border-radius: 4px; background: rgba(0, 0, 0, .55); overflow: hidden; }
+.bg3-init-hpfill { height: 100%; background: linear-gradient(90deg, #b23b2e, #e0603a); transition: width .25s; }
+.bg3-init-card.is-pc .bg3-init-hpfill { background: linear-gradient(90deg, #3f8f4f, #6fcf6f); }
+.bg3-init-hptext { display: block; margin-top: 2px; font-size: 10px; color: #b8ab90; text-align: right; }
+.bg3-init-cond { display: inline-block; margin-top: 1px; font-size: 11px; letter-spacing: 1px; }
+
+/* ---- Tray azioni in basso al centro ---- */
+.bg3-tray {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8000;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(24, 20, 16, .92), rgba(8, 6, 5, .96));
+  border: 1px solid rgba(200, 155, 60, .5);
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .6);
+  color: #d8c7a3;
+  font: 12px/1.3 system-ui, sans-serif;
+}
+.bg3-block { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 8px; }
+.bg3-block + .bg3-block { border-left: 1px solid rgba(255, 255, 255, .1); }
+.bg3-block-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #c89b3c; }
+
+/* economia azioni: 3 pip */
+.bg3-pips { display: flex; gap: 6px; }
+.bg3-pip { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8a8378; }
+.bg3-pip .dot { width: 11px; height: 11px; border-radius: 50%; background: #2c2722; border: 1px solid rgba(255,255,255,.18); }
+.bg3-pip.on { color: #ecdfc2; }
+.bg3-pip.on.azione .dot { background: #5bb7c8; box-shadow: 0 0 7px rgba(91,183,200,.7); }
+.bg3-pip.on.bonus .dot { background: #c89b3c; box-shadow: 0 0 7px rgba(200,155,60,.7); }
+.bg3-pip.on.reazione .dot { background: #7bd47b; box-shadow: 0 0 7px rgba(123,212,123,.6); }
+
+/* movimento */
+.bg3-move-val { font-weight: 700; color: #ecdfc2; }
+.bg3-move-track { width: 110px; height: 6px; border-radius: 4px; background: rgba(0,0,0,.55); overflow: hidden; }
+.bg3-move-fill { height: 100%; background: linear-gradient(90deg, #5bb7c8, #9fe0ea); transition: width .2s; }
+
+/* bersaglio + percentuale di colpire (la "70%" di BG3) */
+.bg3-target { min-width: 150px; }
+.bg3-target-name { font-weight: 700; color: #ffb9a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.bg3-flank-badge {
+  display: inline-block; margin-top: 2px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+  color: #2a1c02; background: #f0d472; border-radius: 5px; letter-spacing: .02em;
+}
+.bg3-flank-badge[hidden] { display: none; }
+.bg3-elev-badge {
+  display: inline-block; margin-top: 2px; margin-left: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+  border-radius: 5px; letter-spacing: .02em;
+}
+.bg3-elev-badge.high { color: #2a1c02; background: #f0d472; }
+.bg3-elev-badge.low { color: #eaf3fb; background: rgba(91,140,183,.85); }
+.bg3-elev-badge[hidden] { display: none; }
+.bg3-cond-badge {
+  display: inline-block; margin-top: 2px; margin-left: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+  border-radius: 5px; letter-spacing: .02em;
+}
+.bg3-cond-badge.boost { color: #2a1c02; background: #f0d472; }
+.bg3-cond-badge.hinder { color: #eaf3fb; background: rgba(178,59,46,.85); }
+.bg3-cond-badge[hidden] { display: none; }
+.bg3-hit { display: flex; align-items: baseline; gap: 6px; }
+.bg3-hit-pct { font-size: 22px; font-weight: 800; line-height: 1; color: #f0d472; }
+.bg3-hit-pct.low { color: #e0603a; }
+.bg3-hit-pct.high { color: #7bd47b; }
+.bg3-hit-mode { font-size: 10px; color: #b8ab90; }
+.bg3-dmg { margin-top: 2px; font-size: 11px; color: #e0b88a; }
+.bg3-target-empty { color: #8a8378; font-size: 11px; }
+
+/* selettore modalità tiro */
+.bg3-modes { display: flex; gap: 4px; }
+.bg3-mode-btn {
+  padding: 4px 8px; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .03em; cursor: pointer;
+  color: #cdbf9f; background: rgba(40, 36, 30, .85); border: 1px solid rgba(255,255,255,.14); border-radius: 6px;
+}
+.bg3-mode-btn.active { color: #2a1c02; background: #f0d472; border-color: #f0d472; }
+
+/* pulsanti azione principali */
+.bg3-actions { display: flex; align-items: center; gap: 8px; }
+.bg3-btn {
+  padding: 9px 14px; font: 800 12px/1 system-ui, sans-serif; letter-spacing: .03em; cursor: pointer;
+  border-radius: 9px; border: 1px solid rgba(200,155,60,.7);
+  color: #f0d472; background: linear-gradient(180deg, rgba(80,50,5,.85), rgba(30,18,2,.95));
+}
+.bg3-btn:hover { border-color: #f0d472; }
+.bg3-btn:disabled { opacity: .4; cursor: not-allowed; }
+.bg3-btn.attack { color: #ffe0d6; border-color: rgba(200,80,60,.8); background: linear-gradient(180deg, rgba(120,40,28,.9), rgba(60,16,10,.96)); }
+.bg3-btn.endturn { color: #cfe6c3; border-color: rgba(120,180,110,.6); background: linear-gradient(180deg, rgba(40,80,40,.9), rgba(15,40,18,.96)); }
+.bg3-btn.shove { color: #cfe4f0; border-color: rgba(91,155,183,.7); background: linear-gradient(180deg, rgba(28,60,80,.9), rgba(10,26,36,.96)); }
+
+/* feed dell'ultimo tiro */
+.bg3-feed {
+  position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%); z-index: 7999;
+  max-width: 70vw; padding: 6px 12px; border-radius: 8px;
+  background: rgba(9, 7, 6, .8); border: 1px solid rgba(255,255,255,.1);
+  color: #e8dcc0; font: 12px/1.35 system-ui, sans-serif; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bg3-feed[hidden] { display: none; }

@@ -75,10 +75,14 @@
           defaultReply: "Il Master lascia correre la scena per un respiro, poi riporta l'attenzione su di te."
         }
       ];
+      // Modello scelto per stare comodo in ~6GB di VRAM (es. laptop con GPU mobile RTX 4050): un
+      // 12B come mistral-nemo in Q4 richiede piu' di 6GB solo per i pesi e sforerebbe, costringendo
+      // Ollama a scaricare parte del modello su CPU (molto piu' lento). llama3.1:8b in Q4 sta
+      // intorno ai 5GB e lascia margine per il resto del rendering (canvas, dadi 3D) sulla stessa GPU.
       const ollamaMasterConfig = {
         tagsEndpoint: "http://127.0.0.1:11434/api/tags",
         endpoint: "http://127.0.0.1:11434/api/chat",
-        model: "mistral-nemo:12b",
+        model: "llama3.1:8b",
         pingTimeoutMs: 2500,
         timeoutMs: 45000
       };
@@ -95,6 +99,11 @@
       };
 
       const groqMasterStorageKey = "ultimate-vtt-groq-api-key";
+      // Resta VUOTA nel sorgente del repository (nessun segreto in chiaro nel codice condiviso su
+      // GitHub): usata solo come fallback quando localStorage non ha ancora una chiave salvata, cosi'
+      // una copia locale/personale del file (mai committata) puo' avere una chiave pre-impostata
+      // senza dover toccare il meccanismo di attivazione/salvataggio, che resta identico.
+      const DEFAULT_GROQ_API_KEY = "";
       const groqMasterConfig = {
         endpoint: "https://api.groq.com/openai/v1/chat/completions",
         model: "llama-3.3-70b-versatile",
@@ -107,6 +116,37 @@
         lastError: ""
       };
       const groqChatHistory = [];
+      // Riepilogo dell'ultimo combattimento concluso (impostato dal modulo 29, "memoria di
+      // combattimento"): persiste oltre la finestra scorrevole di groqChatHistory (16 messaggi),
+      // cosi' il Master non lo "dimentica" dopo qualche scambio, e viene incluso anche nel prompt
+      // di Ollama, che altrimenti e' del tutto stateless (nessuna cronologia tra una chiamata e l'altra).
+      let ultimoRiepilogoCombattimento = "";
+
+      // Diario di campagna a lungo termine (alimentato dal modulo 32, "memoria di campagna"): a
+      // differenza di ultimoRiepilogoCombattimento (un solo scontro, sovrascritto), qui si accumulano
+      // eventi chiave dell'INTERA sessione (combattimenti, spostamenti tra luoghi di Ventimiglia,
+      // level-up) — cosi' il Master resta coerente anche dopo ore di gioco, quando la cronologia
+      // scorrevole di Groq (16 messaggi) ha gia' fatto uscire scambi di molto tempo prima. Capato a
+      // un numero massimo di voci per non far esplodere il prompt (soprattutto verso Ollama locale,
+      // dove un prompt enorme rallenta molto su una GPU da laptop).
+      let diarioDiCampagna = [];
+      const DIARIO_CAMPAGNA_MAX_VOCI = 50;
+      function pushDiarioCampagna(testo) {
+        if (!testo) { return; }
+        diarioDiCampagna.push(String(testo));
+        if (diarioDiCampagna.length > DIARIO_CAMPAGNA_MAX_VOCI) {
+          diarioDiCampagna = diarioDiCampagna.slice(-DIARIO_CAMPAGNA_MAX_VOCI);
+        }
+      }
+
+      // Inietta un evento nella memoria REALE dell'IA (non solo nella chat visibile): stesso
+      // pattern gia' usato da passTurn() per la notifica di cambio turno, generalizzato per essere
+      // richiamabile da qualunque modulo tramite window.UltimateVTTCoreGameplay.notifyMasterMemory.
+      function pushSystemMemoria(text) {
+        if (groqMasterState.enabled && text) {
+          groqChatHistory.push({ role: "system", content: String(text) });
+        }
+      }
       const GROQ_HISTORY_LIMIT = 16;
 
       function getElement(id) {
@@ -305,9 +345,16 @@
           "Sei il Master di un gioco di ruolo fantasy in italiano, stile Baldur's Gate 3.",
           "Rispondi sempre in italiano con 1-3 frasi narrative, in prima persona come Master.",
           "Giocatore attivo: " + activeName + ".",
+          diarioDiCampagna.length
+            ? "DIARIO DI CAMPAGNA (eventi chiave di questa sessione, in ordine cronologico, tienine conto anche se lontani nella conversazione): " + diarioDiCampagna.join(" | ")
+            : "",
+          ultimoRiepilogoCombattimento
+            ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo): " + ultimoRiepilogoCombattimento.replace(/\n/g, " ")
+            : "",
           suggestionText,
           "Se riesci, rispondi con JSON valido: {\"reply\":\"testo narrativo\",\"roll\":null} oppure {\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}.",
           "Aggiungi \"teleportCity\":\"nome_luogo\" al JSON se il PG viaggia in citta. Aggiungi \"moveToken\":\"flee\" se fugge in modo tattico.",
+          "Se compaiono nemici o inizia uno scontro, aggiungi \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] al JSON (bestiario: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin). NON risolvere tu gli attacchi ne' contare gli HP: il combattimento lo gestisce il gioco.",
           "Se non riesci col JSON, scrivi solo il testo narrativo della risposta, senza nient'altro.",
           "Usa il campo roll solo quando l'azione del giocatore ha un rischio reale. Stat consentite: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco."
         ].filter(Boolean).join("\n");
@@ -425,6 +472,12 @@
       }
 
       function readGroqApiKey() {
+        // Se una build personale ha una chiave incorporata (DEFAULT_GROQ_API_KEY non vuota), quella
+        // ha SEMPRE la precedenza su localStorage: altrimenti una chiave vecchia/revocata salvata in
+        // precedenza dal browser continuerebbe a essere usata anche dopo aver aggiornato il file con
+        // una chiave nuova, e il Master resterebbe rotto (401) senza un motivo apparente. Nel
+        // repository DEFAULT_GROQ_API_KEY e' vuota, quindi vale il comportamento normale (localStorage).
+        if (DEFAULT_GROQ_API_KEY) { return DEFAULT_GROQ_API_KEY; }
         try { return window.localStorage.getItem(groqMasterStorageKey) || ""; } catch (e) { return ""; }
       }
 
@@ -540,6 +593,14 @@
           "SCHEDE DEI PERSONAGGI DEL PARTY (gia note):",
           buildPartySheetContext(),
           "",
+          diarioDiCampagna.length
+            ? "DIARIO DI CAMPAGNA (eventi chiave dell'INTERA sessione, in ordine cronologico — tienine conto per restare coerente anche dopo molti scambi, non solo con gli ultimi messaggi):\n" + diarioDiCampagna.map(function (voce) { return "- " + voce; }).join("\n")
+            : "",
+          "",
+          ultimoRiepilogoCombattimento
+            ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo, non chiedere cosa e' successo):\n" + ultimoRiepilogoCombattimento
+            : "",
+          "",
           diceHint,
           "",
           "FORMATO RISPOSTA - Rispondi SEMPRE e SOLO con JSON valido, senza testo fuori:",
@@ -548,7 +609,8 @@
           "{\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}",
           "SPOSTAMENTO SULLA MAPPA: quando il party si reca o arriva in un luogo preciso di Ventimiglia, aggiungi al JSON \"moveTo\":\"nome esatto del luogo\". Il token del PG si spostera' in QUEL punto della mappa reale. Usa SOLO questi luoghi: " + ((window.VTTCampagna && window.VTTCampagna.places) ? window.VTTCampagna.places().join(", ") : "Stazione FS, Citta Alta, Porto Turistico, Forte dell'Annunziata") + ".",
           "Aggiungi \"moveToken\":\"flee\" se il PG fugge in modo tattico.",
-          "QUANDO COMPAIONO NEMICI: aggiungi al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] elencando i nemici che appaiono nella scena. I nemici compariranno sulla mappa vicino al party e nel tracker di combattimento.",
+          "QUANDO COMPAIONO NEMICI O INIZIA UNO SCONTRO: aggiungi SEMPRE al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] con i nemici della scena. Il gioco li fara' comparire sulla griglia tattica e avviera' il combattimento a turni (iniziativa, dadi, HUD stile Baldur's Gate 3).",
+          "IN COMBATTIMENTO NON risolvere MAI tu gli attacchi e NON inventare o tenere il conto degli HP: tiri per colpire, danni, iniziativa e turni li gestisce il sistema di combattimento del gioco. Tu descrivi solo la scena e le intenzioni dei nemici, e riprendi la narrazione quando il sistema ti riporta l'esito dello scontro.",
           "Bestiario disponibile per spawn: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin.",
           "Stat valide: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco"
         ].join("\n");
@@ -1419,6 +1481,56 @@
         },
         getDiceLockState: function getDiceLockState() {
           return cloneData(diceLockState);
+        },
+        // Iniettano un evento nella memoria REALE dell'IA (groqChatHistory), non solo nella chat
+        // visibile: usati dal modulo 29 (memoria di combattimento) per notificare al Master IA
+        // cosa e' successo in battaglia, cosi' puo' riprendere la narrazione in modo coerente.
+        notifyMasterMemory: pushSystemMemoria,
+        setUltimoRiepilogoCombattimento: function setUltimoRiepilogoCombattimento(testo) {
+          ultimoRiepilogoCombattimento = String(testo || "");
+        },
+        getUltimoRiepilogoCombattimento: function getUltimoRiepilogoCombattimentoSnapshot() {
+          return ultimoRiepilogoCombattimento;
+        },
+        // Diario di campagna a lungo termine (usato dal modulo 32, "memoria di campagna"): eventi
+        // chiave dell'intera sessione (combattimenti, spostamenti, level-up), cosi' il Master resta
+        // coerente anche dopo ore di gioco e molti scambi, oltre la finestra scorrevole di Groq.
+        appendDiarioCampagna: pushDiarioCampagna,
+        getDiarioCampagna: function getDiarioCampagnaSnapshot() {
+          return diarioDiCampagna.slice();
+        },
+        // Permettono al modulo di backup (js/11) di salvare/ripristinare la memoria del Master IA
+        // (cronologia Groq, riepilogo dell'ultimo combattimento, diario di campagna) insieme al
+        // resto della partita: senza questo, ricaricare la pagina o importare un backup
+        // azzererebbe la memoria costruita dai moduli 29/32, vanificando la "ripartenza coerente".
+        getState: function getState() {
+          return {
+            groqChatHistory: cloneData(groqChatHistory),
+            ultimoRiepilogoCombattimento: ultimoRiepilogoCombattimento,
+            diarioDiCampagna: diarioDiCampagna.slice()
+          };
+        },
+        hydrate: function hydrate(snapshot) {
+          if (!snapshot) {
+            return false;
+          }
+          if (Array.isArray(snapshot.groqChatHistory)) {
+            groqChatHistory.length = 0;
+            snapshot.groqChatHistory.forEach(function pushEntry(entry) {
+              if (entry && typeof entry.role === "string" && typeof entry.content === "string") {
+                groqChatHistory.push({ role: entry.role, content: entry.content });
+              }
+            });
+          }
+          if (typeof snapshot.ultimoRiepilogoCombattimento === "string") {
+            ultimoRiepilogoCombattimento = snapshot.ultimoRiepilogoCombattimento;
+          }
+          if (Array.isArray(snapshot.diarioDiCampagna)) {
+            diarioDiCampagna = snapshot.diarioDiCampagna
+              .filter(function (voce) { return typeof voce === "string"; })
+              .slice(-DIARIO_CAMPAGNA_MAX_VOCI);
+          }
+          return true;
         }
       };
 
@@ -3364,6 +3476,18 @@
         var sprintBtn = el("campSprintBtn");
         var examBtn   = el("campExamBtn");
         var fightBtn  = el("campFightBtn");
+        var sendBtnCheck = el("campDmSend"), inpCheck = el("campDmInput");
+        var backBtnCheck = el("campBackBtn");
+        // #campOverlay (con TUTTI questi pulsanti) e' definito nell'HTML DOPO questo script: alla
+        // primissima chiamata (sincrona, subito dopo aver trovato campLaunchBtn in wireLaunchBtn)
+        // questi elementi non esistono ancora nel DOM. A differenza di campLaunchBtn (che ha gia' un
+        // suo retry in wireLaunchBtn), qui non c'era alcun retry: gli "if (bottone) ..." sottostanti
+        // fallivano silenziosamente UNA SOLA VOLTA e per sempre, lasciando "← VTT", Sprint, Esamina,
+        // Combatti e l'invio del messaggio completamente senza alcuna azione collegata, ogni volta.
+        if (!sprintBtn || !examBtn || !fightBtn || !sendBtnCheck || !inpCheck || !backBtnCheck) {
+          setTimeout(wireActionButtons, 200);
+          return;
+        }
         if (sprintBtn) sprintBtn.addEventListener("click", function() {
           state.sprint = !state.sprint;
           sprintBtn.classList.toggle("on", state.sprint);

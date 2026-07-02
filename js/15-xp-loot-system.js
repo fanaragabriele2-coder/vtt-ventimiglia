@@ -108,10 +108,14 @@
     announce("⭐ LIVELLO " + toLvl + "! " + nameById(id) + " sale di livello: +" + hpGain + " HP max, competenza +" + prof + ".");
   }
 
-  function gainXp(amount, reason){
+  // targetId: a chi accreditare l'XP. Se omesso ricade su activeId() (il PG attualmente mostrato in
+  // hotseat) — corretto per le ricompense dirette del Master (completeQuest, tag [XP:n] in chat),
+  // ma NON per un'uccisione in combattimento: li' l'XP deve andare a chi ha davvero sferrato il
+  // colpo, non a chi capita di essere visualizzato quando il polling se ne accorge (vedi onEnemyDefeated).
+  function gainXp(amount, reason, targetId){
     amount = Math.max(0, Math.round(amount || 0));
     if (!amount) return;
-    var id = activeId(); var p = getProg(id);
+    var id = targetId || activeId(); var p = getProg(id);
     var from = p.level;
     p.xp += amount;
     announce("✨ +" + amount + " XP" + (reason ? (" — " + reason) : "") + " (" + nameById(id) + ").");
@@ -128,10 +132,37 @@
     for (var i=0;i<cat.length;i++){ if (cat[i].id === catId) return cat[i].name; }
     return catId;
   }
-  function onEnemyDefeated(c){
-    gainXp(xpForEnemy(c), "sconfitto " + baseName(c.name));
+  function onEnemyDefeated(c, killerId){
+    gainXp(xpForEnemy(c), "sconfitto " + baseName(c.name), killerId);
     var loot = lootForEnemy(c);
     if (loot.items.length || loot.gold){ lootQueue.push(loot); showNextLoot(); }
+  }
+
+  // ---- attribuzione dell'uccisione: chi ha davvero sferrato il colpo, non chi e' attivo ora ----
+  // combatState.lastRoll.title e' impostato da OGNI risoluzione di attacco (sia il resolver classico
+  // a due fasi sia resolveAttack() della HUD BG3) nel formato "NomeAttaccante vs NomeBersaglio" —
+  // path-agnostico, stesso principio gia' usato dal modulo 29 per la memoria di combattimento.
+  function attaccanteDelBersaglio(lastRoll, nomeBersaglio){
+    var titolo = lastRoll && lastRoll.title;
+    if (typeof titolo !== "string" || !nomeBersaglio) return null;
+    var suffisso = " vs " + nomeBersaglio;
+    if (titolo.length <= suffisso.length || titolo.slice(-suffisso.length) !== suffisso) return null;
+    return titolo.slice(0, titolo.length - suffisso.length);
+  }
+  // Il tracker di combattimento (js/06) ha UN SOLO slot per PG, sempre con id fisso "pc-local":
+  // solo il NOME viene risincronizzato a chi e' attivo in hotseat (syncPlayerCombatantFromState),
+  // l'id no. Percio' NON si puo' usare l'id del combattente per accreditare l'XP (sarebbe sempre
+  // "pc-local", un id fantasma su cui nessuna scheda/barra XP e' mai mostrata): si risale invece al
+  // vero id di progressione cercando il NOME nel roster hotseat (window.partyData), l'unico posto
+  // dove nome e id-di-progressione reale sono entrambi presenti insieme.
+  function trovaMembroPerNome(nome){
+    if (!nome) return null;
+    var lista = window.partyData || [];
+    for (var i = 0; i < lista.length; i++){
+      var m = lista[i];
+      if (m && m.identity && m.identity.name === nome) return m.identity.id;
+    }
+    return null;
   }
   function collectLoot(loot){
     var inv = window.UltimateVTTInventory;
@@ -236,7 +267,13 @@
       seen[c.id] = true;
       var dead = c.defeated || c.hitPoints <= 0;
       if (c.kind === "npc"){
-        if (dead && !deadSet[c.id]){ deadSet[c.id] = true; if (initialized) onEnemyDefeated(c); }
+        if (dead && !deadSet[c.id]){
+          deadSet[c.id] = true;
+          if (initialized){
+            var nomeUccisore = attaccanteDelBersaglio(st.lastRoll, c.name);
+            onEnemyDefeated(c, trovaMembroPerNome(nomeUccisore));
+          }
+        }
         else if (!dead && deadSet[c.id]){ deadSet[c.id] = false; }
       }
     });
@@ -262,7 +299,13 @@
   // API pubblica
   window.VTTProgression = {
     gainXp: gainXp, completeQuest: completeQuest, getProg: getProg,
-    renderXpBar: renderXpBar, _onEnemyDefeated: onEnemyDefeated
+    renderXpBar: renderXpBar, _onEnemyDefeated: onEnemyDefeated,
+    // logica pura (testabile): attribuzione dell'uccisione al vero autore del colpo, non a chi e'
+    // attivo in hotseat quando il polling se ne accorge.
+    attaccanteDelBersaglio: attaccanteDelBersaglio,
+    trovaMembroPerNome: trovaMembroPerNome,
+    // utile ai test: esegue un ciclo di polling reale (lo stesso richiamato da setInterval)
+    _pollCombat: function () { pollCombat(); }
   };
 
   function boot(){

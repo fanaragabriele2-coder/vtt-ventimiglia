@@ -1,0 +1,171 @@
+/* --- Pannello di sessione multiplayer (Fase 3 UI) --- */
+/* Tutte le classi sono prefissate .vtt-sess- per non collidere con il resto dell'app. */
+
+.vtt-sess-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 9000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font: 700 13px/1 system-ui, sans-serif;
+  letter-spacing: .03em;
+  color: #f0d472;
+  background: linear-gradient(180deg, rgba(80, 50, 5, .82), rgba(30, 18, 2, .94));
+  border: 1px solid rgba(200, 155, 60, .8);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
+}
+.vtt-sess-toggle:hover { border-color: #f0d472; }
+.vtt-sess-toggle .vtt-sess-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #8a8378; box-shadow: 0 0 6px rgba(0, 0, 0, .5);
+}
+.vtt-sess-toggle.online .vtt-sess-dot { background: #7bd47b; box-shadow: 0 0 8px rgba(123, 212, 123, .8); }
+
+.vtt-sess-panel {
+  position: fixed;
+  left: 14px;
+  bottom: 58px;
+  z-index: 9001;
+  width: 320px;
+  max-height: 72vh;
+  overflow: auto;
+  color: #d8c7a3;
+  background: linear-gradient(180deg, rgba(36, 32, 28, .96), rgba(9, 7, 6, .97));
+  border: 1px solid rgba(200, 155, 60, .5);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .6);
+  font: 13px/1.4 system-ui, sans-serif;
+}
+.vtt-sess-panel[hidden] { display: none; }
+
+.vtt-sess-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(200, 155, 60, .3);
+}
+.vtt-sess-head h3 { margin: 0; font-size: 13px; letter-spacing: .04em; color: #f0d472; font-weight: 700; }
+.vtt-sess-close {
+  background: none; border: none; color: #d8c7a3; font-size: 16px; cursor: pointer; line-height: 1;
+}
+.vtt-sess-close:hover { color: #fff; }
+
+.vtt-sess-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+
+.vtt-sess-status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(9, 7, 6, .55);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+.vtt-sess-status .vtt-sess-dot { width: 10px; height: 10px; border-radius: 50%; background: #8a8378; }
+.vtt-sess-status.online .vtt-sess-dot { background: #7bd47b; box-shadow: 0 0 7px rgba(123, 212, 123, .7); }
+.vtt-sess-status .vtt-sess-status-text { font-weight: 600; color: #e8dcc0; }
+.vtt-sess-status .vtt-sess-status-sub { margin-left: auto; font-size: 11px; color: #9c917d; }
+
+.vtt-sess-field { display: flex; flex-direction: column; gap: 4px; }
+.vtt-sess-field > label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #c89b3c; }
+.vtt-sess-field input,
+.vtt-sess-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  color: #f3ead2;
+  background: rgba(9, 7, 6, .7);
+  border: 1px solid rgba(200, 155, 60, .35);
+  border-radius: 7px;
+  font: 13px system-ui, sans-serif;
+}
+.vtt-sess-field input:focus,
+.vtt-sess-field select:focus { outline: none; border-color: #f0d472; }
+
+.vtt-sess-owners {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 132px; overflow: auto;
+  padding: 6px;
+  border-radius: 7px;
+  background: rgba(9, 7, 6, .45);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+.vtt-sess-owner { display: flex; align-items: center; gap: 7px; padding: 2px 2px; }
+.vtt-sess-owner input { width: auto; }
+.vtt-sess-owner span { font-size: 12px; color: #d8c7a3; }
+.vtt-sess-owners-empty { font-size: 11px; color: #9c917d; padding: 2px; }
+
+.vtt-sess-actions { display: flex; gap: 8px; }
+.vtt-sess-btn {
+  flex: 1;
+  padding: 8px 10px;
+  font: 700 12px/1 system-ui, sans-serif;
+  letter-spacing: .03em;
+  color: #f0d472;
+  background: linear-gradient(180deg, rgba(80, 50, 5, .7), rgba(30, 18, 2, .9));
+  border: 1px solid rgba(200, 155, 60, .7);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.vtt-sess-btn:hover { border-color: #f0d472; }
+.vtt-sess-btn.secondary {
+  color: #d8c7a3;
+  background: linear-gradient(180deg, rgba(40, 36, 30, .8), rgba(16, 13, 10, .92));
+  border-color: rgba(255, 255, 255, .14);
+}
+.vtt-sess-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.vtt-sess-turn {
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(9, 7, 6, .5);
+  border: 1px solid rgba(255, 255, 255, .08);
+  font-size: 12px;
+  color: #cfe6c3;
+}
+.vtt-sess-turn b { color: #f0d472; }
+
+.vtt-sess-roster { display: flex; flex-direction: column; gap: 4px; }
+.vtt-sess-roster > .vtt-sess-roster-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #c89b3c;
+}
+.vtt-sess-peer {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: rgba(9, 7, 6, .5);
+  border: 1px solid rgba(255, 255, 255, .07);
+}
+.vtt-sess-peer.me { border-color: rgba(200, 155, 60, .55); }
+.vtt-sess-peer .vtt-sess-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 6px; border-radius: 5px;
+}
+.vtt-sess-peer .vtt-sess-badge.gm { color: #2a1c02; background: #f0d472; }
+.vtt-sess-peer .vtt-sess-badge.player { color: #cfe6c3; background: rgba(74, 170, 74, .35); border: 1px solid rgba(123, 212, 123, .4); }
+.vtt-sess-peer .vtt-sess-name { font-weight: 600; color: #ecdfc2; }
+.vtt-sess-peer .vtt-sess-tokens { margin-left: auto; font-size: 11px; color: #9c917d; }
+.vtt-sess-roster-empty { font-size: 11px; color: #9c917d; }
+
+/* Mappatura token <-> combattente */
+.vtt-sess-map { display: flex; flex-direction: column; gap: 5px; }
+.vtt-sess-map-head { display: flex; align-items: center; justify-content: space-between; }
+.vtt-sess-map-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #c89b3c; }
+.vtt-sess-map-refresh {
+  background: none; border: 1px solid rgba(200, 155, 60, .4); color: #d8c7a3;
+  border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 7px;
+}
+.vtt-sess-map-refresh:hover { border-color: #f0d472; color: #fff; }
+.vtt-sess-map-body { display: flex; flex-direction: column; gap: 4px; }
+.vtt-sess-map-row { display: flex; align-items: center; gap: 7px; }
+.vtt-sess-map-name { flex: 0 0 38%; font-size: 12px; color: #ecdfc2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vtt-sess-map-sel {
+  flex: 1; min-width: 0; padding: 5px 7px; font: 12px system-ui, sans-serif;
+  color: #f3ead2; background: rgba(9, 7, 6, .7);
+  border: 1px solid rgba(200, 155, 60, .35); border-radius: 6px;
+}
+.vtt-sess-map-sel:focus { outline: none; border-color: #f0d472; }
+.vtt-sess-map-sel:disabled { opacity: .55; cursor: not-allowed; }
+.vtt-sess-map-empty { font-size: 11px; color: #9c917d; }
