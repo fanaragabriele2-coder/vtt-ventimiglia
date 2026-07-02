@@ -207,7 +207,9 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       const st = window.UltimateVTTCombat.getState();
       const cur = st.combatants[st.currentTurnIndex];
       const sel = document.getElementById("moduleFiveTargetSelect");
-      const other = st.combatants.find(c => c.id !== cur.id && !c.defeated);
+      // Il bersaglio della Spinta deve essere un PNG (ha un token sulla griglia); un membro del
+      // party hotseat ("pc-party-*") non ha token e la cella non sarebbe risolvibile.
+      const other = st.combatants.find(c => c.kind === "npc" && !c.defeated);
       if (sel && other) { sel.value = other.id; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       const tp = window.UltimateVTTTokenPhysics.getState();
       const cellaBersaglio = tp.tokens.find(t => window.UltimateVTTCombatFSM.tokenACombattente(t.id) === other.id);
@@ -231,16 +233,28 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     // La prova contrapposta resta genuinamente casuale: si ritenta invece di manipolare
     // rollD20WithMode, che e' condivisa col modulo 24 (reazioni) e non va falsata globalmente. ---
     const setup = await gm.evaluate(() => {
+      // Ruota il turno fino a pc-local: e' l'unico PG con un token sulla griglia (i membri
+      // "pc-party-*" del roster hotseat non hanno token), e la Spinta richiede le posizioni.
+      let guardiaTurno = 0;
+      while (guardiaTurno++ < 20) {
+        const s = window.UltimateVTTCombat.getState();
+        const c = s.combatants[s.currentTurnIndex];
+        if (c && c.id === "pc-local") break;
+        window.UltimateVTTCombat.nextTurn();
+      }
       const st = window.UltimateVTTCombat.getState();
       const cur = st.combatants[st.currentTurnIndex];
-      const nemico = st.combatants.find(c => c.kind !== cur.kind && !c.defeated);
-      if (!nemico) return { ok: false };
+      const nemico = st.combatants.find(c => c.kind === "npc" && !c.defeated);
+      if (!nemico || !cur || cur.id !== "pc-local") return { ok: false };
       const tokAttaccante = window.UltimateVTTCombatFSM.combattenteAToken(cur.id);
       const tokBersaglio = window.UltimateVTTCombatFSM.combattenteAToken(nemico.id);
       const sel = document.getElementById("moduleFiveTargetSelect");
       if (sel) { sel.value = nemico.id; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       let esito = null;
       for (let i = 0; i < 10 && (!esito || !esito.successo); i++) {
+        // La Spinta di un PG spende l'Azione Bonus: tra un tentativo e l'altro il pool va
+        // ripristinato (in gioco lo fa il cambio turno), altrimenti dal 2° tentativo e' rifiutata.
+        if (window.UltimateVTTInventory && window.UltimateVTTInventory.resetTurn) window.UltimateVTTInventory.resetTurn();
         // Riposiziona adiacenti (attaccante in (10,10), bersaglio in (11,10)) prima di ogni tentativo.
         window.UltimateVTTTokenPhysics.moveTokenToCell(tokAttaccante, 10, 10, false);
         window.UltimateVTTTokenPhysics.moveTokenToCell(tokBersaglio, 11, 10, false);

@@ -160,10 +160,15 @@
     var btnAttacca = el("button", "bg3-btn attack", "Attacca");
     btnAttacca.type = "button";
     btnAttacca.addEventListener("click", azioneAttacca);
+    var btnRialza = el("button", "bg3-btn revive", "Rialza");
+    btnRialza.type = "button";
+    btnRialza.hidden = true;
+    btnRialza.title = "Spendi l'Azione Bonus per rialzare un alleato incosciente adiacente (1 HP)";
+    btnRialza.addEventListener("click", azioneRialza);
     var btnEnd = el("button", "bg3-btn endturn", "Termina turno");
     btnEnd.type = "button";
     btnEnd.addEventListener("click", azioneTerminaTurno);
-    bBtns.appendChild(btnAttacca); bBtns.appendChild(btnEnd);
+    bBtns.appendChild(btnAttacca); bBtns.appendChild(btnRialza); bBtns.appendChild(btnEnd);
     tray.appendChild(bBtns);
 
     hud.appendChild(tray);
@@ -175,7 +180,7 @@
       movVal: movVal, movFill: movFill,
       targetName: targetName, flankBadge: flankBadge, elevBadge: elevBadge, condBadge: condBadge, hitPct: hitPct, hitMode: hitMode, dmgLine: dmgLine, targetBlock: bTarget,
       modi: { normal: mNorm, advantage: mAdv, disadvantage: mDis },
-      btnAttacca: btnAttacca, btnEnd: btnEnd
+      btnAttacca: btnAttacca, btnRialza: btnRialza, btnEnd: btnEnd
     };
     costruito = true;
   }
@@ -230,6 +235,54 @@
     if (typeof c.resolveAttack === "function") {
       try { c.resolveAttack(); } catch (e) { /* ignora */ }
     }
+    render(true);
+  }
+
+  // Pool di azioni del turno (modulo 05). Senza il modulo (ambienti ridotti) nessun blocco.
+  function economiaAzioni() {
+    var inv = inventory();
+    try {
+      var ae = inv && inv.getState ? inv.getState().actionEconomy : null;
+      if (ae) { return { action: Boolean(ae.action), bonusAction: Boolean(ae.bonusAction) }; }
+    } catch (e) { /* fallback sotto */ }
+    return { action: true, bonusAction: true };
+  }
+
+  // Primo alleato PG incosciente raggiungibile dal combattente di turno: adiacente se entrambe le
+  // posizioni sono note (Regola 5: rialzo in mischia), altrimenti ammesso (teatro della mente).
+  function alleatoIncosciente(st, corrente) {
+    if (!st || !corrente) { return null; }
+    var C = combat();
+    var candidati = (st.combatants || []).filter(function (c) {
+      return c.kind === "pc" && c.id !== corrente.id && (c.defeated || c.hitPoints <= 0);
+    });
+    for (var i = 0; i < candidati.length; i += 1) {
+      var dist = null;
+      if (C && typeof C.distanzaCelle === "function") {
+        try { dist = C.distanzaCelle(corrente.id, candidati[i].id); } catch (e) { dist = null; }
+      }
+      if (dist == null || dist <= 1) { return candidati[i]; }
+    }
+    return null;
+  }
+
+  // Regola 5: rialzare un alleato incosciente costa l'Azione Bonus (o l'Azione, se la bonus e' gia'
+  // spesa). L'alleato torna cosciente con 1 HP.
+  function azioneRialza() {
+    var c = combat();
+    if (!c || typeof c.reviveCombatant !== "function") { return; }
+    var st = statoCombat();
+    var corrente = combattenteCorrente(st);
+    if (!corrente || corrente.kind !== "pc") { return; }
+    var alleato = alleatoIncosciente(st, corrente);
+    if (!alleato) { return; }
+    var inv = inventory();
+    if (inv && inv.spendActionResource) {
+      var speso = false;
+      try { speso = inv.spendActionResource("bonusAction") === true || inv.spendActionResource("action") === true; } catch (e) { speso = true; }
+      if (!speso) { return; } // niente risorse: il bottone dovrebbe gia' essere disabilitato
+    }
+    try { c.reviveCombatant(alleato.id, 1); } catch (e) { /* ignora */ }
     render(true);
   }
 
@@ -289,9 +342,17 @@
     renderModalita(st);
     renderFeed(st);
 
-    // Stato pulsanti.
-    var puoAttaccare = Boolean(corrente && bersaglio && !bersaglio.defeated && bersaglio.id !== corrente.id);
+    // Stato pulsanti (Regola 1): si attacca solo nel turno di un PG e solo con l'Azione ancora
+    // disponibile — a 0 azioni il pulsante si disabilita finche' non si termina il turno.
+    var econ = economiaAzioni();
+    var puoAttaccare = Boolean(corrente && corrente.kind === "pc" && bersaglio && !bersaglio.defeated && bersaglio.id !== corrente.id && econ.action);
     rif.btnAttacca.disabled = !puoAttaccare;
+    rif.btnAttacca.title = econ.action ? "Attacca il bersaglio (spende l'Azione)" : "Azione già spesa in questo turno";
+
+    // Rialza (Regola 5): visibile solo se un alleato PG e' incosciente e raggiungibile.
+    var alleatoATerra = (corrente && corrente.kind === "pc") ? alleatoIncosciente(st, corrente) : null;
+    rif.btnRialza.hidden = !alleatoATerra;
+    rif.btnRialza.disabled = !alleatoATerra || !(econ.bonusAction || econ.action);
   }
 
   function trovaCombattente(st, id) {

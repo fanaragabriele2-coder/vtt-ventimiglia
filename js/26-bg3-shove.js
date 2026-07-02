@@ -168,6 +168,17 @@
       return { ok: false, message: "Fuori portata di mischia." };
     }
 
+    // Stile BG3: la spinta di un PG costa l'AZIONE BONUS del turno (i PNG gestiscono il proprio
+    // turno via IA). Spesa DOPO il controllo di portata: un tentativo impossibile non costa nulla.
+    if (attaccante.kind === "pc" && window.UltimateVTTInventory && window.UltimateVTTInventory.spendActionResource) {
+      var bonusSpesa = false;
+      try { bonusSpesa = window.UltimateVTTInventory.spendActionResource("bonusAction") === true; } catch (e) { bonusSpesa = true; }
+      if (!bonusSpesa) {
+        annuncia("🤼 Azione bonus già spesa in questo turno: niente spinta.");
+        return { ok: false, message: "Azione bonus non disponibile." };
+      }
+    }
+
     var tiroA = C.rollD20WithMode("normal").chosen;
     var tiroB = C.rollD20WithMode("normal").chosen;
     var esito = esitoSpinta({

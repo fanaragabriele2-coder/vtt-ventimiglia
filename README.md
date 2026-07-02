@@ -213,6 +213,31 @@ stava giocando. Il problema è attaccato da due lati:
   menzione "goblin 8" è il **nome** di un nemico, non un conteggio (serve un vero elenco con almeno
   due indici distinti).
 
+**Regole di stato del combattimento (action economy, distanze, multi-party, KO/TPK).** Cinque
+regole rigorose implementate nel motore (`js/06`) e riflesse nella HUD (`js/23`):
+- **Azioni limitate (Regola 1):** l'attacco di un PG spende la sua **Azione** (una per turno) — il
+  tentativo, non solo il colpo andato a segno; la Spinta spende l'**Azione Bonus** (`js/26`); gli
+  incantesimi spendevano già Azione/Bonus + slot (`js/05`). A risorsa esaurita il pulsante Attacca
+  si **disabilita** finché non si termina il turno (che ripristina il pool). Niente più attacchi
+  infiniti.
+- **Distanze sulla griglia (Regola 4):** prima di ogni attacco il motore calcola la distanza
+  Chebyshev fra i token di attaccante e bersaglio (`distanzaCelle`): mischia = 1 cella, arco = 12
+  celle (`portataArma`). Fuori portata l'attacco si **interrompe senza consumare l'Azione**. Se le
+  posizioni non sono note (teatro della mente) non si blocca nulla.
+- **Tutto il party in campo (Regola 2):** `startCombat` itera l'intero roster hotseat
+  (`window.partyData`): il membro attivo resta `pc-local`, gli altri entrano come combattenti
+  `pc-party-<id>` con statistiche derivate dalle loro schede, tirano l'iniziativa e ciclano nei
+  turni. I danni ai membri non attivi **persistono nel roster** (restano sul personaggio giusto
+  anche cambiando scheda in hotseat).
+- **IA nemica a script chiuso (Regola 3, `js/33`):** distanza dal PG più vicino → movimento →
+  d20 vs CA → danni → **fine turno automatica**, un'azione per turno garantita da una chiave di
+  deduplicazione (round:indice:id) — nessun loop infinito possibile, sampler con cleanup esplicito.
+- **Incoscienza, rialzo e TPK (Regola 5):** un PG a 0 HP cade **incosciente** (non "sconfitto");
+  un alleato adiacente può spendere l'Azione Bonus (o l'Azione) col pulsante **Rialza** della HUD
+  per rimetterlo in piedi a 1 HP (`reviveCombatant`). Se **tutti** i PG sono a terra scatta
+  `resetCombat()`: lo scontro si chiude subito e il Master ne riceve il riepilogo (esito
+  "sconfitta del party").
+
 **In combattimento comanda SOLO l'interfaccia di combattimento.** Tre regole che tengono chat e
 motore ognuno al proprio posto durante uno scontro:
 - **La chat del Master è in pausa (`js/12`):** a combattimento attivo `handlePlayerPrompt` blocca

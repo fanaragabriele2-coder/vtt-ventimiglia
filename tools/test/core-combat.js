@@ -103,5 +103,114 @@ const npcCurato = C.getState().combatants.find(c => c.id === npcId);
 check("la cura di un PNG non supera i suoi HP massimi", npcCurato.hitPoints === npcCurato.maxHitPoints);
 check("applyDamageToCombatant su un id inesistente ritorna false (non lancia)", C.applyDamageToCombatant("non-esiste", 5) === false);
 
+// ============================================================================
+// REGOLE DI STATO DEL COMBATTIMENTO (action economy, distanze, multi-party, KO/TPK)
+// ============================================================================
+
+// Stub controllabile dell'action economy (modulo 05) e delle posizioni (FSM + token).
+let economia = { action: true, bonusAction: true, reaction: true, movementMetersUsed: 0 };
+window.UltimateVTTInventory = {
+  itemCatalog: [{ id: "shortbow", name: "Arco corto" }, { id: "longsword", name: "Spada lunga" }],
+  getState: () => ({ actionEconomy: Object.assign({}, economia), equipmentSlots: { mainHand: armaEquipaggiata }, inventory: inventarioPg }),
+  spendActionResource: (k) => { if (k === "movement") return true; if (!economia[k]) return false; economia[k] = false; return true; },
+  resetTurn: () => { economia = { action: true, bonusAction: true, reaction: true, movementMetersUsed: 0 }; }
+};
+let armaEquipaggiata = null;
+let inventarioPg = [];
+let celleToken = { "token-pc": { x: 0, y: 0 }, "token-gob": { x: 1, y: 0 } };
+window.UltimateVTTCombatFSM = { combattenteAToken: (id) => (id === "pc-local" ? "token-pc" : (id === npcId ? "token-gob" : null)) };
+window.UltimateVTTTokenPhysics = { getState: () => ({ tokens: Object.keys(celleToken).map(id => ({ id, cellX: celleToken[id].x, cellY: celleToken[id].y })) }) };
+
+console.log("\n[Regola 4: distanza sulla griglia e portata dell'arma]");
+check("distanzaCelle usa la metrica di Chebyshev (diagonale compresa)", (function () {
+  celleToken["token-gob"] = { x: 3, y: 2 };
+  return C.distanzaCelle("pc-local", npcId) === 3;
+})());
+check("portata in mischia = 1 cella (nessuna arma a distanza equipaggiata)", C.portataArma({ kind: "pc" }) === 1);
+check("con un arco in mano principale la portata sale a 12 celle", (function () {
+  armaEquipaggiata = "inv-bow"; inventarioPg = [{ inventoryId: "inv-bow", catalogId: "shortbow" }];
+  const r = C.portataArma({ kind: "pc" });
+  armaEquipaggiata = null; inventarioPg = [];
+  return r === 12;
+})());
+check("i PNG del bestiario hanno portata di mischia (1)", C.portataArma({ kind: "npc" }) === 1);
+
+console.log("\n[Regola 1: l'attacco del PG spende l'Azione — niente attacchi infiniti]");
+// Porta il turno al PG (nextTurn resetta l'economia a ogni cambio, come in gioco).
+C.startCombat();
+let guardia = 0;
+while (guardia++ < 10) { const st = C.getState(); if (st.combatants[st.currentTurnIndex] && st.combatants[st.currentTurnIndex].id === "pc-local") break; C.nextTurn(); }
+celleToken["token-gob"] = { x: 1, y: 0 }; // goblin adiacente
+economia.action = true;
+const primoAttacco = conSequenza([0.9, 0.5], () => C.resolveAttack());
+check("il primo attacco del turno viene eseguito", primoAttacco !== null);
+check("l'attacco ha consumato l'Azione", economia.action === false);
+const secondoAttacco = C.resolveAttack();
+check("il secondo attacco NELLO STESSO turno viene bloccato", secondoAttacco === null);
+check("il blocco spiega che l'Azione e' gia' stata spesa", /Azione già spesa/.test(C.getState().lastEvent));
+
+console.log("\n[Regola 4 applicata: attacco in mischia bloccato fuori portata, senza consumare l'Azione]");
+economia.action = true;
+celleToken["token-gob"] = { x: 6, y: 0 }; // 6 celle: fuori portata mischia
+const attaccoLontano = C.resolveAttack();
+check("l'attacco in mischia a 6 celle viene interrotto", attaccoLontano === null);
+check("il messaggio riporta distanza e portata", /Fuori portata/.test(C.getState().lastEvent));
+check("un attacco impossibile NON consuma l'Azione", economia.action === true);
+check("con posizioni ignote (nessun token) l'attacco non viene bloccato dalla distanza", (function () {
+  const vecchia = celleToken; celleToken = {};
+  const r = conSequenza([0.9, 0.5], () => C.resolveAttack());
+  celleToken = vecchia;
+  return r !== null;
+})());
+
+console.log("\n[Regola 2: TUTTO il party entra in combattimento e tira l'iniziativa]");
+C.endCombat();
+const basePg = JSON.parse(S.serialize());
+basePg.identity.id = "player-1"; basePg.identity.name = "Aria";
+S.hydrate(basePg);
+window.partyData = [
+  JSON.parse(S.serialize()), // il membro ATTIVO (player-1) -> rappresentato da pc-local
+  { identity: { id: "player-2", name: "Ligeia" }, proficiencyBonus: 2,
+    abilities: { dex: { score: 14 }, str: { score: 10 } },
+    resources: { hp: { current: 9, max: 9 }, armorClass: 13 } },
+  { identity: { id: "player-3", name: "Doran" }, proficiencyBonus: 2,
+    abilities: { dex: { score: 10 }, str: { score: 16 } },
+    resources: { hp: { current: 12, max: 12 }, armorClass: 16 } }
+];
+window.partyData[0].identity.id = "player-1";
+C.startCombat();
+const inCampo = C.getState().combatants;
+check("il membro attivo e' in campo come pc-local", inCampo.some(c => c.id === "pc-local"));
+check("Ligeia (player-2) e' in campo come combattente distinto", inCampo.some(c => c.id === "pc-party-player-2" && c.kind === "pc"));
+check("Doran (player-3) e' in campo come combattente distinto", inCampo.some(c => c.id === "pc-party-player-3"));
+check("il membro attivo NON e' duplicato (nessun pc-party-player-1)", !inCampo.some(c => c.id === "pc-party-player-1"));
+check("le statistiche derivano dalla scheda (Ligeia: CA 13, attacco +4 da DES)", (function () {
+  const l = inCampo.find(c => c.id === "pc-party-player-2");
+  return l.armorClass === 13 && l.attackBonus === 4 && l.hitPoints === 9;
+})());
+check("TUTTI i PG hanno tirato l'iniziativa (nessuno resta a 0)", inCampo.filter(c => c.kind === "pc").every(c => c.initiative >= 1));
+
+console.log("\n[Regola 5: danni ai membri del party, incoscienza, rialzo e TPK]");
+C.applyDamageToCombatant("pc-party-player-2", 4);
+check("il danno a Ligeia scala i SUOI HP nel tracker (9-4=5)", C.getState().combatants.find(c => c.id === "pc-party-player-2").hitPoints === 5);
+check("il danno persiste nel roster hotseat (window.partyData)", window.partyData[1].resources.hp.current === 5);
+C.applyDamageToCombatant("pc-party-player-2", 99);
+check("a 0 HP il PG cade INCOSCIENTE (non 'sconfitto' come un PNG)", /INCOSCIENTE/.test(C.getState().lastEvent));
+check("il combattimento continua finche' resta almeno un PG in piedi", C.getState().active === true);
+check("reviveCombatant rialza Ligeia con 1 HP e la toglie dall'incoscienza", (function () {
+  const ok = C.reviveCombatant("pc-party-player-2", 1);
+  const l = C.getState().combatants.find(c => c.id === "pc-party-player-2");
+  return ok === true && l.hitPoints === 1 && l.defeated === false && window.partyData[1].resources.hp.current === 1;
+})());
+check("reviveCombatant NON funziona sui PNG (i mostri sconfitti restano sconfitti)", C.reviveCombatant(npcId, 5) === false);
+
+// TPK: tutti i PG a terra contemporaneamente -> resetCombat() chiude subito lo scontro.
+C.applyDamageToCombatant("pc-party-player-2", 99);
+C.applyDamageToCombatant("pc-party-player-3", 99);
+check("con altri PG ancora in piedi (pc-local) il combattimento e' ancora attivo", C.getState().active === true);
+C.applyDamageToCombatant("pc-local", 9999);
+check("quando ANCHE l'ultimo PG cade, scatta il TPK: resetCombat chiude il combattimento", C.getState().active === false);
+
+window.partyData = undefined;
 console.log("\nRisultato core-combat: " + passati + " passati, " + falliti + " falliti.");
 process.exit(falliti === 0 ? 0 : 1);
