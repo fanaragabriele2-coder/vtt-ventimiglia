@@ -40,7 +40,8 @@ vttg2506/
 │   ├── 31-combat-view-autoswitch.js    ← torna alla griglia tattica a inizio combattimento
 │   ├── 32-campaign-memory.js           ← diario di campagna a lungo termine per il Master IA
 │   ├── 33-enemy-ai.js                  ← IA dei nemici: al loro turno si avvicinano e attaccano
-│   └── 34-chat-combat-bridge.js        ← ponte chat Master → combat system (spawn dalla narrazione)
+│   ├── 34-chat-combat-bridge.js        ← ponte chat Master → combat system (spawn dalla narrazione)
+│   └── 35-layout-cinematografico.js    ← layout definitivo a 3 colonne: cassetto strumenti, topbar misurata
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -65,6 +66,61 @@ comunica con gli altri tramite `window.UltimateVTT*` (es. `UltimateVTTState`,
 1. Modifica i file in `css/` e `js/` (oppure aggiungine di nuovi e referenziali in `index.html`).
 2. Verifica con `node dev-server.js` → http://localhost:4599.
 3. Quando vuoi un file unico da condividere: `node tools/bundle.js` → `dist/ultimate-vtt.html`.
+
+## Layout definitivo a tre colonne (revisione strutturale)
+
+L'interfaccia è organizzata in **tre colonne pulite**, senza pannelli sovrapposti alla scena
+(`css/07-layout-cinematografico.css` + `js/35-layout-cinematografico.js`):
+
+- **Sinistra — i PG:** scheda del personaggio attivo, party hotseat, statistiche, tab
+  (Core/Abilità/Inventario/Spellbook/Combat/Note).
+- **Centro — la scena:** mappa tattica protagonista (terreno, griglia, token di PG e nemici)
+  con gli elementi di combattimento BG3 sopra di essa (barra iniziativa in alto, tray azioni in
+  basso, HUD dadi al centro) SOLO a combattimento attivo. Vignettatura leggera, niente etichette
+  tecniche.
+- **Destra — Chat Master:** la chat del Master IA riempie la colonna (log che scorre, input in
+  basso); il pulsante CHAT in topbar porta lì. La diagnostica e i riepiloghi tecnici dei moduli
+  stanno in un cassetto richiudibile in fondo, chiuso di default.
+
+Interventi strutturali della revisione (con i bug che risolvono):
+
+- **La topbar non spinge più la chat fuori dallo schermo.** La topbar (flex `nowrap`, piena di
+  pulsanti) imponeva la sua larghezza minima all'intera griglia `#app`: su schermi normali la
+  colonna destra finiva LETTERALMENTE fuori dalla finestra (il "layout rotto"/"la chat non
+  c'è"). Ora `#app` è bloccato alla larghezza della finestra, la topbar va a capo se serve, e i
+  comandi di servizio (CHECK, Modalità Console, Full) stanno nel dropdown **🖥 Sistema**. La
+  barra iniziativa BG3 si aggancia all'altezza REALE della topbar (variabile
+  `--topbar-real-height` misurata dal modulo 35 con ResizeObserver).
+- **Rimosso il secondo renderer di mappa** che viveva in js/12 (stanza con muri fissi, token
+  del party a pixel, nebbia line-of-sight al 95% di nero) e che sovrascriveva OGNI frame il
+  renderer ufficiale sullo stesso canvas: in gioco la mappa appariva nera, senza terreno e senza
+  nemici. Il rendering della scena è SOLO del modulo 07 (terreno/griglia/nebbia) + 08 (token).
+- **Strumenti del Master in un cassetto.** Il pannellone tecnico fisso sopra la mappa (controlli
+  mappa/nebbia, token, dadi fisici, audio, AI bridge, salvataggi) è diventato un cassetto
+  laterale chiuso di default: si apre con **🛠 STRUMENTI** in topbar, si chiude con la ✕.
+  Nessun controllo rimosso: stessi id, stessa logica.
+- **Nebbia non invasiva e mappa luminosa:** la mappa parte tutta visibile (la nebbia è uno
+  strumento che il Master attiva quando serve), le celle nascoste non sono più nero pieno, e le
+  etichette di coordinate stampate sul terreno sono sparite.
+- **Una sola striscia d'iniziativa:** con la barra BG3 presente, la vecchia `#initiativeStrip`
+  resta spenta (prima comparivano entrambe, sovrapposte).
+- **Niente nemici fantasma all'avvio:** i tre PNG di esempio della mappa (Goblin/Bandito/
+  Scheletro) partono nascosti; i nemici compaiono solo quando il Master li evoca.
+- **Un solo flusso d'attacco lato giocatore:** tutti i pulsanti del player (HUD BG3 "Attacca",
+  scheda "Attacca"/"Critico") usano il flusso a due fasi ANIMATO (`resolveAttackAnimato`);
+  la risoluzione immediata `resolveAttack` resta solo per usi tecnici (comando IA `attack`,
+  test); `resolveAttackBetween`/`resolveAttackAnimatoTra` restano all'IA dei nemici.
+
+### Morte, risveglio e riavvio del combattimento (fix)
+
+- **`nextTurn()` non riavvia più il combattimento**: a scontro spento avanzare il turno non fa
+  nulla (prima richiamava `startCombat()` e riavviava lo scontro in uno stato rotto dopo un TPK).
+- **`startCombat()` rifiuta di partire se tutto il party è incosciente**: lo scontro riparte
+  solo quando almeno un PG è stato rianimato davvero.
+- **Dopo il TPK il party si risveglia** (HP pieni, messaggio narrativo in chat): niente più stato
+  "zombie" in cui il Master narra la rianimazione ma il PG resta meccanicamente a 0 HP. Il
+  riepilogo per il Master IA (modulo 29) fotografa comunque l'ultimo stato attivo, quindi l'esito
+  "sconfitta del party" resta corretto nella sua memoria.
 
 ## Master IA
 

@@ -98,6 +98,41 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       !document.getElementById("campOverlay").classList.contains("camp-active"), null, { timeout: 6000 });
     check("Campagna: il pulsante '← VTT' chiude davvero la schermata (non restava senza azione collegata)", true);
 
+    // --- Layout cinematografico (modulo 35): mappa protagonista al centro, chat del Master
+    // padrona della colonna destra, strumenti tecnici in un cassetto chiuso di default. ---
+    const layoutIniziale = await gm.evaluate(() => {
+      const drawer = document.getElementById("mapToolsDrawer");
+      const label = document.querySelector(".stage-label");
+      const body = document.querySelector(".side-panel.right .panel-body");
+      const primo = body ? body.firstElementChild : null;
+      const titolo = document.querySelector(".side-panel.right .panel-title");
+      return {
+        drawerChiuso: drawer ? window.getComputedStyle(drawer).display === "none" : null,
+        labelNascosta: label ? window.getComputedStyle(label).display === "none" : null,
+        chatInCima: Boolean(primo && primo.classList.contains("master-chat-panel")),
+        diagChiusa: (function () { const d = document.getElementById("diagnosticsDrawer"); return d ? d.open === false : null; })(),
+        titoloDestra: titolo ? titolo.textContent.trim() : ""
+      };
+    });
+    check("Layout: gli strumenti del Master partono CHIUSI (niente pannello sopra la mappa)", layoutIniziale.drawerChiuso === true);
+    check("Layout: nessuna etichetta diagnostica sopra la mappa", layoutIniziale.labelNascosta === true);
+    check("Layout: la chat del Master e' il PRIMO elemento della colonna destra", layoutIniziale.chatInCima === true);
+    check("Layout: la diagnostica sta in un cassetto richiudibile, chiuso di default", layoutIniziale.diagChiusa === true);
+    check("Layout: la colonna destra si intitola 'Chat Master'", layoutIniziale.titoloDestra === "Chat Master");
+
+    await gm.click("#mapToolsToggleBtn");
+    await gm.waitForFunction(() => {
+      const d = document.getElementById("mapToolsDrawer");
+      return d && window.getComputedStyle(d).display !== "none";
+    }, null, { timeout: 4000 });
+    check("Layout: 🛠 STRUMENTI apre il cassetto degli strumenti", true);
+    await gm.click("#mapToolsCloseBtn");
+    await gm.waitForFunction(() => {
+      const d = document.getElementById("mapToolsDrawer");
+      return d && window.getComputedStyle(d).display === "none";
+    }, null, { timeout: 4000 });
+    check("Layout: la ✕ richiude il cassetto (la mappa torna libera)", true);
+
     await connettiDaPannello(gm, { url: URL_RELAY, ruolo: "gm", id: "test-gm" });
     await gm.waitForFunction(() =>
       /Connesso/.test(document.querySelector(".vtt-sess-status-text").textContent), null, { timeout: 6000 });
@@ -179,6 +214,14 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("BG3 HUD: visibile dopo l'inizio del combattimento", true);
     const nCard = await gm.evaluate(() => document.querySelectorAll(".bg3-init-card").length);
     check("BG3 HUD: barra iniziativa con una card per combattente", nCard >= 2);
+    // Una SOLA striscia d'iniziativa: con la barra BG3 presente, la vecchia #initiativeStrip
+    // (modulo 06) deve restare spenta anche a combattimento attivo — prima comparivano entrambe,
+    // sovrapposte, a dire la stessa cosa.
+    const stripLegacy = await gm.evaluate(() => {
+      const s = document.getElementById("initiativeStrip");
+      return s ? { visibile: s.classList.contains("is-visible"), righe: s.children.length } : null;
+    });
+    check("Una sola barra iniziativa: la vecchia initiative strip resta spenta in combattimento", stripLegacy !== null && stripLegacy.visibile === false && stripLegacy.righe === 0);
     // L'iniziativa e' casuale: seleziona un bersaglio diverso dall'attaccante di turno, cosi' la
     // percentuale e' sempre calcolabile (non si mostra una % "contro se stessi").
     await gm.evaluate(() => {

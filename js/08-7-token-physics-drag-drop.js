@@ -28,9 +28,12 @@
         lastFrameTime: performance.now(),
         tokens: [
           { id: "token-pc", name: "Eroe Locale", kind: "pc", color: "#c89b3c", ringColor: "#f0ddb3", cellX: 16, cellY: 12, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.38, dragging: false, hidden: false },
-          { id: "token-npc-1", name: "Goblin", kind: "npc", color: "#5d9f45", ringColor: "#9fe087", cellX: 20, cellY: 12, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: false },
-          { id: "token-npc-2", name: "Bandito", kind: "npc", color: "#8f1d18", ringColor: "#ff8b83", cellX: 22, cellY: 14, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: false },
-          { id: "token-npc-3", name: "Scheletro", kind: "npc", color: "#707070", ringColor: "#d8c7a3", cellX: 20, cellY: 16, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: false }
+          // I tre PNG di esempio partono NASCOSTI: sulla scena iniziale c'e' solo l'eroe.
+          // I nemici veri compaiono quando il Master li evoca (spawn -> token-extra-N mappati
+          // esplicitamente). Questi restano disponibili alle liste tecniche (mappatura, select).
+          { id: "token-npc-1", name: "Goblin", kind: "npc", color: "#5d9f45", ringColor: "#9fe087", cellX: 20, cellY: 12, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: true },
+          { id: "token-npc-2", name: "Bandito", kind: "npc", color: "#8f1d18", ringColor: "#ff8b83", cellX: 22, cellY: 14, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: true },
+          { id: "token-npc-3", name: "Scheletro", kind: "npc", color: "#707070", ringColor: "#d8c7a3", cellX: 20, cellY: 16, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: true }
         ]
       };
 

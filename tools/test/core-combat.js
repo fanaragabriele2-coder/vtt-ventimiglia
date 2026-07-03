@@ -211,6 +211,40 @@ check("con altri PG ancora in piedi (pc-local) il combattimento e' ancora attivo
 C.applyDamageToCombatant("pc-local", 9999);
 check("quando ANCHE l'ultimo PG cade, scatta il TPK: resetCombat chiude il combattimento", C.getState().active === false);
 
+console.log("\n[Dopo il TPK: risveglio del party, niente stati 'zombie' a 0 HP]");
+check("dopo il TPK il PG locale si risveglia con gli HP pieni (niente vivo-ma-a-0-HP)", (function () {
+  const st = window.UltimateVTTState.getState();
+  return st.resources.hp.current === st.resources.hp.max;
+})());
+check("anche i membri del party si risvegliano (HP pieni nel roster hotseat)", (function () {
+  return window.partyData[1].resources.hp.current === window.partyData[1].resources.hp.max &&
+         window.partyData[2].resources.hp.current === window.partyData[2].resources.hp.max;
+})());
+check("nel tracker nessun PG resta 'defeated' dopo il risveglio", C.getState().combatants.every(c => c.kind !== "pc" || c.defeated === false));
+
+console.log("\n[Riavvio del combattimento: mai automatico, mai in stato rotto]");
+check("nextTurn a combattimento spento NON riavvia lo scontro", (function () {
+  C.nextTurn();
+  return C.getState().active === false;
+})());
+check("startCombat con TUTTI i PG incoscienti viene rifiutato", (function () {
+  // Riporta a terra tutto il party a combattimento spento (nessun TPK-trigger: combat inattivo).
+  window.UltimateVTTState.applyDamage(9999);
+  window.partyData[1].resources.hp.current = 0;
+  window.partyData[2].resources.hp.current = 0;
+  C.startCombat();
+  const rifiutato = C.getState().active === false && /incoscienti/i.test(C.getState().lastEvent);
+  return rifiutato;
+})());
+check("dopo una vera rianimazione startCombat riparte normalmente", (function () {
+  C.reviveCombatant("pc-local", 5);
+  C.startCombat();
+  const st = C.getState();
+  const ok = st.active === true && st.round === 1;
+  C.endCombat();
+  return ok;
+})());
+
 window.partyData = undefined;
 console.log("\nRisultato core-combat: " + passati + " passati, " + falliti + " falliti.");
 process.exit(falliti === 0 ? 0 : 1);

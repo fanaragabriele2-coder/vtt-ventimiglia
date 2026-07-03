@@ -214,8 +214,10 @@
 
       function initializeMapCells() {
         generateTerrain();
-        fillFog(true);
-        revealCircle(Math.floor(mapState.columns / 2), Math.floor(mapState.rows / 2), 5);
+        // La mappa parte tutta VISIBILE: la nebbia di guerra e' uno strumento che il Master attiva
+        // quando serve ("Tutto Buio" / pennello Nascondi), non un sipario nero che all'avvio copre
+        // quasi tutta la scena rendendo il tavolo illeggibile.
+        fillFog(false);
       }
 
       function resizeCanvasToDisplaySize() {
@@ -315,17 +317,8 @@
           context.stroke();
         }
 
-        context.fillStyle = "rgba(216, 199, 163, 0.46)";
-        context.font = "10px Arial, Helvetica, sans-serif";
-        context.textAlign = "left";
-        context.textBaseline = "top";
-
-        for (let labelY = 0; labelY < mapState.rows; labelY += 4) {
-          for (let labelX = 0; labelX < mapState.columns; labelX += 4) {
-            context.fillText(labelX + "," + labelY, labelX * mapState.gridSize + 4, labelY * mapState.gridSize + 4);
-          }
-        }
-
+        // Niente etichette di coordinate ("4,8") stampate sul terreno: erano rumore tecnico sopra
+        // la scena. La cella sotto il cursore resta leggibile nel readout in fondo agli strumenti.
         context.restore();
       }
 
@@ -350,13 +343,15 @@
           return;
         }
 
+        // Nebbia meno invasiva: le celle nascoste restano leggibili come "zona ignota" (non un nero
+        // pieno), quelle visibili non vengono scurite quasi per niente — la mappa resta luminosa.
         for (let y = 0; y < mapState.rows; y += 1) {
           for (let x = 0; x < mapState.columns; x += 1) {
             if (isFogHidden(x, y)) {
-              context.fillStyle = "rgba(0, 0, 0, 0.82)";
+              context.fillStyle = "rgba(4, 3, 6, 0.72)";
               context.fillRect(x * mapState.gridSize, y * mapState.gridSize, mapState.gridSize, mapState.gridSize);
             } else {
-              context.fillStyle = "rgba(0, 0, 0, 0.08)";
+              context.fillStyle = "rgba(0, 0, 0, 0.02)";
               context.fillRect(x * mapState.gridSize, y * mapState.gridSize, mapState.gridSize, mapState.gridSize);
             }
           }

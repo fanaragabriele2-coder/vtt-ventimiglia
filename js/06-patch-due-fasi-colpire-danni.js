@@ -443,6 +443,19 @@
       function startCombat() {
         syncPlayerCombatantFromState();
         syncPartyCombatantsFromRoster();
+        // Non si combatte con tutto il party a terra: dopo una sconfitta lo scontro puo' ripartire
+        // solo quando almeno un PG e' di nuovo cosciente (rianimato/curato DAVVERO), altrimenti si
+        // riaprirebbe un combattimento gia' perso in uno stato rotto (turni che girano a vuoto,
+        // nemici senza bersagli validi).
+        var pgCoscienti = combatState.combatants.some(function (c) {
+          return c.kind === "pc" && !c.defeated && c.hitPoints > 0;
+        });
+        if (!pgCoscienti) {
+          combatState.lastEvent = "Impossibile iniziare il combattimento: tutti i PG sono incoscienti. Rianimali prima.";
+          renderCombat();
+          appendLog(combatState.lastEvent);
+          return;
+        }
         combatState.active = true;
         combatState.round = 1;
         rollAllInitiative();
@@ -481,8 +494,14 @@
       }
 
       function nextTurn() {
+        // A combattimento spento avanzare il turno NON deve (ri)avviare lo scontro: dopo un TPK o
+        // una fine combattimento, un "Turno Succ." (o un nextTurn programmatico rimasto in coda)
+        // riavviava il combattimento in uno stato incoerente. Lo scontro parte SOLO da startCombat
+        // (pulsante Start, spawn dei nemici, ponte chat).
         if (!combatState.active) {
-          startCombat();
+          combatState.lastEvent = "Il combattimento non e' attivo: nessun turno da avanzare.";
+          renderCombat();
+          appendLog(combatState.lastEvent);
           return;
         }
 
@@ -699,6 +718,31 @@
         } catch (e) { /* ignora */ }
         appendLog("💀 TPK: tutti i PG sono a terra. Combattimento interrotto.");
         endCombat();
+        risveglioDopoLaSconfitta();
+      }
+
+      // Dopo il TPK il party NON resta in uno stato "zombie" a 0 HP: prima il Master narrava la
+      // rianimazione ma meccanicamente i PG restavano incoscienti, quindi il combattimento non
+      // poteva ripartire in modo valido (o ripartiva rotto). A scontro ormai chiuso — il riepilogo
+      // del modulo 29 fotografa l'ultimo stato ATTIVO, quindi l'esito "sconfitta del party" resta
+      // corretto — il party si risveglia con gli HP pieni, pronto a riprendere la storia. Applica
+      // il risveglio solo il Master (o il gioco in solitaria/hotseat): in multiplayer decide un
+      // client solo, come per tutte le azioni GM-autorevoli.
+      function risveglioDopoLaSconfitta() {
+        if (window.UltimateVTTSync && !window.UltimateVTTSync.isMaster()) {
+          return;
+        }
+        combatState.combatants.forEach(function risvegliaPg(c) {
+          if (c.kind !== "pc") {
+            return;
+          }
+          reviveCombatant(c.id, c.maxHitPoints || 1);
+        });
+        try {
+          if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) {
+            window.UltimateVTTCoreGameplay.appendChatMessage("system", "🌅 Il party si risveglia malconcio ma vivo: HP ripristinati. La storia continua.");
+          }
+        } catch (e) { /* ignora */ }
       }
 
       function setRollMode(mode) {
@@ -1087,6 +1131,14 @@
       function renderInitiativeStrip() {
         var strip = document.getElementById("initiativeStrip");
         if (!strip) return;
+        // La barra iniziativa in stile BG3 (modulo 23) e' l'UNICA striscia d'iniziativa del gioco:
+        // quando e' presente, questa versione precedente resta spenta, altrimenti in combattimento
+        // comparivano DUE barre sovrapposte che dicevano la stessa cosa una sopra l'altra.
+        if (window.UltimateVTTBG3HUD) {
+          strip.classList.remove("is-visible");
+          strip.innerHTML = "";
+          return;
+        }
         if (!combatState.active || combatState.combatants.length === 0) {
           strip.classList.remove("is-visible");
           strip.innerHTML = "";
