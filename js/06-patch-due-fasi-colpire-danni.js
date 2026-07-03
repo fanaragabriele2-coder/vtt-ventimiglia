@@ -132,10 +132,12 @@
         player.maxHitPoints = character.resources && character.resources.hp ? character.resources.hp.max : player.maxHitPoints;
         player.temporaryHitPoints = character.resources && character.resources.hp ? character.resources.hp.temporary : 0;
         player.initiativeBonus = dexModifier;
-        player.attackBonus = proficiencyBonus + Math.max(strengthModifier, dexModifier);
-        // formula danni: dado dell'arma equipaggiata + modificatore (Forza/Destrezza piu alto)
+        // formula danni: dado dell'arma equipaggiata + modificatore (Forza/Destrezza piu alto).
+        // Le armi dell'Armeria (modulo 41) portano un bonus di rarita' cotto nella formula
+        // ("1d8+2"): quel +N si somma al modificatore nei DANNI e si aggiunge anche al TIRO PER
+        // COLPIRE (arma magica: +N a colpire e ai danni).
         var atkMod = Math.max(strengthModifier, dexModifier);
-        var weaponDie = "1d8";
+        var weaponDie = "1d8", weaponBonus = 0;
         try {
           var inv = window.UltimateVTTInventory;
           if (inv && inv.getState) {
@@ -143,10 +145,15 @@
             var mainId = invState.equipmentSlots && invState.equipmentSlots.mainHand;
             var entry = mainId ? (invState.inventory || []).filter(function (e) { return e.inventoryId === mainId; })[0] : null;
             var cat = entry ? (inv.itemCatalog || []).filter(function (c) { return c.id === entry.catalogId; })[0] : null;
-            if (cat && cat.damage) { var dm = String(cat.damage).match(/\d+d\d+/); if (dm) weaponDie = dm[0]; }
+            if (cat && cat.damage) {
+              var dm = String(cat.damage).match(/(\d+d\d+)\s*([+-]\d+)?/);
+              if (dm) { weaponDie = dm[1]; weaponBonus = dm[2] ? parseInt(dm[2], 10) : 0; }
+            }
           }
         } catch (e) {}
-        player.damageFormula = atkMod > 0 ? (weaponDie + "+" + atkMod) : (atkMod < 0 ? (weaponDie + atkMod) : weaponDie);
+        player.attackBonus = proficiencyBonus + atkMod + weaponBonus;
+        var flatDanno = atkMod + weaponBonus;
+        player.damageFormula = flatDanno > 0 ? (weaponDie + "+" + flatDanno) : (flatDanno < 0 ? (weaponDie + flatDanno) : weaponDie);
         player.defeated = player.hitPoints <= 0;
       }
 
@@ -671,6 +678,25 @@
           const pgTotali = combatState.combatants.filter(function contaPg(c) { return c.kind === "pc"; });
           if (pgTotali.length > 0 && pgVivi.length === 0) {
             resetCombat();
+          }
+        }
+
+        // VITTORIA: quando l'ULTIMO nemico cade, lo scontro finisce DA SOLO (prima restava attivo
+        // e la chat del Master — in pausa durante il combattimento — non ripartiva mai finché non
+        // si premeva "End" a mano). All'annuncio segue endCombat: la chat si riattiva da sola,
+        // perché il suo blocco controlla lo stato active. Il controllo scatta SOLO sul danno a un
+        // PNG (l'evento dell'uccisione), non su un danno qualsiasi a un PG.
+        if (combatState.active && combatant.kind === "npc") {
+          const pncTotali = combatState.combatants.filter(function contaPnc(c) { return c.kind === "npc"; });
+          const pncVivi = pncTotali.filter(function contaPncVivi(c) { return !c.defeated && c.hitPoints > 0; });
+          if (pncTotali.length > 0 && pncVivi.length === 0) {
+            try {
+              if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) {
+                window.UltimateVTTCoreGameplay.appendChatMessage("system", "🏆 VITTORIA! Tutti i nemici sono stati sconfitti. La chat del Master è di nuovo attiva.");
+              }
+            } catch (eVitt) { /* ignora */ }
+            appendLog("🏆 Vittoria: tutti i nemici sconfitti. Combattimento concluso.");
+            endCombat();
           }
         }
         return true;

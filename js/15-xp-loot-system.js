@@ -36,6 +36,12 @@
     var items = [];
     table.forEach(function(row){ if (Math.random() < row[1]) items.push(row[0]); });
     var ref = XP_BY_NAME[bn] || 30;
+    // ARMERIA (modulo 41): drop di armi/armature/amuleti con RARITA' scalata sulla forza del
+    // nemico — piu' e' forte (XP/CR alto), piu' e' probabile un oggetto raro/epico/leggendario.
+    try {
+      var A = window.UltimateVTTArmeria;
+      if (A && A.rollDropNemico) { A.rollDropNemico(ref).forEach(function(id){ items.push(id); }); }
+    } catch(eArm){}
     var gold = Math.floor(Math.random() * Math.max(3, ref / 8)) + 1;
     return { items: items, gold: gold, enemyName: bn };
   }
@@ -243,7 +249,20 @@
     var sub = document.getElementById("lpSub"); if (sub) sub.textContent = loot.enemyName + " sconfitto";
     var box = document.getElementById("lpItems");
     if (box){
-      var rows = (loot.items || []).map(function(id){ return '<div class="lp-item">⚔️ ' + itemName(id) + '</div>'; });
+      var rows = (loot.items || []).map(function(id){
+        // Colore per rarita' (Armeria, modulo 41): il nome dell'oggetto brilla del suo colore.
+        var stile = "", badge = "";
+        try {
+          var A = window.UltimateVTTArmeria;
+          var rar = A && A.raritaDi ? A.raritaDi(id) : null;
+          if (rar && rar !== "comune") {
+            var col = A.coloreRarita(rar);
+            stile = ' style="border-color:' + col + ';color:' + col + '"';
+            badge = ' <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.85">[' + (A.RARITA[rar] ? A.RARITA[rar].etichetta : rar) + ']</span>';
+          }
+        } catch(eRar){}
+        return '<div class="lp-item"' + stile + '>⚔️ ' + itemName(id) + badge + '</div>';
+      });
       if (loot.gold) rows.push('<div class="lp-item lp-gold">🪙 ' + loot.gold + ' monete d\'oro</div>');
       if (!rows.length) rows.push('<div class="lp-item">Nessun oggetto.</div>');
       box.innerHTML = rows.join("");

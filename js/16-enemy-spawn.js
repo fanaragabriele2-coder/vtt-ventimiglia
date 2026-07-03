@@ -57,7 +57,10 @@
     } catch (eBil) { /* bilanciamento best-effort: in caso di errore si spawna la lista originale */ }
 
     var base = pcCell();
-    var offsets = [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[1,1],[-1,1],[1,-1],[-1,-1],[2,1],[-2,-1]];
+    // Distanza TATTICA: i nemici compaiono a 4-7 celle dal party (non piu' addosso), cosi' il
+    // posizionamento e il movimento (pulsante Sposta, ostacoli, altura) contano davvero, come in
+    // BG3: la distanza sulla griglia e' quella reale che separa PG e nemici.
+    var offsets = [[5,0],[-5,1],[0,5],[0,-5],[4,4],[-4,-4],[6,2],[-6,-1],[4,-4],[-4,4],[7,0],[-2,6]];
     var k = 0, names = [];
 
     // Prima si AGGIUNGONO i nemici, POI si avvia il combattimento (sotto): cosi' l'iniziativa viene

@@ -135,12 +135,33 @@ check("con un arco in mano principale la portata sale a 12 celle", (function () 
 })());
 check("i PNG del bestiario hanno portata di mischia (1)", C.portataArma({ kind: "npc" }) === 1);
 
+console.log("\n[Armeria: il bonus di rarita' dell'arma (+N) conta a colpire e nei danni]");
+check("un'arma '+2' equipaggiata alza il tiro per colpire e la formula danni del PG", (function () {
+  window.UltimateVTTInventory.itemCatalog.push({ id: "spada-magica", name: "Spada Magica", damage: "1d8+2" });
+  // Aspettative calcolate dai modificatori REALI del PG nello state manager.
+  const st = S.getState();
+  const mod = (v) => Math.floor((v - 10) / 2);
+  const atkMod = Math.max(mod(st.abilities.str.score), mod(st.abilities.dex.score));
+  const prof = st.proficiencyBonus;
+  armaEquipaggiata = "inv-magic"; inventarioPg = [{ inventoryId: "inv-magic", catalogId: "spada-magica" }];
+  C.rollAllInitiative(); // forza la sincronizzazione del PG dallo state manager + inventario
+  const pc = C.getState().combatants.find(c => c.id === "pc-local");
+  armaEquipaggiata = null; inventarioPg = [];
+  const flatAtteso = atkMod + 2;
+  return pc.damageFormula === ("1d8+" + flatAtteso) && pc.attackBonus === prof + atkMod + 2;
+})());
+
 console.log("\n[Regola 1: l'attacco del PG spende l'Azione — niente attacchi infiniti]");
+// Bersaglio DUREVOLE per i test d'attacco: uno zombie (22 HP) sopravvive al primo colpo — con la
+// nuova regola di vittoria, uccidere l'unico nemico chiuderebbe subito lo scontro a metà test.
+const zombieTest = C.addNpc("zombie");
+window.UltimateVTTCombatFSM = { combattenteAToken: (id) => (id === "pc-local" ? "token-pc" : (id === zombieTest.id ? "token-gob" : null)) };
 // Porta il turno al PG (nextTurn resetta l'economia a ogni cambio, come in gioco).
 C.startCombat();
 let guardia = 0;
 while (guardia++ < 10) { const st = C.getState(); if (st.combatants[st.currentTurnIndex] && st.combatants[st.currentTurnIndex].id === "pc-local") break; C.nextTurn(); }
-celleToken["token-gob"] = { x: 1, y: 0 }; // goblin adiacente
+C.getState(); // lo zombie e' il bersaglio selezionato (addNpc lo seleziona da solo)
+celleToken["token-gob"] = { x: 1, y: 0 }; // bersaglio adiacente
 economia.action = true;
 const primoAttacco = conSequenza([0.9, 0.5], () => C.resolveAttack());
 check("il primo attacco del turno viene eseguito", primoAttacco !== null);
@@ -244,6 +265,24 @@ check("dopo una vera rianimazione startCombat riparte normalmente", (function ()
   C.endCombat();
   return ok;
 })());
+
+console.log("\n[VITTORIA: uccisi tutti i nemici, lo scontro finisce DA SOLO]");
+C.reviveCombatant("pc-local", 20);
+C.startCombat();
+check("scenario: combattimento attivo con nemici in campo", C.getState().active === true && C.getState().combatants.some(c => c.kind === "npc" && !c.defeated));
+let annunciVittoria = [];
+window.UltimateVTTCoreGameplay = { appendChatMessage: (sp, t) => { annunciVittoria.push(t); } };
+// Uccidi TUTTI i PNG uno a uno: alla morte dell'ultimo il combattimento deve chiudersi da solo.
+C.getState().combatants.filter(c => c.kind === "npc").forEach(n => C.applyDamageToCombatant(n.id, 9999));
+check("alla morte dell'ULTIMO nemico il combattimento termina automaticamente", C.getState().active === false);
+check("tutti i PNG risultano sconfitti", C.getState().combatants.filter(c => c.kind === "npc").every(c => c.defeated));
+check("la vittoria viene annunciata in chat (e la chat del Master riparte)", annunciVittoria.some(t => /VITTORIA/i.test(t)));
+check("un danno a un PG fuori combattimento NON genera falsi annunci di vittoria", (function () {
+  annunciVittoria = [];
+  C.applyDamageToCombatant("pc-local", 1);
+  return !annunciVittoria.some(t => /VITTORIA/i.test(t));
+})());
+window.UltimateVTTCoreGameplay = undefined;
 
 window.partyData = undefined;
 console.log("\nRisultato core-combat: " + passati + " passati, " + falliti + " falliti.");

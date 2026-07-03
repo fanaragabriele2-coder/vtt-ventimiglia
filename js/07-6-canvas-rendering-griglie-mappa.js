@@ -265,6 +265,20 @@
         return getTerrainAt(cellX, cellY) === "wall";
       }
 
+      // Scrive il terreno di UNA cella (usato dall'arena tattica, modulo 40, per piazzare ostacoli
+      // e coperture a inizio combattimento). Terreni validi: stone/earth/water/wall.
+      function setTerrainAt(cellX, cellY, terrain) {
+        if (!isCellInBounds(cellX, cellY)) {
+          return false;
+        }
+        const valid = ["stone", "earth", "water", "wall"];
+        if (valid.indexOf(terrain) < 0) {
+          return false;
+        }
+        mapState.terrainCells[cellIndex(cellX, cellY)] = terrain;
+        return true;
+      }
+
       function drawTerrainLayer() {
         const palette = terrainPalettes[mapState.terrainMode] || terrainPalettes.dungeon;
 
@@ -740,6 +754,11 @@
         isFogHidden: isFogHidden,
         isTerrainBlocking: isTerrainBlocking,
         getTerrainAt: getTerrainAt,
+        setTerrainAt: function publicSetTerrainAt(cellX, cellY, terrain) {
+          const ok = setTerrainAt(cellX, cellY, terrain);
+          if (ok) { requestRender(); }
+          return ok;
+        },
         worldToScreen: worldToScreen,
         screenToWorld: screenToWorld,
         screenToCell: screenToCell,

@@ -36,6 +36,8 @@ const suite = [
   ["Core: Encounter Balancer / scontri bilanciati (modulo 37)", "core-encounter-balancer.js"],
   ["Core: menu Azione Bonus dinamico (modulo 38)", "core-action-menu.js"],
   ["Core: ponte chat Master -> mappa POI Ventimiglia (modulo 39)", "core-chat-map-sync.js"],
+  ["Core: arena tattica / movimento col click (modulo 40)", "core-arena-tattica.js"],
+  ["Core: armeria con rarita' e drop scalati (modulo 41)", "core-armeria.js"],
   // Livello multiplayer real-time (Fasi 1-3 + hardening).
   ["Smoke moduli 18/19/20", "smoke.js"],
   ["Sync turni / hydration / interpolazione", "sync.js"],

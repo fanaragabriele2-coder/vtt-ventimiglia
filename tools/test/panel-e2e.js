@@ -246,6 +246,28 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("BG3 HUD: presente il pulsante 'Termina turno'", hasEnd === true);
     await gm.waitForSelector("#bg3ShoveButton", { timeout: 6000 });
     check("BG3 HUD: il modulo 26 inietta il pulsante 'Spingi'", true);
+
+    // --- Arena tattica (modulo 40) + menu azioni (modulo 38): a combattimento attivo la scena e'
+    // strategica (insegna del luogo, pulsante Sposta per il movimento col click) e la barra azioni
+    // offre il menu dinamico delle Azioni Bonus. ---
+    await gm.waitForFunction(() => {
+      const b = document.getElementById("arenaLuogoBanner");
+      return b && !b.hidden && b.textContent.length > 3;
+    }, null, { timeout: 6000 });
+    check("Arena: l'insegna del LUOGO del combattimento compare sopra la scena", true);
+    await gm.waitForSelector("#bg3MoveButton", { timeout: 6000 });
+    check("Arena: il pulsante '👣 Sposta' (movimento col click) e' nella barra azioni", true);
+    await gm.waitForSelector("#bg3BonusButton", { timeout: 6000 });
+    check("Azioni: il pulsante '⚡ Bonus' (menu dinamico) e' nella barra azioni", true);
+    const spostaFunziona = await gm.evaluate(() => {
+      // La modalita' movimento si attiva/disattiva senza errori (il click sulla cella e' provato
+      // dalla suite unit del modulo 40; qui si verifica il collegamento reale del pulsante).
+      document.getElementById("bg3MoveButton").click();
+      const attivo = window.UltimateVTTArena.movimentoAttivo();
+      window.UltimateVTTArena.attivaModalitaMovimento(false);
+      return attivo === true && window.UltimateVTTArena.movimentoAttivo() === false;
+    });
+    check("Arena: 'Sposta' attiva e disattiva la modalita' movimento", spostaFunziona === true);
     const primaCella = await gm.evaluate(() => {
       const st = window.UltimateVTTCombat.getState();
       const cur = st.combatants[st.currentTurnIndex];
@@ -293,6 +315,11 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       const tokBersaglio = window.UltimateVTTCombatFSM.combattenteAToken(nemico.id);
       const sel = document.getElementById("moduleFiveTargetSelect");
       if (sel) { sel.value = nemico.id; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      // L'arena tattica (modulo 40) puo' aver piazzato ostacoli casuali: libera le celle usate da
+      // questo test deterministico (attaccante, bersaglio e destinazione della spinta).
+      if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.setTerrainAt) {
+        [[10, 10], [11, 10], [12, 10]].forEach(c => window.UltimateVTTCanvas.setTerrainAt(c[0], c[1], "stone"));
+      }
       let esito = null;
       for (let i = 0; i < 10 && (!esito || !esito.successo); i++) {
         // La Spinta di un PG spende l'Azione Bonus: tra un tentativo e l'altro il pool va
@@ -419,9 +446,22 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     });
     check("IA nemici: l'HUD dadi si richiude da sola a fine animazione", hudChiusa === true);
 
-    await gm.evaluate(() => window.UltimateVTTCombat && window.UltimateVTTCombat.endCombat());
+    // --- VITTORIA AUTOMATICA: uccidi tutti i nemici e verifica che lo scontro finisca DA SOLO
+    // (prima serviva premere "End" a mano e la chat del Master restava in pausa per sempre). ---
+    await gm.evaluate(() => {
+      const C = window.UltimateVTTCombat;
+      C.getState().combatants.filter(c => c.kind === "npc" && !c.defeated).forEach(n => C.applyDamageToCombatant(n.id, 9999));
+    });
+    await gm.waitForFunction(() => window.UltimateVTTCombat.getState().active === false, null, { timeout: 6000 });
+    check("VITTORIA: uccisi tutti i nemici, il combattimento termina DA SOLO", true);
+    const vittoriaInChat = await gm.evaluate(() => /VITTORIA/i.test(document.getElementById("masterChatLog").textContent));
+    check("VITTORIA: l'annuncio arriva nella chat del Master (che si riattiva)", vittoriaInChat === true);
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);
+    // Chiudi eventuali popup di bottino aperti dalle uccisioni (per non coprire i passi successivi).
+    await gm.evaluate(() => {
+      for (let i = 0; i < 8; i++) { const b = document.getElementById("lpTake"); if (b) b.click(); else break; }
+    });
 
     // --- Memoria di combattimento per il Master IA (modulo 29): a fine scontro il riepilogo deve
     // raggiungere davvero il canale della memoria del Master IA nell'app reale (js/12), non solo
@@ -432,6 +472,21 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     const riepilogoReale = await gm.evaluate(() => window.UltimateVTTCoreGameplay.getUltimoRiepilogoCombattimento());
     check("Memoria Master IA: il riepilogo di fine combattimento raggiunge davvero js/12", /RIEPILOGO DEL COMBATTIMENTO/.test(riepilogoReale));
     check("Memoria Master IA: il riepilogo riporta un esito riconoscibile", /vittoria del party|sconfitta del party|combattimento interrotto/.test(riepilogoReale));
+
+    // Le uccisioni della vittoria fanno comparire i popup di bottino ANCHE sul Giocatore (il suo
+    // js/15 rileva le stesse sconfitte via rete): vanno chiusi o intercettano i click successivi.
+    // La coda ne mostra uno alla volta: si chiudono finche' non ne restano.
+    for (let giro = 0; giro < 10; giro++) {
+      const ancoraAperto = await pl.evaluate(() => {
+        const pop = document.getElementById("vttLootPop");
+        if (!pop || !pop.classList.contains("show")) return false;
+        const b = document.getElementById("lpTake") || document.getElementById("lpLeave");
+        if (b) b.click();
+        return true;
+      });
+      if (!ancoraAperto) break;
+      await sleep(150);
+    }
 
     // Disconnessione del giocatore -> il roster del GM torna a 1.
     await pl.click(".vtt-sess-btn:has-text('Disconnetti')");

@@ -45,7 +45,9 @@ vttg2506/
 │   ├── 36-global-game-state.js         ← Global Game State: store osservabile unico (get/set/subscribe/publish)
 │   ├── 37-encounter-balancer.js        ← Encounter Balancer: scontri scalati su party/livelli/HP (anti-swarm, anti-TPK)
 │   ├── 38-action-menu.js               ← menu Azione Bonus dinamico (classe/razza/inventario)
-│   └── 39-chat-map-sync.js             ← ponte chat Master → mappa Ventimiglia (POI dalla narrazione)
+│   ├── 39-chat-map-sync.js             ← ponte chat Master → mappa Ventimiglia (POI dalla narrazione)
+│   ├── 40-arena-tattica.js             ← arena strategica: ostacoli, altura, luogo, movimento col click
+│   └── 41-armeria-rarita.js            ← armeria: rarità (comune→leggendaria), armature, amuleti, drop scalati
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -170,6 +172,42 @@ così una menzione di sfuggita non teletrasporta) e **sposta l'icona del party**
 overworld (Campagna + mappa reale Ventimiglia). La posizione vive solo nel Global Game State
 (`party.location`): se il party è già lì (magari mosso dal percorso JSON `moveTo` del Master IA),
 il movimento non viene rifatto (idempotenza). GM-autorevole e in pausa durante il combattimento.
+
+## Combattimento strategico e bottino (stile BG3)
+
+**Vittoria automatica (fix, `js/06`).** Quando l'ULTIMO nemico cade, lo scontro finisce da solo con
+l'annuncio "🏆 VITTORIA!" e la chat del Master si riattiva — prima restava tutto appeso finché non
+si premeva "End" a mano. Il controllo scatta solo sul danno a un PNG (l'evento dell'uccisione).
+
+**Arena tattica — `js/40-arena-tattica.js` (`UltimateVTTArena`).** A inizio combattimento la
+griglia diventa un campo di battaglia strategico:
+- **ostacoli/coperture** generati attorno alla zona dello scontro (celle "wall", mai a ridosso dei
+  token), da usare per la manovra;
+- una **zona sopraelevata** (highground, modulo 28): chi ci sale ha **vantaggio** sui bersagli in
+  basso — meccanica già attiva nel motore;
+- l'**insegna del luogo** (dall'ultimo POI narrato dal Master, modulo 39) sotto la barra iniziativa,
+  con palette del terreno a tema (Teatro Romano→pietra, Giardini Hanbury→verde, Porto→scuro…);
+- i nemici compaiono a **distanza tattica reale** (4-7 celle, `js/16`), non più addosso al party;
+- il pulsante **👣 Sposta** nella barra azioni: clicchi, poi scegli la cella di destinazione sulla
+  griglia — il PG si muove entro il **budget di movimento del turno** (FSM, modulo 19), rispettando
+  gli ostacoli, con costi in metri (Chebyshev × 1,5 m). Come il click-to-move di BG3.
+
+**Armeria — `js/41-armeria-rarita.js` (`UltimateVTTArmeria`).** Equipaggiamento in stile BG3:
+- **rarità** comune / **rara** (blu, +1) / **epica** (viola, +2) / **leggendaria** (arancio, +3),
+  con colore e bonus in tabella;
+- **armi con abilità** (il bonus vale sia a colpire sia nei danni: il motore combat legge il "+N"
+  dell'arma equipaggiata), **armature** (CA base) e **amuleti** (slot collo, +CA), più consumabili
+  potenti (Pozione Maggiore, Elisir);
+- **drop scalati sulla forza del nemico** (`js/15`): più il nemico è forte (XP/CR), più è probabile
+  che lasci oggetti rari — i boss possono lasciarne due; nel popup del bottino i nomi brillano del
+  colore della rarità;
+- ogni classe parte con **arma primaria E secondaria** equipaggiate (Guerriero spada+scudo, Barbaro
+  spada+pugnale, Ladro spada corta+pugnale, Ranger arco+spada corta, Mago bastone+focus, Chierico
+  bastone+scudo);
+- gli oggetti raccolti finiscono nello **zaino del PG** (inventario per-personaggio, modulo 17), si
+  **equipaggiano** dagli slot della scheda e si **usano** sia fuori dal combattimento (inventario)
+  sia in combattimento come **Azione Bonus** (menu ⚡, modulo 38). Tutto passa dal catalogo del
+  modulo 05 (`registerCatalogItems`): aggiungere un oggetto leggendario è aggiungere una riga.
 
 ## Master IA
 
