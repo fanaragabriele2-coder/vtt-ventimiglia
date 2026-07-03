@@ -20,6 +20,14 @@ streamlit run app.py
 
 L'app si apre su `http://localhost:8501` con layout wide e tema scuro.
 
+### Avvio rapido successivo (Windows)
+
+Dopo il primo setup, per riaprire l'Hub basta un doppio click su
+**`run_hub.bat`** (nella cartella `god_mode_hub/`): attiva il venv e avvia
+`streamlit run app.py`, che apre automaticamente il browser predefinito.
+Puoi trascinare un collegamento a questo file sul Desktop per un accesso
+ancora più rapido.
+
 ### Backend esterni (opzionali ma consigliati)
 
 | Backend | A cosa serve | Setup |
