@@ -40,6 +40,22 @@
     // il Master puo' evocarne di nuovi per un nuovo combattimento.
     try { if (Combat.getState && Combat.getState().active) return; } catch (eAttivo) {}
 
+    // ENCOUNTER BALANCER (modulo 37): prima di far comparire i nemici, ridimensiona quantita' e
+    // statistiche in base al party reale (numero, livello, HP correnti), cosi' un PG solitario non
+    // viene circondato da 10 goblin e non si generano TPK accidentali. Retrocompatibile: se il
+    // modulo non c'e', si spawna la lista com'e'. Ogni tipo puo' portare "overrides" con le stat
+    // scalate, passati ad addNpc.
+    var overridesPerTipo = {};
+    try {
+      if (window.UltimateVTTEncounterBalancer && window.UltimateVTTEncounterBalancer.bilanciaPerGioco) {
+        var bil = window.UltimateVTTEncounterBalancer.bilanciaPerGioco(list);
+        if (bil && Array.isArray(bil.lista) && bil.lista.length) {
+          list = bil.lista;
+          bil.lista.forEach(function (t) { overridesPerTipo[idFor(t.name)] = t.overrides || null; });
+        }
+      }
+    } catch (eBil) { /* bilanciamento best-effort: in caso di errore si spawna la lista originale */ }
+
     var base = pcCell();
     var offsets = [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[1,1],[-1,1],[1,-1],[-1,-1],[2,1],[-2,-1]];
     var k = 0, names = [];
@@ -53,9 +69,10 @@
       var cid = idFor(e.name || e.type || e.id);
       var tmpl = templateById(cid);
       var label = tmpl ? tmpl.name : (e.name || "Nemico");
+      var overrides = overridesPerTipo[cid] || null;
       for (var c=0;c<count;c++){
         var comb = null, tok = null;
-        try { comb = Combat.addNpc(cid); } catch (err) {}
+        try { comb = Combat.addNpc(cid, overrides); } catch (err) {}
         var off = offsets[k % offsets.length]; k++;
         try { if (TP && TP.addToken) tok = TP.addToken(label, base.cellX + off[0], base.cellY + off[1], "#8f1d18"); } catch (err2) {}
         // Collega esplicitamente il token appena creato (id "token-extra-N") al combattente

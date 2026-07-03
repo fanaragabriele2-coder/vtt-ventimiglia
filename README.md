@@ -41,7 +41,11 @@ vttg2506/
 │   ├── 32-campaign-memory.js           ← diario di campagna a lungo termine per il Master IA
 │   ├── 33-enemy-ai.js                  ← IA dei nemici: al loro turno si avvicinano e attaccano
 │   ├── 34-chat-combat-bridge.js        ← ponte chat Master → combat system (spawn dalla narrazione)
-│   └── 35-layout-cinematografico.js    ← layout definitivo a 3 colonne: cassetto strumenti, topbar misurata
+│   ├── 35-layout-cinematografico.js    ← layout definitivo a 3 colonne: cassetto strumenti, topbar misurata
+│   ├── 36-global-game-state.js         ← Global Game State: store osservabile unico (get/set/subscribe/publish)
+│   ├── 37-encounter-balancer.js        ← Encounter Balancer: scontri scalati su party/livelli/HP (anti-swarm, anti-TPK)
+│   ├── 38-action-menu.js               ← menu Azione Bonus dinamico (classe/razza/inventario)
+│   └── 39-chat-map-sync.js             ← ponte chat Master → mappa Ventimiglia (POI dalla narrazione)
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -121,6 +125,51 @@ Interventi strutturali della revisione (con i bug che risolvono):
   "zombie" in cui il Master narra la rianimazione ma il PG resta meccanicamente a 0 HP. Il
   riepilogo per il Master IA (modulo 29) fotografa comunque l'ultimo stato attivo, quindi l'esito
   "sconfitta del party" resta corretto nella sua memoria.
+
+## Sistemi RPG avanzati (bilanciamento, azioni dinamiche, chat→mappa)
+
+Tre sistemi core costruiti su un unico stato condiviso, così chat, combattimento, inventario e
+mappe reagiscono agli stessi eventi senza copie divergenti.
+
+**Global Game State — `js/36-global-game-state.js` (`UltimateVTTGameState`).** Lo store osservabile
+unico (l'equivalente vanilla di Provider/Riverpod/BLoC): `get(chiave)`, `set(chiave, valore)` (che
+notifica solo se il valore cambia), `subscribe(evento, cb)` e `publish(evento, payload)`. Chiavi a
+namespace (`party.location`, `encounter.last`, …). È la "singola fonte di verità" a cui gli altri
+sistemi si iscrivono, invece di tenere variabili indipendenti e in conflitto.
+
+**Encounter Balancer — `js/37-encounter-balancer.js` (`UltimateVTTEncounterBalancer`).** Basta col
+PG solitario circondato da 10 goblin. Prima di far comparire i nemici, calcola un **budget di
+minaccia** dal party reale — numero di membri, livello (dalla progressione, modulo 15) e **HP
+correnti** — e ridimensiona lo scontro:
+- la **quantità** dei nemici viene ridotta (mai oltre ~3 per PG vivo; almeno 1) finché la minaccia
+  totale rientra nel budget;
+- le **statistiche** vengono scalate (`statScale`): nemici indeboliti quando il party è debole o
+  ferito (anti-TPK), rinforzati quando il party è forte e i nemici sarebbero banali;
+- un membro a 0 HP non conta nel budget, e dopo uno scontro duro (HP bassi) gli avversari
+  successivi sono più leggeri.
+
+Tutta la matematica è in funzioni pure (`potenzaPg`, `potenzaPartito`, `budgetSfida`, `bilancia`);
+i pesi di minaccia derivano dal Challenge Rating 5e del bestiario (data-driven, niente numeri
+sparsi). Lo spawn (modulo 16) consulta il balancer e passa gli override scalati ad `addNpc`
+(esteso, retrocompatibile). Il risultato è pubblicato sul Global Game State (`encounter.last`).
+
+**Menu Azione Bonus dinamico — `js/38-action-menu.js` (`UltimateVTTActionMenu`).** Il PG ha 1
+Azione e 1 Azione Bonus per turno, ma le **opzioni** di Azione Bonus sono istanziate dinamicamente
+valutando **classe, razza e inventario**: il Guerriero ha "Recupero Energie", il Ladro "Azione
+Scaltra", una pozione nello zaino diventa "Bevi Pozione" (consumata dopo l'uso), un'arma secondaria
+equipaggiata abilita un attacco bonus. Le capacità stanno in cataloghi dati (`CAPACITA_CLASSE`,
+`CAPACITA_RAZZA`) — aggiungere un archetipo è aggiungere una voce, non codice (VINCOLO NEGATIVO 2).
+Un pulsante **⚡ Bonus** nella barra azioni BG3 apre la griglia delle opzioni correnti; scegliendone
+una si spende la risorsa e si applica l'effetto reale (cura, consumo oggetto, attacco).
+
+**Ponte chat Master → mappa Ventimiglia — `js/39-chat-map-sync.js` (`UltimateVTTMapSync`).** Un
+listener avvolge la chat (come i moduli 29/34); quando il **Master narra un arrivo** nominando un
+POI codificato ("Arrivate alla Passeggiata", "Giungete al Forte dell'Annunziata"), un parser
+riconosce il luogo (alias semantici → nome canonico → parole chiave, con gating sui verbi d'arrivo
+così una menzione di sfuggita non teletrasporta) e **sposta l'icona del party** sulla mappa
+overworld (Campagna + mappa reale Ventimiglia). La posizione vive solo nel Global Game State
+(`party.location`): se il party è già lì (magari mosso dal percorso JSON `moveTo` del Master IA),
+il movimento non viene rifatto (idempotenza). GM-autorevole e in pausa durante il combattimento.
 
 ## Master IA
 

@@ -531,7 +531,24 @@
         appendLog(combatState.lastEvent);
       }
 
-      function addNpc(catalogId) {
+      // Applica una variazione al modificatore fisso di una formula danni ("1d6+2" con delta -1 ->
+      // "1d6+1"; "2d4" con delta +1 -> "2d4+1"). Non tocca i dadi: scala solo il bonus costante.
+      function applicaDeltaDanno(formula, delta) {
+        const norm = String(formula || "1d4").trim();
+        const m = norm.match(/^(.*?d\d+)\s*([+-]\s*\d+)?$/i);
+        if (!m) { return norm; }
+        const dado = m[1].replace(/\s+/g, "");
+        const bonusAttuale = m[2] ? parseInt(m[2].replace(/\s+/g, ""), 10) : 0;
+        const nuovo = bonusAttuale + delta;
+        if (nuovo === 0) { return dado; }
+        return dado + (nuovo > 0 ? "+" + nuovo : String(nuovo));
+      }
+
+      // addNpc(catalogId[, overrides]): overrides opzionale usato dall'Encounter Balancer (modulo
+      // 37) per SCALARE le statistiche del nemico appena creato senza toccare il catalogo — es.
+      // { hitPoints, maxHitPoints, attackBonus, armorClass, damageBonusDelta }. Retrocompatibile:
+      // senza overrides il PNG esce identico al template, come prima.
+      function addNpc(catalogId, overrides) {
         const npcTemplate = npcCatalog.find(function findNpc(template) {
           return template.id === catalogId;
         });
@@ -544,18 +561,24 @@
           return combatant.kind === "npc" && combatant.name.indexOf(npcTemplate.name) === 0;
         }).length + 1;
 
+        const ov = overrides || {};
+        const hp = clampNumber(ov.hitPoints != null ? ov.hitPoints : npcTemplate.hitPoints, 1, 9999, npcTemplate.hitPoints);
+        // damageBonusDelta: variazione del modificatore FISSO della formula danni (es. "1d6+2" con
+        // delta -1 -> "1d6+1"). Scala l'offesa senza cambiare il dado, mantenendo la formula leggibile.
+        const dmgFormula = ov.damageBonusDelta ? applicaDeltaDanno(npcTemplate.damageFormula, ov.damageBonusDelta) : npcTemplate.damageFormula;
+
         const combatant = {
           id: "npc-" + combatState.nextNpcNumber,
           kind: "npc",
           name: npcTemplate.name + " " + sameTypeCount,
-          armorClass: npcTemplate.armorClass,
-          hitPoints: npcTemplate.hitPoints,
-          maxHitPoints: npcTemplate.hitPoints,
+          armorClass: clampNumber(ov.armorClass != null ? ov.armorClass : npcTemplate.armorClass, 1, 40, npcTemplate.armorClass),
+          hitPoints: hp,
+          maxHitPoints: clampNumber(ov.maxHitPoints != null ? ov.maxHitPoints : hp, 1, 9999, hp),
           temporaryHitPoints: 0,
           initiative: 0,
           initiativeBonus: npcTemplate.initiativeBonus,
-          attackBonus: npcTemplate.attackBonus,
-          damageFormula: npcTemplate.damageFormula,
+          attackBonus: clampNumber(ov.attackBonus != null ? ov.attackBonus : npcTemplate.attackBonus, -5, 30, npcTemplate.attackBonus),
+          damageFormula: dmgFormula,
           defeated: false
         };
 
