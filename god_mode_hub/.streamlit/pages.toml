@@ -1,0 +1,40 @@
+# Elenco dichiarativo delle pagine (opzionale).
+#
+# Questo file è letto dal pacchetto opzionale `st-pages`. L'Hub funziona anche
+# senza: Streamlit scopre automaticamente le pagine dalla cartella `pages/`.
+# Se vuoi usare la navigazione dichiarativa: pip install st-pages
+
+[[pages]]
+path = "app.py"
+name = "Hub"
+icon = "🚀"
+
+[[pages]]
+path = "pages/01_🏠_Home.py"
+name = "Home"
+icon = "🏠"
+
+[[pages]]
+path = "pages/02_🧠_Secondo_Cervello.py"
+name = "Secondo Cervello"
+icon = "🧠"
+
+[[pages]]
+path = "pages/03_⚙️_Orchestratore.py"
+name = "Orchestratore"
+icon = "⚙️"
+
+[[pages]]
+path = "pages/04_🎨_Asset_Forge.py"
+name = "Asset Forge"
+icon = "🎨"
+
+[[pages]]
+path = "pages/05_👤_Generatore_Personaggi.py"
+name = "Generatore Personaggi"
+icon = "👤"
+
+[[pages]]
+path = "pages/06_🎬_Animazioni.py"
+name = "Animazioni"
+icon = "🎬"

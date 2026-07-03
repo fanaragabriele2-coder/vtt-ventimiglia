@@ -1,0 +1,22 @@
+# Configurazione Streamlit — God-Mode Local AI Hub
+#
+# NOTA: il layout "wide" non è un'opzione di config.toml: viene impostato in
+# ogni pagina con st.set_page_config(layout="wide").
+
+[theme]
+base = "dark"
+primaryColor = "#7c3aed"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1a1d29"
+textColor = "#fafafa"
+
+[server]
+# Nota: con XSRF attivo Streamlit forza comunque CORS a true (warning innocuo
+# all'avvio). Teniamo entrambe le impostazioni esplicite per documentare l'intento.
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 512
+
+[browser]
+# 100% locale: nessuna telemetria verso l'esterno.
+gatherUsageStats = false

@@ -1,0 +1,18 @@
+# God-Mode Local AI Hub — dipendenze Python (100% locale, nessuna API cloud)
+#
+# Installazione: pip install -r requirements.txt
+# Python 3.12+ consigliato (funziona da 3.10 in su).
+
+streamlit>=1.40
+chromadb>=0.6.3
+sentence-transformers>=3.0
+mdextractor>=0.1.0
+requests>=2.31
+Pillow>=10.0
+
+# --- Backend esterni (NON pip, vedi README) -------------------------------
+# Stable Diffusion : Stability Matrix / A1111-Forge con --api sulla porta 7860
+# TripoSR          : repo clonato a parte, puntato dalla env var TRIPOSR_DIR
+#                    (usa il suo venv: env var TRIPOSR_PYTHON)
+# TRELLIS.2        : servizio HTTP locale opzionale, env var TRELLIS_URL
+# ffmpeg           : opzionale, per l'export MP4 delle animazioni

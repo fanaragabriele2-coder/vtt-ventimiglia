@@ -1,0 +1,12 @@
+# Artefatti generati dall'Hub (ricostruibili in locale)
+__pycache__/
+*.pyc
+chroma_index/
+wiki/wiki_fts.db*
+.streamlit/secrets.toml
+
+# Output pesanti di Asset Forge: decommenta se non vuoi versionarli
+# asset_forge/**/*.png
+# asset_forge/**/*.glb
+# asset_forge/**/*.gif
+# asset_forge/**/*.mp4
