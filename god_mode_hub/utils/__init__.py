@@ -24,8 +24,12 @@ WIKI_SOURCES_DIR: Final[Path] = WIKI_DIR / "sources"
 WIKI_CONCEPTS_DIR: Final[Path] = WIKI_DIR / "concepts"
 WIKI_ENTITIES_DIR: Final[Path] = WIKI_DIR / "entities"
 
-#: Codebase Flutter/Python su cui gira il RAG (file .dart / .py).
+#: Codebase Flutter/Python futura su cui gira il RAG (file .dart / .py).
 CODEBASE_DIR: Final[Path] = HUB_ROOT / "codebase"
+
+#: Progetto VTT attuale (JS/HTML/CSS): la cartella padre di god_mode_hub,
+#: cioè la radice del repo (index.html, css/, js/, tools/).
+VTT_PROJECT_DIR: Final[Path] = HUB_ROOT.parent
 
 #: Output di Asset Forge.
 ASSET_FORGE_DIR: Final[Path] = HUB_ROOT / "asset_forge"

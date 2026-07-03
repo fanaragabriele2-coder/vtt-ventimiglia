@@ -1,4 +1,4 @@
-"""🧠 Secondo Cervello — RAG sulla codebase Flutter + LLM Wiki con FTS5."""
+"""🧠 Secondo Cervello — RAG sul progetto VTT (js/css/html) + LLM Wiki con FTS5."""
 
 from __future__ import annotations
 
@@ -43,18 +43,29 @@ with tab_rag:
                 icon="⚠️",
             )
         else:
-            st.info(f"Chunk indicizzati: **{indexed}** · cartella `codebase/`", icon="📦")
+            st.info(
+                f"Chunk indicizzati: **{indexed}** · progetto VTT "
+                f"(`{chroma_rag.VTT_PROJECT_DIR.name}/`: js, css, html) + "
+                "`codebase/` (Flutter futuro)",
+                icon="📦",
+            )
     with action_col:
-        if st.button("📥 (Re)indicizza codebase", use_container_width=True, disabled=not chroma_ok):
+        if st.button("📥 (Re)indicizza tutto", use_container_width=True, disabled=not chroma_ok):
             with st.spinner("Indicizzazione in corso (il primo avvio scarica il modello di embedding)…"):
                 try:
-                    stats = chroma_rag.ingest_codebase()
+                    stats = chroma_rag.ingest_all()
                 except Exception as exc:  # noqa: BLE001 — mostrato all'utente
                     st.error(f"Indicizzazione fallita: {exc}")
                 else:
-                    st.success(f"Indicizzati {stats.files} file → {stats.chunks} chunk.")
-                    if stats.skipped:
-                        st.caption("Saltati: " + ", ".join(stats.skipped[:10]))
+                    vtt_stats = stats["vtt_web"]
+                    code_stats = stats["codebase"]
+                    st.success(
+                        f"VTT (js/css/html): {vtt_stats.files} file → {vtt_stats.chunks} chunk. "
+                        f"Flutter (codebase/): {code_stats.files} file → {code_stats.chunks} chunk."
+                    )
+                    skipped = vtt_stats.skipped + code_stats.skipped
+                    if skipped:
+                        st.caption("Saltati: " + ", ".join(skipped[:10]))
                     st.rerun()
 
     query = st.text_input(
@@ -73,13 +84,19 @@ with tab_rag:
                 hits = []
         if not hits:
             st.info(
-                "Nessun risultato. La cartella `codebase/` è vuota? Copia lì i "
-                "sorgenti Flutter del VTT e reindicizza."
+                "Nessun risultato. Hai già indicizzato con '📥 (Re)indicizza tutto' "
+                "qui sopra?"
             )
         for hit in hits:
-            badge = "🟣 vettoriale" if hit.source == "chroma" else "🔤 full-text"
-            with st.expander(f"`{hit.path}` · riga {hit.start_line} · score {hit.score} · {badge}"):
-                language = "dart" if hit.path.endswith(".dart") else "python"
+            source_badge = "🟣 vettoriale" if hit.source == "chroma" else "🔤 full-text"
+            project_badge = "🌐 VTT (js/css/html)" if hit.project == "vtt_web" else "📱 codebase (Flutter)"
+            with st.expander(
+                f"`{hit.path}` · riga {hit.start_line} · score {hit.score} · "
+                f"{project_badge} · {source_badge}"
+            ):
+                ext_lang = {".dart": "dart", ".py": "python", ".js": "javascript",
+                            ".html": "html", ".css": "css"}
+                language = ext_lang.get(Path(hit.path).suffix.lower(), "text")
                 st.code(hit.snippet, language=language)
 
 # ---------------------------------------------------------------------------
@@ -169,7 +186,8 @@ with tab_wiki:
 with st.sidebar:
     st.header("🧠 Secondo Cervello")
     st.markdown(
-        f"- Codebase: `{CODEBASE_DIR.name}/`\n"
+        f"- Progetto VTT: `{chroma_rag.VTT_PROJECT_DIR.name}/` (js/css/html)\n"
+        f"- Codebase Flutter futuro: `{CODEBASE_DIR.name}/`\n"
         f"- Note grezze: `{RAW_DIR.name}/`\n"
         "- RAG: ChromaDB + MiniLM (locale)\n"
         "- Wiki: SQLite FTS5 + RRF"

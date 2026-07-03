@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from utils import CODEBASE_DIR, WIKI_DIR, ensure_dirs
+from utils import CODEBASE_DIR, VTT_PROJECT_DIR, WIKI_DIR, ensure_dirs
 
 FENCE_RE = re.compile(
     r"^(?P<fence>```+|~~~+)[ \t]*(?P<info>[^\n]*?)[ \t]*\n"
@@ -30,11 +30,11 @@ FENCE_RE = re.compile(
     re.DOTALL | re.MULTILINE,
 )
 COMMENT_PATH_RE = re.compile(
-    r"^\s*(?://|#|<!--|;|--)\s*(?:file\s*:\s*)?"
-    r"(?P<path>[\w./\\-]+\.(?:dart|py|md|yaml|yml|json))\s*(?:-->)?\s*$",
+    r"^\s*(?://|#|<!--|/\*|;|--)\s*(?:file\s*:\s*)?"
+    r"(?P<path>[\w./\\-]+\.(?:dart|py|md|yaml|yml|json|js|html|css))\s*(?:-->|\*/)?\s*$",
     re.IGNORECASE,
 )
-PATH_TOKEN_RE = re.compile(r"([\w./\\-]+\.(?:dart|py|md|yaml|yml|json))")
+PATH_TOKEN_RE = re.compile(r"([\w./\\-]+\.(?:dart|py|md|yaml|yml|json|js|html|css))")
 
 LANG_TO_EXT: dict[str, str] = {
     "dart": ".dart",
@@ -45,8 +45,17 @@ LANG_TO_EXT: dict[str, str] = {
     "yaml": ".yaml",
     "yml": ".yaml",
     "json": ".json",
+    "javascript": ".js",
+    "js": ".js",
+    "html": ".html",
+    "css": ".css",
 }
-CODE_EXTS = {".dart", ".py", ".yaml", ".json"}
+#: Codice per il futuro riscritto Flutter -> salvato in codebase/.
+FLUTTER_CODE_EXTS = {".dart", ".py", ".yaml", ".json"}
+#: Codice del progetto VTT attuale -> salvato direttamente nella radice del
+#: repo (index.html, css/, js/), cioè nel progetto reale, non in una copia.
+VTT_CODE_EXTS = {".js", ".html", ".css"}
+CODE_EXTS = FLUTTER_CODE_EXTS | VTT_CODE_EXTS
 WIKI_EXTS = {".md"}
 
 
@@ -146,7 +155,9 @@ def _classify(language: str, suggested_path: str) -> str:
     ext = PurePosixPath(suggested_path).suffix.lower() if suggested_path else ""
     if ext in WIKI_EXTS or language in ("markdown", "md"):
         return "wiki"
-    if ext in CODE_EXTS or language in ("dart", "python", "py", "yaml", "yml", "json"):
+    if ext in CODE_EXTS or language in (
+        "dart", "python", "py", "yaml", "yml", "json", "javascript", "js", "html", "css",
+    ):
         return "code"
     return "other"
 
@@ -207,11 +218,18 @@ def resolve_destination(
     index: int,
     codebase_dir: Path = CODEBASE_DIR,
     wiki_dir: Path = WIKI_DIR,
+    vtt_project_dir: Path = VTT_PROJECT_DIR,
 ) -> Path | None:
     """Calcola il percorso assoluto di destinazione per un blocco.
 
     * blocchi ``wiki`` → sotto ``wiki/`` (default ``wiki/sources/``);
-    * blocchi ``code`` → sotto ``codebase/`` (preservando le sottocartelle);
+    * blocchi ``code`` con estensione ``.js``/``.html``/``.css`` → **nel
+      progetto VTT reale** (radice del repo: ``index.html``, ``css/``,
+      ``js/``), non in una copia — così le risposte di Claude/Gemini
+      aggiornano direttamente il VTT. Le modifiche restano comunque
+      revisionabili/annullabili con git prima di un commit;
+    * blocchi ``code`` con estensione ``.dart``/``.py``/``.yaml``/``.json``
+      → sotto ``codebase/`` (futuro riscritto Flutter);
     * blocchi ``other`` → None (non salvati).
     """
     if block.kind == "other":
@@ -228,19 +246,26 @@ def resolve_destination(
     # kind == "code"
     if rel is None:
         rel = PurePosixPath(_default_name(block, index))
-    elif rel.parts[0] == "codebase":
+    ext = rel.suffix.lower()
+    target_root = vtt_project_dir if ext in VTT_CODE_EXTS else codebase_dir
+    prefix_name = "codebase" if target_root is codebase_dir else None
+    if prefix_name and rel.parts[0] == prefix_name:
         rel = PurePosixPath(*rel.parts[1:]) if len(rel.parts) > 1 else PurePosixPath(
             _default_name(block, index)
         )
-    return codebase_dir / rel
+    return target_root / rel
 
 
 def save_blocks(
     blocks: list[ParsedBlock],
     codebase_dir: Path = CODEBASE_DIR,
     wiki_dir: Path = WIKI_DIR,
+    vtt_project_dir: Path = VTT_PROJECT_DIR,
 ) -> list[SavedFile]:
     """Salva su disco i blocchi ``code`` e ``wiki`` (gli ``other`` sono ignorati).
+
+    I blocchi ``.js``/``.html``/``.css`` finiscono in ``vtt_project_dir``
+    (il progetto VTT reale), gli altri blocchi codice in ``codebase_dir``.
 
     Returns:
         Un :class:`SavedFile` per ogni blocco effettivamente scritto.
@@ -248,7 +273,7 @@ def save_blocks(
     ensure_dirs()
     saved: list[SavedFile] = []
     for index, block in enumerate(blocks):
-        destination = resolve_destination(block, index, codebase_dir, wiki_dir)
+        destination = resolve_destination(block, index, codebase_dir, wiki_dir, vtt_project_dir)
         if destination is None:
             continue
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -266,6 +291,7 @@ def parse_and_save(
     markdown_text: str,
     codebase_dir: Path = CODEBASE_DIR,
     wiki_dir: Path = WIKI_DIR,
+    vtt_project_dir: Path = VTT_PROJECT_DIR,
 ) -> tuple[list[ParsedBlock], list[SavedFile]]:
     """Convenienza: estrae e salva in un colpo solo.
 
@@ -273,4 +299,4 @@ def parse_and_save(
         ``(blocchi_estratti, file_salvati)``.
     """
     blocks = extract_blocks(markdown_text)
-    return blocks, save_blocks(blocks, codebase_dir, wiki_dir)
+    return blocks, save_blocks(blocks, codebase_dir, wiki_dir, vtt_project_dir)

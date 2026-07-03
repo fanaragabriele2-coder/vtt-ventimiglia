@@ -2,8 +2,10 @@
 
 Ponte manuale verso gli abbonamenti Pro (Claude/Gemini/Perplexity via chat
 web, MAI via API): genera un mega-prompt ricco di contesto locale, incolla la
-risposta nella Drop Zone e i file vengono salvati automaticamente in
-``codebase/`` e ``wiki/``.
+risposta nella Drop Zone e i file vengono salvati automaticamente. I blocchi
+``.js``/``.css``/``.html`` finiscono **direttamente nel progetto VTT reale**
+(radice del repo), i blocchi ``.dart``/``.py`` in ``codebase/`` (futuro
+riscritto Flutter), le pagine ```markdown in ``wiki/``.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ if str(_HUB_ROOT) not in sys.path:
 
 st.set_page_config(page_title="Orchestratore — God-Mode Hub", page_icon="⚙️", layout="wide")
 
-from utils import ensure_dirs  # noqa: E402
+from utils import VTT_PROJECT_DIR, ensure_dirs  # noqa: E402
 from utils import chroma_rag, drop_zone_parser, llm_wiki  # noqa: E402
 
 ensure_dirs()
@@ -31,8 +33,11 @@ OUTPUT_CONTRACT = """\
 1. Rispondi SOLO con blocchi di codice recintati (```), senza testo fuori dai blocchi
    se non brevissime note.
 2. Ogni blocco di CODICE deve avere come PRIMA riga un commento con il percorso
-   file completo relativo al progetto, ad esempio:
-   - Dart:   `// lib/widgets/token_layer.dart`
+   file completo relativo alla radice del progetto, ad esempio:
+   - JavaScript: `// js/15-nuovo-modulo.js`
+   - CSS:        `/* css/10-nuovo-stile.css */`
+   - HTML:       `<!-- index.html -->`
+   - Dart (futuro riscritto Flutter): `// lib/widgets/token_layer.dart`
    - Python: `# utils/export_assets.py`
 3. Le pagine WIKI vanno in blocchi ```markdown con prima riga
    `<!-- wiki/concepts/nome_pagina.md -->` (cartelle valide: sources/, concepts/, entities/).
@@ -85,7 +90,8 @@ def _build_mega_prompt(
 st.title("⚙️ Orchestratore")
 st.caption(
     "Mega-prompt → chat web di Claude/Gemini (abbonamento Pro, niente API) → "
-    "risposta nella Drop Zone → file salvati in `codebase/` e `wiki/`."
+    "risposta nella Drop Zone → `.js/.css/.html` salvati nel progetto VTT reale, "
+    "`.dart/.py` in `codebase/`, pagine wiki in `wiki/`."
 )
 
 tab_prompt, tab_drop = st.tabs(["📝 Mega-Prompt", "📥 Drop Zone"])
@@ -97,17 +103,19 @@ with tab_prompt:
     role = st.text_input(
         "Ruolo per l'LLM",
         value=(
-            "Sei un Senior Flutter/Dart engineer che lavora sul Virtual Tabletop "
-            "\"Ultimate VTT 5e — Tavolo Oscuro di Ventimiglia\". Scrivi codice "
-            "production-ready, tipato e commentato in italiano."
+            "Sei un Senior JavaScript/HTML/CSS engineer che lavora sul Virtual "
+            "Tabletop \"Ultimate VTT 5e — Tavolo Oscuro di Ventimiglia\" "
+            "(vanilla JS modulare, window.UltimateVTT*). Scrivi codice "
+            "production-ready, commentato in italiano, coerente con lo stile "
+            "esistente in js/ e css/."
         ),
     )
     task = st.text_area(
         "Task da svolgere",
         height=160,
         placeholder=(
-            "es. Implementa il widget Flutter che renderizza i token .glb sulla "
-            "griglia con drag&drop e snap alle celle…"
+            "es. Aggiungi lo snap alla griglia quando si trascina un token "
+            "sulla mappa in js/…-combattimento.js…"
         ),
     )
     col_a, col_b, col_c, col_d = st.columns(4)
@@ -145,8 +153,10 @@ with tab_prompt:
 with tab_drop:
     st.markdown(
         "Incolla qui la **risposta completa** di Claude/Gemini. Il parser estrae "
-        "i code block (`.dart`, `.py`, …) e le pagine wiki (```markdown) e li "
-        "salva nei posti giusti."
+        "i code block (`.js`, `.css`, `.html`, `.dart`, `.py`, …) e le pagine "
+        "wiki (```markdown) e li salva nei posti giusti — i blocchi "
+        "`.js/.css/.html` **direttamente nel progetto VTT reale** "
+        f"(`{VTT_PROJECT_DIR.name}/`), revisionabili con `git diff` prima di committare."
     )
     dropped = st.text_area("Risposta LLM", height=380, key="drop_text",
                            placeholder="Incolla qui il Markdown della risposta…")
@@ -172,7 +182,11 @@ with tab_drop:
                     "Percorso di destinazione (relativo)",
                     value=block.suggested_path,
                     key=f"path_{i}",
-                    help="Vuoto = nome autogenerato. Prefissi codebase/ e wiki/ gestiti automaticamente.",
+                    help=(
+                        "Vuoto = nome autogenerato. .js/.css/.html → radice del progetto VTT "
+                        "reale; .dart/.py → codebase/; .md → wiki/. Prefissi codebase/ e wiki/ "
+                        "gestiti automaticamente."
+                    ),
                 )
                 block.suggested_path = new_path.strip()
                 # Il percorso può cambiare la classificazione (es. aggiungo .md).
@@ -196,7 +210,7 @@ with tab_drop:
             if saved:
                 st.success(f"Salvati {len(saved)} file:")
                 for item in saved:
-                    rel = item.path.relative_to(_HUB_ROOT).as_posix()
+                    rel = item.path.relative_to(VTT_PROJECT_DIR).as_posix()
                     st.markdown(f"- `{rel}` ({item.action}, {item.bytes_written} B)")
                 wiki_saved = [s for s in saved if s.kind == "wiki"]
                 if wiki_saved:
@@ -208,7 +222,7 @@ with tab_drop:
                         try:
                             llm_wiki.rebuild_index()
                             if chroma_rag.is_available() and any(s.kind == "code" for s in saved):
-                                chroma_rag.ingest_codebase()
+                                chroma_rag.ingest_all()
                         except Exception as exc:  # noqa: BLE001
                             st.warning(f"Reindicizzazione parziale: {exc}")
                 st.session_state.pop("parsed_blocks", None)

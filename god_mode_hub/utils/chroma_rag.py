@@ -1,10 +1,16 @@
-"""RAG locale sulla codebase Flutter con ChromaDB + all-MiniLM-L6-v2.
+"""RAG locale con ChromaDB + all-MiniLM-L6-v2, su due sorgenti reali:
+
+* ``codebase/`` — futuro riscritto Flutter (``.dart``/``.py``), vuoto finché
+  non lo avvii;
+* il **progetto VTT attuale di questo repo** (``.js``/``.html``/``.css``:
+  ``index.html``, ``css/``, ``js/``, ``tools/``) — la codebase reale su cui
+  lavorare oggi.
 
 ChromaDB e sentence-transformers vengono importati in modo *pigro*: se non
 sono installati (o l'indice non esiste ancora) l'Hub resta utilizzabile e le
-query ricadono automaticamente su una ricerca full-text ingenua sui file
-(:func:`fts_fallback_search`). Nessuna chiamata di rete: embeddings e indice
-vivono su disco in ``chroma_index/``.
+query ricadono automaticamente su una ricerca full-text ingenua sui file di
+entrambe le sorgenti (:func:`fts_fallback_search`). Nessuna chiamata di rete:
+embeddings e indice vivono su disco in ``chroma_index/``.
 """
 
 from __future__ import annotations
@@ -15,7 +21,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
-from utils import CHROMA_DIR, CODEBASE_DIR, ensure_dirs
+from utils import CHROMA_DIR, CODEBASE_DIR, VTT_PROJECT_DIR, ensure_dirs
 
 COLLECTION_NAME = "flutter_codebase"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -24,6 +30,15 @@ CHUNK_LINES = 80
 CHUNK_OVERLAP = 15
 MAX_FILE_BYTES = 512_000
 UPSERT_BATCH = 128
+
+VTT_EXTENSIONS: tuple[str, ...] = (".js", ".html", ".css")
+
+#: Cartelle da escludere quando si scansiona VTT_PROJECT_DIR (che è la radice
+#: dell'intero repo, non una cartella sorgente dedicata).
+EXCLUDED_DIR_NAMES: frozenset[str] = frozenset({
+    "god_mode_hub", "node_modules", ".git", ".claude",
+    "dist", "legacy", ".venv", "chroma_index", "__pycache__",
+})
 
 
 @dataclass(frozen=True)
@@ -35,6 +50,7 @@ class RagHit:
     score: float
     start_line: int
     source: str  # "chroma" oppure "fts"
+    project: str = "codebase"  # "codebase" (Flutter futuro) oppure "vtt_web" (JS/HTML/CSS)
 
 
 @dataclass
@@ -102,13 +118,25 @@ def collection_count() -> int:
 def iter_source_files(
     root: Path = CODEBASE_DIR,
     extensions: Sequence[str] = DEFAULT_EXTENSIONS,
+    exclude_dirs: frozenset[str] = frozenset(),
 ) -> Iterator[Path]:
-    """Itera i file sorgente indicizzabili sotto ``root`` (ricorsivo)."""
+    """Itera i file sorgente indicizzabili sotto ``root`` (ricorsivo).
+
+    ``exclude_dirs`` salta qualunque file la cui cartella (a qualsiasi
+    profondità sotto ``root``) abbia uno di questi nomi — usato per
+    scansionare la radice dell'intero repo evitando ``.git``, ``god_mode_hub``,
+    ``node_modules``, ecc.
+    """
     if not root.exists():
         return
     for path in sorted(root.rglob("*")):
-        if path.is_file() and path.suffix.lower() in extensions:
-            yield path
+        if not (path.is_file() and path.suffix.lower() in extensions):
+            continue
+        if exclude_dirs:
+            rel_parts = path.relative_to(root).parts[:-1]
+            if any(part in exclude_dirs for part in rel_parts):
+                continue
+        yield path
 
 
 def chunk_text(
@@ -136,12 +164,59 @@ def chunk_text(
     return chunks
 
 
+def _ingest_into_collection(
+    root: Path,
+    extensions: Sequence[str],
+    project: str,
+    exclude_dirs: frozenset[str] = frozenset(),
+) -> IngestStats:
+    """Indicizza i file di ``root`` nella collection Chroma, taggati ``project``."""
+    collection = _get_collection()
+    stats = IngestStats()
+    ids: list[str] = []
+    documents: list[str] = []
+    metadatas: list[dict[str, Any]] = []
+
+    def _flush() -> None:
+        if ids:
+            collection.upsert(ids=list(ids), documents=list(documents), metadatas=list(metadatas))
+            ids.clear()
+            documents.clear()
+            metadatas.clear()
+
+    for path in iter_source_files(root, extensions, exclude_dirs=exclude_dirs):
+        rel = path.relative_to(root).as_posix()
+        if path.stat().st_size > MAX_FILE_BYTES:
+            stats.skipped.append(f"{rel} (troppo grande)")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            stats.skipped.append(f"{rel} ({exc})")
+            continue
+        file_chunks = chunk_text(text)
+        if not file_chunks:
+            continue
+        stats.files += 1
+        for chunk, start_line in file_chunks:
+            ids.append(f"{project}::{rel}::{start_line}")
+            documents.append(chunk)
+            metadatas.append(
+                {"path": rel, "start_line": start_line, "ext": path.suffix, "project": project}
+            )
+            stats.chunks += 1
+            if len(ids) >= UPSERT_BATCH:
+                _flush()
+    _flush()
+    return stats
+
+
 def ingest_codebase(
     root: Path = CODEBASE_DIR,
     extensions: Sequence[str] = DEFAULT_EXTENSIONS,
     full_reset: bool = True,
 ) -> IngestStats:
-    """Indicizza la codebase in ChromaDB.
+    """Indicizza ``codebase/`` (riscritto Flutter futuro) in ChromaDB.
 
     Args:
         root: cartella radice da scansionare.
@@ -158,43 +233,50 @@ def ingest_codebase(
         )
     if full_reset:
         reset_collection()
-    collection = _get_collection()
+    return _ingest_into_collection(root, extensions, project="codebase")
 
-    stats = IngestStats()
-    ids: list[str] = []
-    documents: list[str] = []
-    metadatas: list[dict[str, Any]] = []
 
-    def _flush() -> None:
-        if ids:
-            collection.upsert(ids=list(ids), documents=list(documents), metadatas=list(metadatas))
-            ids.clear()
-            documents.clear()
-            metadatas.clear()
+def ingest_vtt_project(
+    root: Path = VTT_PROJECT_DIR,
+    extensions: Sequence[str] = VTT_EXTENSIONS,
+    exclude_dirs: frozenset[str] = EXCLUDED_DIR_NAMES,
+    full_reset: bool = False,
+) -> IngestStats:
+    """Indicizza il progetto VTT attuale (``.js``/``.html``/``.css``) in ChromaDB.
 
-    for path in iter_source_files(root, extensions):
-        rel = path.relative_to(root).as_posix()
-        if path.stat().st_size > MAX_FILE_BYTES:
-            stats.skipped.append(f"{rel} (troppo grande)")
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            stats.skipped.append(f"{rel} ({exc})")
-            continue
-        file_chunks = chunk_text(text)
-        if not file_chunks:
-            continue
-        stats.files += 1
-        for chunk, start_line in file_chunks:
-            ids.append(f"{rel}::{start_line}")
-            documents.append(chunk)
-            metadatas.append({"path": rel, "start_line": start_line, "ext": path.suffix})
-            stats.chunks += 1
-            if len(ids) >= UPSERT_BATCH:
-                _flush()
-    _flush()
-    return stats
+    Scansiona la radice del repo (``VTT_PROJECT_DIR``), che è la cartella
+    padre di ``god_mode_hub``, escludendo ``exclude_dirs``.
+
+    Raises:
+        ImportError: se ChromaDB non è installato.
+    """
+    if not is_available():
+        raise ImportError(
+            "chromadb non è installato: esegui `pip install -r requirements.txt`."
+        )
+    if full_reset:
+        reset_collection()
+    return _ingest_into_collection(root, extensions, project="vtt_web", exclude_dirs=exclude_dirs)
+
+
+def ingest_all(full_reset: bool = True) -> dict[str, IngestStats]:
+    """Reindicizza sia ``codebase/`` sia il progetto VTT (JS/HTML/CSS) attuale.
+
+    Returns:
+        Statistiche per progetto: ``{"codebase": ..., "vtt_web": ...}``.
+    """
+    if not is_available():
+        raise ImportError(
+            "chromadb non è installato: esegui `pip install -r requirements.txt`."
+        )
+    if full_reset:
+        reset_collection()
+    return {
+        "codebase": _ingest_into_collection(CODEBASE_DIR, DEFAULT_EXTENSIONS, project="codebase"),
+        "vtt_web": _ingest_into_collection(
+            VTT_PROJECT_DIR, VTT_EXTENSIONS, project="vtt_web", exclude_dirs=EXCLUDED_DIR_NAMES
+        ),
+    }
 
 
 def query_codebase(
@@ -204,8 +286,11 @@ def query_codebase(
 ) -> list[RagHit]:
     """Interroga la codebase: ChromaDB se disponibile, altrimenti fallback FTS.
 
-    Il fallback scatta anche quando l'indice esiste ma è vuoto o la query
-    vettoriale fallisce, così la pagina Streamlit non si rompe mai.
+    La query vettoriale copre automaticamente sia ``codebase/`` sia il
+    progetto VTT (stessa collection, tag ``project`` diverso). Il fallback
+    full-text scansiona esplicitamente entrambe le sorgenti e fonde i
+    risultati. Il fallback scatta anche quando l'indice esiste ma è vuoto o
+    la query vettoriale fallisce, così la pagina Streamlit non si rompe mai.
     """
     question = question.strip()
     if not question:
@@ -224,7 +309,18 @@ def query_codebase(
                     return hits
         except Exception:
             pass  # qualunque problema vettoriale -> fallback testuale
-    return fts_fallback_search(question, top_k=top_k, root=root)
+
+    combined = fts_fallback_search(question, top_k=top_k, root=root, project="codebase")
+    combined += fts_fallback_search(
+        question,
+        top_k=top_k,
+        root=VTT_PROJECT_DIR,
+        extensions=VTT_EXTENSIONS,
+        exclude_dirs=EXCLUDED_DIR_NAMES,
+        project="vtt_web",
+    )
+    combined.sort(key=lambda hit: hit.score, reverse=True)
+    return combined[:top_k]
 
 
 def _hits_from_chroma(result: dict[str, Any]) -> list[RagHit]:
@@ -243,6 +339,7 @@ def _hits_from_chroma(result: dict[str, Any]) -> list[RagHit]:
                 score=round(1.0 / (1.0 + distance), 4),
                 start_line=int(meta.get("start_line", 1)),
                 source="chroma",
+                project=str(meta.get("project", "codebase")),
             )
         )
     return hits
@@ -258,6 +355,8 @@ def fts_fallback_search(
     root: Path = CODEBASE_DIR,
     extensions: Sequence[str] = DEFAULT_EXTENSIONS,
     context_lines: int = 6,
+    exclude_dirs: frozenset[str] = frozenset(),
+    project: str = "codebase",
 ) -> list[RagHit]:
     """Ricerca full-text ingenua sui file (nessuna dipendenza esterna).
 
@@ -269,7 +368,7 @@ def fts_fallback_search(
     if not tokens:
         return []
     scored: list[tuple[float, Path, int]] = []  # (score, path, best_line_idx)
-    for path in iter_source_files(root, extensions):
+    for path in iter_source_files(root, extensions, exclude_dirs=exclude_dirs):
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -299,6 +398,7 @@ def fts_fallback_search(
                 score=round(score / max_score, 4),
                 start_line=start + 1,
                 source="fts",
+                project=project,
             )
         )
     return hits
