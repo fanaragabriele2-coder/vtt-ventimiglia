@@ -25,10 +25,21 @@
 
 /* Con 5 azioni (Attacca, Spingi, Bonus, Sposta, Termina) i pulsanti del tray si impilavano in
    una colonna altissima che copriva la mappa: griglia compatta su 2 colonne. */
+/* display:grid con colonne "auto" qui collassava a 0px (figlio flessibile di .bg3-tray senza
+   larghezza propria da cui calcolare le tracce): tutti i pulsanti finivano sovrapposti alla
+   stessa X, intercettandosi i click a vicenda. .bg3-block (classe condivisa) impone
+   flex-direction:column: va ribaltata esplicitamente a row perche' flex-wrap vada a capo in
+   RIGHE (vincolate da max-width) invece che impilarsi in un'unica colonna senza mai avvolgere. */
 .bg3-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, auto));
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 6px;
+  /* larghezza ESPLICITA (non max-width): come figlio flessibile di .bg3-tray, senza un valore
+     fisso il "fit-content" della riga si allarga per contenere TUTTI i pulsanti su una riga
+     sola prima ancora di valutare l'a-capo, vanificando il wrap. */
+  width: 190px;
+  flex: 0 0 auto;
   align-items: stretch;
 }
 

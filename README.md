@@ -173,6 +173,25 @@ overworld (Campagna + mappa reale Ventimiglia). La posizione vive solo nel Globa
 (`party.location`): se il party è già lì (magari mosso dal percorso JSON `moveTo` del Master IA),
 il movimento non viene rifatto (idempotenza). GM-autorevole e in pausa durante il combattimento.
 
+## Il Master narra ma il combattimento non parte (fix strutturale)
+
+Bug reale osservato in partita: il Master (Groq) narrava un intero scontro in prosa ("Il
+combattimento inizia!... scheletri...") ma il combat system restava spento ("Combat: off"),
+nessun nemico sulla mappa. Causa: in `js/12` le VERE risposte del Master (Groq/Ollama/modello
+locale) chiamavano la funzione privata di rendering della chat **direttamente**, invece di
+passare da `window.UltimateVTTCoreGameplay.appendChatMessage` — l'API pubblica che i moduli 29
+(memoria combattimento), 32 (diario di campagna), 34 (ponte chat→combattimento) e 39 (ponte
+chat→mappa Ventimiglia) avvolgono per osservare la narrazione. Quei ponti quindi non vedevano
+**mai** le vere risposte del Master, solo le chiamate esterne di altri moduli (annunci di
+sistema) — la suite di test di ciascun modulo passava comunque, perché chiamava l'API pubblica
+direttamente, senza esercitare il percorso interno reale.
+
+**Fix**: ogni emissione di chat generata internamente da `js/12` (system/player/master) passa
+ora da un unico punto, `publicaChatMessage(...)`, che instrada sempre attraverso l'API pubblica.
+Verificato con un test che carica il **vero** `js/12` e il **vero** modulo 34, stuba solo
+`fetch` per simulare Groq, e conferma che una narrazione in prosa senza il campo JSON "spawn"
+attiva davvero lo spawn e il combattimento (non solo in isolamento).
+
 ## Combattimento strategico e bottino (stile BG3)
 
 **Vittoria automatica (fix, `js/06`).** Quando l'ULTIMO nemico cade, lo scontro finisce da solo con

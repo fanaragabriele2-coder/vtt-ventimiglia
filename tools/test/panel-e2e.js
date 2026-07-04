@@ -285,10 +285,13 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     await sleep(300); // la risoluzione di spingi() e' sincrona ma lascia respirare il rendering
     const esitoSpinta = await gm.evaluate(() => {
       const st = window.UltimateVTTCombat.getState();
-      const cur = st.combatants[st.currentTurnIndex];
-      const other = st.combatants.find(c => c.id !== cur.id && !c.defeated);
+      // Come sopra: il bersaglio deve essere un PNG (ha sempre un token). Un membro del party
+      // hotseat ("pc-party-*") non ne ha uno — se "other" ne pescasse uno per caso (dipende
+      // dall'ordine d'iniziativa, casuale), la cella risulterebbe irrisolvibile per un motivo
+      // estraneo alla Spinta stessa, con un fallimento intermittente del test.
+      const other = st.combatants.find(c => c.kind === "npc" && !c.defeated);
       const tp = window.UltimateVTTTokenPhysics.getState();
-      const t = tp.tokens.find(tk => window.UltimateVTTCombatFSM.tokenACombattente(tk.id) === other.id);
+      const t = other && tp.tokens.find(tk => window.UltimateVTTCombatFSM.tokenACombattente(tk.id) === other.id);
       return t ? { cellX: t.cellX, cellY: t.cellY } : null;
     });
     check("BG3 HUD: Spingi si risolve senza errori di pagina (esito leggibile)", !!esitoSpinta);

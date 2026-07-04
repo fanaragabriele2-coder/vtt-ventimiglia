@@ -234,7 +234,7 @@
         }
 
         if (announce) {
-          appendMasterChatMessage("system", "Modello locale Master: " + model.status + ".");
+          publicaChatMessage("system", "Modello locale Master: " + model.status + ".");
           appendSystemLog("Modello locale Master cambiato: " + model.status + ".");
         }
       }
@@ -308,7 +308,7 @@
           renderGroqMasterState();
         }
         renderOllamaMasterState();
-        appendMasterChatMessage("system", ollamaMasterState.enabled
+        publicaChatMessage("system", ollamaMasterState.enabled
           ? "Master Ollama attivo: " + ollamaMasterConfig.model + "."
           : "Master Ollama disattivato. Torno al Master offline.");
       }
@@ -491,14 +491,14 @@
           groqMasterState.lastError = "";
           groqChatHistory.length = 0;
           renderGroqMasterState();
-          appendMasterChatMessage("system", "Groq AI disattivato. Storia resettata.");
+          publicaChatMessage("system", "Groq AI disattivato. Storia resettata.");
           return;
         }
         groqMasterState.apiKey = readGroqApiKey();
         if (!groqMasterState.apiKey) {
           var key = window.prompt("Inserisci la tua Groq API key gratuita (ottienila su console.groq.com):");
           if (!key || !key.trim()) {
-            appendMasterChatMessage("system", "Groq non attivato: API key non inserita.");
+            publicaChatMessage("system", "Groq non attivato: API key non inserita.");
             return;
           }
           groqMasterState.apiKey = key.trim();
@@ -511,7 +511,7 @@
         groqMasterState.enabled = true;
         groqMasterState.lastError = "";
         renderGroqMasterState();
-        appendMasterChatMessage("system", "Groq AI attivo come Master.");
+        publicaChatMessage("system", "Groq AI attivo come Master.");
         appendSystemLog("Groq AI Master attivato.");
         
         // Benvenuto: il Master conosce gia le schede del party, niente presentazioni
@@ -678,7 +678,7 @@
         renderGroqMasterState();
         if (groqMasterState.enabled) {
           window.setTimeout(function () {
-            appendMasterChatMessage("system", "🤖 Master IA Groq attivo (" + groqMasterConfig.model + "). Crea il party dal menu per iniziare.");
+            publicaChatMessage("system", "🤖 Master IA Groq attivo (" + groqMasterConfig.model + "). Crea il party dal menu per iniziare.");
             // Il benvenuto vero parte da startAdventure (quando il party e creato),
             // cosi il Master conosce gia le schede e non chiede presentazioni.
           }, 800);
@@ -812,6 +812,22 @@
         }
       }
 
+      // Punto di emissione UNICO per ogni messaggio di chat generato qui in js/12 (system/player/
+      // master): passa SEMPRE dall'API pubblica (window.UltimateVTTCoreGameplay.appendChatMessage)
+      // invece di chiamare appendMasterChatMessage direttamente. Bug reale: le vere risposte del
+      // Master (Groq/Ollama/locale) chiamavano la funzione privata in modo diretto, scavalcando
+      // completamente i moduli che avvolgono l'API pubblica per osservare "speaker === master"
+      // (34: ponte chat->combattimento; 39: ponte chat->mappa Ventimiglia) — quei ponti non
+      // vedevano MAI la narrazione reale, solo le chiamate esterne di altri moduli. Prima che
+      // qualcuno avvolga l'API (o se nessuno lo fa mai), ricade sulla funzione di rendering diretta.
+      function publicaChatMessage(speaker, text) {
+        var api = window.UltimateVTTCoreGameplay;
+        if (api && typeof api.appendChatMessage === "function") {
+          return api.appendChatMessage(speaker, text);
+        }
+        return appendMasterChatMessage(speaker, text);
+      }
+
       function normalizeDie(value) {
         const normalizedValue = String(value || "").toLowerCase().replace("d", "");
         const die = Number(normalizedValue);
@@ -882,7 +898,7 @@
           diceLockRenderTimer = 0;
         }
         renderDiceLockState();
-        appendMasterChatMessage("system", "Prova richiesta: tira D" + die + (stat ? " su " + stat : "") + ".");
+        publicaChatMessage("system", "Prova richiesta: tira D" + die + (stat ? " su " + stat : "") + ".");
         appendSystemLog("Master IA ha sbloccato D" + die + ".");
         highlightRequestedDie(die);
       }
@@ -909,7 +925,7 @@
       function unlockDiceFromMaster(text) {
         const command = parseMasterDiceCommand(text);
 
-        appendMasterChatMessage("master", text);
+        publicaChatMessage("master", text);
 
         if (!command) {
           return false;
@@ -920,7 +936,7 @@
       }
 
       function lockDiceAfterRoll(sides, result) {
-        appendMasterChatMessage("system", "Risultato D" + sides + ": " + result + ".");
+        publicaChatMessage("system", "Risultato D" + sides + ": " + result + ".");
         diceLockState.locked = true;
         diceLockState.requestedDie = null;
         diceLockState.stat = "";
@@ -1087,21 +1103,21 @@
         try {
           var statoCombattimento = window.UltimateVTTCombat && window.UltimateVTTCombat.getState && window.UltimateVTTCombat.getState();
           if (statoCombattimento && statoCombattimento.active) {
-            appendMasterChatMessage("system", "⚔️ Combattimento in corso: la chat del Master è in pausa. Gestisci lo scontro dall'interfaccia di combattimento (clicca un nemico per bersagliarlo, poi Attacca / Spingi / Termina turno). Il Master riprenderà la narrazione a scontro finito.");
+            publicaChatMessage("system", "⚔️ Combattimento in corso: la chat del Master è in pausa. Gestisci lo scontro dall'interfaccia di combattimento (clicca un nemico per bersagliarlo, poi Attacca / Spingi / Termina turno). Il Master riprenderà la narrazione a scontro finito.");
             return;
           }
         } catch (errorePausaCombattimento) { /* in dubbio, non bloccare la chat */ }
         const request = isAutoRoll ? null : inferMasterRollRequest(text);
 
         if (!isAutoRoll) {
-          appendMasterChatMessage("player", text);
+          publicaChatMessage("player", text);
           var movePlace = inferMoveFromText(text);
           if (movePlace && window.VTTCampagna && window.VTTCampagna.goToPlace) {
             try {
               window.VTTCampagna.goToPlace(movePlace);
               // Feedback leggero in chat solo se siamo in modalità campagna attiva
               if (window.VTTCampagna.isActive && window.VTTCampagna.isActive()) {
-                appendMasterChatMessage("system", "📍 Token spostato → " + movePlace);
+                publicaChatMessage("system", "📍 Token spostato → " + movePlace);
               }
             } catch (e) {}
           }
@@ -1113,7 +1129,7 @@
           renderGroqMasterState();
           try {
             const groqReply = await fetchGroqMasterReply(text, request);
-            appendMasterChatMessage("master", groqReply.reply);
+            publicaChatMessage("master", groqReply.reply);
             appendSystemLog("🤖 Groq ha risposto.");
             if (groqReply.roll) { requestDiceRoll(groqReply.roll.die, groqReply.roll.stat); }
             handleAIMovement(groqReply);
@@ -1123,9 +1139,9 @@
               : (error.message || "Groq non raggiungibile. Controlla la connessione internet.");
             groqMasterState.lastError = message;
             renderGroqMasterState();
-            appendMasterChatMessage("system", "⚠️ " + message + " — rispondo offline.");
+            publicaChatMessage("system", "⚠️ " + message + " — rispondo offline.");
             appendSystemLog("⚠️ Groq ERRORE: " + message);
-            appendMasterChatMessage("master", createGuidedMasterReply(text, request));
+            publicaChatMessage("master", createGuidedMasterReply(text, request));
             if (request) { requestDiceRoll(request.die, request.stat); }
           } finally {
             groqMasterState.busy = false;
@@ -1141,7 +1157,7 @@
 
           try {
             const ollamaReply = await fetchOllamaMasterReply(text, request);
-            appendMasterChatMessage("master", ollamaReply.reply);
+            publicaChatMessage("master", ollamaReply.reply);
 
             if (ollamaReply.roll) {
               requestDiceRoll(ollamaReply.roll.die, ollamaReply.roll.stat);
@@ -1152,8 +1168,8 @@
               ? "Ollama non ha risposto in tempo. Avvia Ollama o usa un modello piu piccolo."
               : "Ollama non raggiungibile. Avvia Ollama e scarica: ollama pull " + ollamaMasterConfig.model;
             setOllamaMasterError(message);
-            appendMasterChatMessage("system", message + " Uso il Master offline per questa risposta.");
-            appendMasterChatMessage("master", createGuidedMasterReply(text, request));
+            publicaChatMessage("system", message + " Uso il Master offline per questa risposta.");
+            publicaChatMessage("master", createGuidedMasterReply(text, request));
 
             if (request) {
               requestDiceRoll(request.die, request.stat);
@@ -1166,7 +1182,7 @@
           return;
         }
 
-        appendMasterChatMessage("master", createGuidedMasterReply(text, request));
+        publicaChatMessage("master", createGuidedMasterReply(text, request));
 
         if (request) {
           requestDiceRoll(request.die, request.stat);
@@ -1337,7 +1353,7 @@
         switchPartyMember(nextIndex);
         
         const activeName = partyData[nextIndex].identity.name;
-        appendMasterChatMessage("system", "⏳ È il turno di " + activeName + ".");
+        publicaChatMessage("system", "⏳ È il turno di " + activeName + ".");
         appendSystemLog("Turno passato a " + activeName + ".");
         
         if (groqMasterState.enabled) {
