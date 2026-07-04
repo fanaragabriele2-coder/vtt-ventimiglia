@@ -47,7 +47,8 @@ vttg2506/
 │   ├── 38-action-menu.js               ← menu Azione Bonus dinamico (classe/razza/inventario)
 │   ├── 39-chat-map-sync.js             ← ponte chat Master → mappa Ventimiglia (POI dalla narrazione)
 │   ├── 40-arena-tattica.js             ← arena strategica: ostacoli, altura, luogo, movimento col click
-│   └── 41-armeria-rarita.js            ← armeria: rarità (comune→leggendaria), armature, amuleti, drop scalati
+│   ├── 41-armeria-rarita.js            ← armeria: rarità (comune→leggendaria), armature, amuleti, drop scalati
+│   └── 42-net-outbox.js                ← net outbox "Supabase-ready": delta di stato coalizzati (debounce+throttle)
 ├── server/
 │   └── relay.js    ← relay WebSocket autorevole (Node, zero dipendenze)
 ├── tools/test/     ← suite di test (zero dipendenze) + runner; CI in .github/workflows
@@ -600,6 +601,23 @@ Master), quindi è l'unico modo per non perdere la partita se quel browser/profi
 Menu iniziale (`js/14-start-menu-...`): 8 razze e 6 classi con bonus di razza,
 HP/CA/velocità ed equipaggiamento iniziale calcolati per classe. Nuova Partita /
 Carica Salvataggio / Continua. Riapribile col pulsante **☰ MENU**.
+
+## Net outbox "Supabase-ready" (Task 2 — stato pronto per il multiplayer documentale)
+
+`js/42-net-outbox.js` (`UltimateVTTNetOutbox`) prepara lo stato al sync con un backend
+(Supabase/WebSocket) **senza floodare la rete**. Osserva le fonti esistenti — la scheda PG
+(`UltimateVTTState.subscribe`), il Global Game State (modulo 36) e le posizioni dei token — e
+**coalizza** le raffiche di cambi: *debounce* di 250ms (uno slider HP trascinato produce UN
+payload con i valori finali, non 20 intermedi) con **tetto massimo di attesa** di 1s (un
+trascinamento continuo emette comunque ~1 payload/s, mai zero fino al rilascio). Ogni emissione è
+un **delta JSON pulito e versionato** (`{v:1, tipo:"vtt/delta-stato", ts, sezioni, delta}`) con le
+sole sezioni cambiate (pg / tokens / combat / location); se lo stato torna identico alla base,
+**zero traffico**. I payload finiscono in un outbox limitato (50) con `drain()` per il recupero
+offline; `setTransport(fn)` registra il futuro canale Supabase (un transport che lancia non blocca
+mai il gioco); ogni delta è pubblicato anche sul bus condiviso (`net:delta`). Coalescer e diff
+sono funzioni pure con timer/clock iniettabili, testate con timer finti (nessuna attesa reale).
+Non duplica il layer live: il modulo 20 continua a streammare i token a ~10Hz per la sessione in
+corso; l'outbox è il canale di persistenza/sync documentale.
 
 ## Sincronizzazione real-time (multiplayer)
 

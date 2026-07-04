@@ -120,6 +120,25 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("Layout: la diagnostica sta in un cassetto richiudibile, chiuso di default", layoutIniziale.diagChiusa === true);
     check("Layout: la colonna destra si intitola 'Chat Master'", layoutIniziale.titoloDestra === "Chat Master");
 
+    // --- Net outbox (modulo 42, "Supabase-ready"): una raffica di danni sulla pagina REALE
+    // produce UN delta coalizzato con gli HP finali, non un payload per ogni tick dello slider. ---
+    const outboxPrima = await gm.evaluate(() => window.UltimateVTTNetOutbox.getOutbox().length);
+    await gm.evaluate(() => {
+      for (let i = 0; i < 12; i++) { window.UltimateVTTState.applyDamage(1); }
+    });
+    await gm.waitForFunction((prima) => {
+      const p = window.UltimateVTTNetOutbox.getUltimoPayload();
+      return window.UltimateVTTNetOutbox.getOutbox().length > prima && p && p.delta && p.delta.pg;
+    }, outboxPrima, { timeout: 4000 });
+    const esitoOutbox = await gm.evaluate((prima) => {
+      const box = window.UltimateVTTNetOutbox.getOutbox();
+      const p = window.UltimateVTTNetOutbox.getUltimoPayload();
+      window.UltimateVTTState.heal(999); // ripristina gli HP per i test successivi
+      return { nuovi: box.length - prima, hp: p.delta.pg.hp.current, v: p.v };
+    }, outboxPrima);
+    check("Net outbox: 12 danni a raffica -> UN solo delta coalizzato (non 12)", esitoOutbox.nuovi === 1);
+    check("Net outbox: il payload e' versionato e porta gli HP finali", esitoOutbox.v === 1 && typeof esitoOutbox.hp === "number");
+
     await gm.click("#mapToolsToggleBtn");
     await gm.waitForFunction(() => {
       const d = document.getElementById("mapToolsDrawer");
