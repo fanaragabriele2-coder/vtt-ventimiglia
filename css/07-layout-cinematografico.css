@@ -161,4 +161,32 @@
 #vttCanvas {
   background: rgba(11, 10, 9, 0.55);
 }
+
+/* 5) Transizione canvas tattico <-> mappa reale di Ventimiglia (Task 3b). Quando la mappa
+      Leaflet e' attiva (classe messa da VentimigliaMap.activate in js/12):
+      - la vignetta cinematografica si spegne (scuriva anche la mappa reale);
+      - la stage-overlay lascia passare i click a Leaflet (pan/zoom), MA il cassetto
+        🛠 Strumenti resta cliccabile — prima veniva spento in blocco con lo stile inline e il
+        cassetto aperto sopra la mappa reale era visibile ma morto al click;
+      - la mappa entra con un fade su opacity: proprieta' composita sulla GPU, nessun reflow. */
+.stage.ventimiglia-attiva::after {
+  display: none;
+}
+
+.stage.ventimiglia-attiva .stage-overlay {
+  pointer-events: none;
+}
+
+.stage.ventimiglia-attiva .stage-overlay .map-toolbar {
+  pointer-events: auto;
+}
+
+#ventimigliaMapDiv {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.stage.ventimiglia-attiva #ventimigliaMapDiv {
+  opacity: 1;
+}
 /* --- FINE MODULO 35 CSS: LAYOUT CINEMATOGRAFICO A TRE COLONNE --- */

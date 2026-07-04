@@ -602,6 +602,27 @@ Menu iniziale (`js/14-start-menu-...`): 8 razze e 6 classi con bonus di razza,
 HP/CA/velocità ed equipaggiamento iniziale calcolati per classe. Nuova Partita /
 Carica Salvataggio / Continua. Riapribile col pulsante **☰ MENU**.
 
+## Canvas con cache offscreen e transizione Leaflet (Task 3 — performance)
+
+**Rendering a cache (`js/07`).** Prima ogni frame ridisegnava TUTTA la griglia cella per cella
+(~1600 operazioni canvas anche solo trascinando un token). Ora i layer statici vivono in due
+canvas offscreen — **terreno+griglia** e **nebbia** — ridisegnati SOLO quando cambiano davvero
+(rigenerazione, ostacoli dell'arena via `setTerrainAt`, pennello della nebbia, palette, toggle
+griglia, resize). Il frame "caldo" si riduce a **2 blit `drawImage`** (accelerati dalla GPU) + i
+token dinamici + l'hover. Le invalidazioni sono mirate: un ostacolo ridisegna solo il terreno, il
+pennello solo la nebbia; rivelare celle già visibili non invalida nulla (no-op riconosciuto).
+`getRenderStats()` espone frame totali vs ridisegni pieni: in un client sano `frames` corre e
+`terrainRedraws`/`fogRedraws` restano quasi fermi — è anche ciò che i test verificano (context 2d
+"registrante" che conta le operazioni, + check E2E in browser reale).
+
+**Transizione canvas ↔ mappa reale (Task 3b, `js/12` + `css/07`).** La commutazione passa da una
+classe (`.stage.ventimiglia-attiva`) invece che da stili inline: la vignetta cinematografica si
+spegne (scuriva anche Leaflet), la stage-overlay lascia passare i click alla mappa (pan/zoom) **ma
+il cassetto 🛠 Strumenti resta cliccabile** — prima veniva spento in blocco con
+`pointerEvents="none"` ed era visibile ma morto al click sopra la mappa reale. La mappa entra con
+un fade su `opacity` (proprietà composita GPU, nessun reflow); al ritorno al canvas tattico un
+repaint esplicito rimette in scena la griglia (che con le cache è un semplice blit).
+
 ## Net outbox "Supabase-ready" (Task 2 — stato pronto per il multiplayer documentale)
 
 `js/42-net-outbox.js` (`UltimateVTTNetOutbox`) prepara lo stato al sync con un backend

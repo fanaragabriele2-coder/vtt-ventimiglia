@@ -139,6 +139,41 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("Net outbox: 12 danni a raffica -> UN solo delta coalizzato (non 12)", esitoOutbox.nuovi === 1);
     check("Net outbox: il payload e' versionato e porta gli HP finali", esitoOutbox.v === 1 && typeof esitoOutbox.hp === "number");
 
+    // --- Canvas con cache offscreen (modulo 07, Task 3): a regime i frame sono solo blit — i
+    // ridisegni PIENI del terreno restano fermi anche forzando piu' render consecutivi. ---
+    const esitoCache = await gm.evaluate(() => {
+      const prima = window.UltimateVTTCanvas.getRenderStats();
+      for (let i = 0; i < 8; i++) { window.UltimateVTTCanvas.renderCanvasNow(); }
+      const dopo = window.UltimateVTTCanvas.getRenderStats();
+      return { framesCresciuti: dopo.frames - prima.frames, terrenoExtra: dopo.terrainRedraws - prima.terrainRedraws, nebbiaExtra: dopo.fogRedraws - prima.fogRedraws };
+    });
+    check("Canvas: 8 frame forzati -> zero ridisegni pieni di terreno/nebbia (cache a regime)",
+      esitoCache.framesCresciuti === 8 && esitoCache.terrenoExtra === 0 && esitoCache.nebbiaExtra === 0);
+
+    // --- Transizione canvas <-> mappa reale Ventimiglia (Task 3b): niente conflitti di
+    // pointer-events. Con la mappa reale attiva, il cassetto Strumenti resta CLICCABILE
+    // (prima la stage-overlay veniva spenta in blocco e il cassetto era visibile ma morto). ---
+    await gm.evaluate(() => window.VentimigliaMap.activate());
+    await gm.waitForFunction(() => document.querySelector(".stage").classList.contains("ventimiglia-attiva"), null, { timeout: 4000 });
+    const conflitti = await gm.evaluate(() => {
+      const stage = document.querySelector(".stage");
+      const overlay = document.querySelector(".stage-overlay");
+      const drawer = document.getElementById("mapToolsDrawer");
+      return {
+        vignettaSpenta: window.getComputedStyle(stage, "::after").display === "none",
+        overlayPassante: window.getComputedStyle(overlay).pointerEvents === "none",
+        cassettoCliccabile: window.getComputedStyle(drawer).pointerEvents === "auto",
+        mappaVisibile: document.getElementById("ventimigliaMapDiv").style.display === "block"
+      };
+    });
+    check("Ventimiglia attiva: overlay passante ai click MA cassetto Strumenti ancora cliccabile",
+      conflitti.overlayPassante === true && conflitti.cassettoCliccabile === true);
+    check("Ventimiglia attiva: vignetta spenta e mappa reale visibile",
+      conflitti.vignettaSpenta === true && conflitti.mappaVisibile === true);
+    await gm.evaluate(() => window.VentimigliaMap.deactivate());
+    await gm.waitForFunction(() => !document.querySelector(".stage").classList.contains("ventimiglia-attiva"), null, { timeout: 4000 });
+    check("Tornati al canvas tattico: la classe di transizione viene rimossa", true);
+
     await gm.click("#mapToolsToggleBtn");
     await gm.waitForFunction(() => {
       const d = document.getElementById("mapToolsDrawer");
@@ -342,8 +377,15 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.setTerrainAt) {
         [[10, 10], [11, 10], [12, 10]].forEach(c => window.UltimateVTTCanvas.setTerrainAt(c[0], c[1], "stone"));
       }
+      // La prova contrapposta resta genuinamente casuale, ma col PG di default (Atletica +2) contro
+      // il goblin (+4) i 10 tentativi originali fallivano tutti in ~1 run su 160: flake raro ma
+      // reale, visto piu' volte. Forza temporaneamente alta (+5) e piu' tentativi rendono la
+      // probabilita' di fallimento totale trascurabile (~1e-8) SENZA falsare rollD20WithMode,
+      // che resta condivisa col modulo 24 (reazioni).
+      const forzaOriginale = window.UltimateVTTState.getState().abilities.str.score;
+      window.UltimateVTTState.setAbilityScore("str", 20);
       let esito = null;
-      for (let i = 0; i < 10 && (!esito || !esito.successo); i++) {
+      for (let i = 0; i < 25 && (!esito || !esito.successo); i++) {
         // La Spinta di un PG spende l'Azione Bonus: tra un tentativo e l'altro il pool va
         // ripristinato (in gioco lo fa il cambio turno), altrimenti dal 2° tentativo e' rifiutata.
         if (window.UltimateVTTInventory && window.UltimateVTTInventory.resetTurn) window.UltimateVTTInventory.resetTurn();
@@ -352,6 +394,7 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
         window.UltimateVTTTokenPhysics.moveTokenToCell(tokBersaglio, 11, 10, false);
         esito = window.UltimateVTTShove.spingi();
       }
+      window.UltimateVTTState.setAbilityScore("str", forzaOriginale);
       return { ok: true, tokBersaglio: tokBersaglio, successo: Boolean(esito && esito.successo) };
     });
     check("sync Spingi: la prova contrapposta riesce entro pochi tentativi", setup.ok === true && setup.successo === true);
@@ -510,8 +553,14 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
       await sleep(150);
     }
 
-    // Disconnessione del giocatore -> il roster del GM torna a 1.
-    await pl.click(".vtt-sess-btn:has-text('Disconnetti')");
+    // Disconnessione del giocatore -> il roster del GM torna a 1. Click via JS: la coda dei popup
+    // di bottino puo' mostrarne uno NUOVO in qualsiasi momento (asincrona) e un click "fisico" di
+    // Playwright verrebbe intercettato dall'overlay; qui interessa il flusso di disconnessione,
+    // non la cliccabilita' visiva del pulsante (coperta dai passi precedenti sul pannello).
+    await pl.evaluate(() => {
+      const btn = Array.from(document.querySelectorAll(".vtt-sess-btn")).find(b => /Disconnetti/.test(b.textContent));
+      if (btn) btn.click();
+    });
     await gm.waitForFunction(() =>
       document.querySelectorAll(".vtt-sess-peer").length === 1, null, { timeout: 6000 });
     check("GM roster: dopo disconnessione del Giocatore torna a 1", true);

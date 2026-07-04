@@ -2387,18 +2387,32 @@
       }
 
       /* -------- Toggle -------- */
+      // Transizione canvas tattico <-> mappa reale (Task 3b): la commutazione passa da una CLASSE
+      // sul contenitore (.stage.ventimiglia-attiva, regole in css/07) invece che da stili inline
+      // sparsi. Motivi concreti:
+      //  - prima overlay.style.pointerEvents="none" spegneva TUTTA la stage-overlay, compreso il
+      //    cassetto 🛠 Strumenti: aperto sopra la mappa reale era visibile ma NON cliccabile — il
+      //    conflitto classico di pointer-events. Con la classe, il CSS rimette pointer-events:auto
+      //    sul solo cassetto, che resta usabile anche durante l'esplorazione urbana;
+      //  - la vignetta cinematografica (.stage::after, z-index 3) scuriva anche Leaflet: la classe
+      //    la spegne quando la mappa reale e' attiva;
+      //  - il fade-in di #ventimigliaMapDiv e' via opacity (compositor GPU, nessun reflow).
       function activate() {
         var mapDiv = document.getElementById("ventimigliaMapDiv");
         var vttC = document.getElementById("vttCanvas");
         var diceC = document.getElementById("diceCanvas");
-        var overlay = document.querySelector(".stage-overlay");
+        var stage = document.querySelector(".stage");
         var btn = document.getElementById("ventimigliaToggleBtn");
 
         if (!mapDiv) return;
         mapDiv.style.display = "block";
         if (vttC) vttC.style.display = "none";
         if (diceC) diceC.style.display = "none";
-        if (overlay) overlay.style.pointerEvents = "none";
+        if (stage) {
+          // display:block e' appena stato applicato: la classe (che porta opacity 1) va aggiunta
+          // al frame DOPO, altrimenti il browser fonde i due cambi e il fade non parte mai.
+          window.requestAnimationFrame(function () { stage.classList.add("ventimiglia-attiva"); });
+        }
         if (btn) { btn.textContent = "🗺 DUNGEON"; btn.style.borderColor = "rgba(200,155,60,.72)"; }
 
         vtActive = true;
@@ -2418,17 +2432,20 @@
         var mapDiv = document.getElementById("ventimigliaMapDiv");
         var vttC = document.getElementById("vttCanvas");
         var diceC = document.getElementById("diceCanvas");
-        var overlay = document.querySelector(".stage-overlay");
+        var stage = document.querySelector(".stage");
         var btn = document.getElementById("ventimigliaToggleBtn");
         var info = document.getElementById("vtTokenInfo");
 
         if (mapDiv) mapDiv.style.display = "none";
         if (vttC) vttC.style.display = "";
         if (diceC) diceC.style.display = "";
-        if (overlay) overlay.style.pointerEvents = "";
+        if (stage) stage.classList.remove("ventimiglia-attiva");
         if (btn) { btn.textContent = "🏔 VENTIMIGLIA"; btn.style.borderColor = "rgba(93,159,69,.72)"; }
         if (info) info.style.display = "none";
         vtActive = false;
+        // Tornando alla griglia tattica, un repaint esplicito rimette subito in scena terreno e
+        // token (le cache offscreen del modulo 07 rendono l'operazione un semplice blit).
+        try { if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.requestRender) window.UltimateVTTCanvas.requestRender(); } catch (e) {}
       }
 
       function toggle() {
