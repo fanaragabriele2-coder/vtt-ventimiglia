@@ -2427,6 +2427,19 @@
       overflow-wrap: anywhere;
     }
 
+    /* Bolla del Master ancora in streaming (creaBollaStreaming, js/12): un cursore che lampeggia
+       segnala che la risposta e' ancora in arrivo dal server Ollama remoto, parola per parola. */
+    .master-chat-message.is-streaming p::after {
+      content: "▋";
+      display: inline-block;
+      margin-left: 2px;
+      color: var(--color-arcane);
+      animation: master-chat-cursor-blink 0.9s steps(1) infinite;
+    }
+    @keyframes master-chat-cursor-blink {
+      50% { opacity: 0; }
+    }
+
     .master-chat-form {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto auto;

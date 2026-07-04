@@ -33,6 +33,7 @@ const suite = [
   ["Core: diario di campagna a lungo termine per il Master IA (modulo 32)", "core-campaign-memory.js"],
   ["Core: integrazione memoria Master IA con il vero js/12", "core-master-memory-integration.js"],
   ["Core: le emissioni interne di js/12 raggiungono davvero i ponti (fix regressione)", "core-chat-emission-bridge.js"],
+  ["Core: AI Bridge Ollama — endpoint remoto, streaming, contesto party (Task 1)", "core-ollama-streaming.js"],
   ["Core: memoria Master IA sopravvive a backup/ripristino (js/11 + js/12)", "core-backup-master-memory.js"],
   ["Core: Encounter Balancer / scontri bilanciati (modulo 37)", "core-encounter-balancer.js"],
   ["Core: menu Azione Bonus dinamico (modulo 38)", "core-action-menu.js"],

@@ -233,6 +233,41 @@ griglia diventa un campo di battaglia strategico:
 Il Master può essere: **Groq** (chiave API gratuita su console.groq.com), **Ollama**
 locale, o il modello **classico** offline. La voce usa Web Speech (TTS + microfono, it-IT).
 
+### Ollama su un PC remoto in LAN ("Split-Rig"), risposta in streaming, contesto del party
+
+Il client (questo file, aperto sul laptop di gioco) resta leggero — deve tenere i suoi FPS su
+canvas/nebbia/dadi 3D. Il Master IA via **Ollama** può girare su un **PC separato sulla stessa
+rete locale** con una GPU molto più potente (es. una desktop con 16GB di VRAM): il client fa
+solo `fetch` verso quell'IP, tutto il calcolo pesante resta sull'altra macchina.
+
+- **Indirizzo configurabile** (`js/12`, `readOllamaHost`/`writeOllamaHost`, persistito in
+  localStorage): pulsante **🖧 IP** nel menu ⚙ Master, di fianco al toggle OLLAMA. Di default
+  punta a `127.0.0.1:11434` (Ollama in locale, comportamento invariato per chi non ha un secondo
+  PC); basta cambiarlo in `192.168.x.x:11434` per puntare al PC con la GPU — effetto immediato,
+  nessun reload.
+- **Streaming reale, parola per parola**: la richiesta a Ollama ora usa `stream:true`; la
+  risposta si legge in modo incrementale (`ReadableStream` + `TextDecoder`, righe NDJSON) e il
+  testo compare nella bolla di chat man mano che arriva, invece di restare fermi su "…" fino
+  alla fine. Per farlo senza mai mostrare sintassi JSON grezza a mezzo, il prompt di sistema
+  chiede al modello un **formato a due parti**: prima la narrazione pura, poi — solo se serve
+  segnalare un tiro/spostamento/comparsa di nemici — un separatore esplicito (`<<DATI>>`) seguito
+  dal JSON strutturato. Tutto ciò che precede il separatore è garantito prosa sicura da mostrare
+  live; ciò che segue si accumula in silenzio e si interpreta solo a risposta conclusa
+  (`separaNarrazioneEDati`/`testoVisibileDuranteStreaming`, funzioni pure e testate). Se il
+  modello risponde ancora nel vecchio formato a blob JSON unico, il parsing ricade su quello
+  (compatibilità). Se il browser non supporta la lettura incrementale, si ricade su una lettura
+  in un colpo solo — stessa logica di parsing, senza gli aggiornamenti progressivi.
+- **Contesto del party in tempo reale**: il prompt di sistema di Ollama ora include
+  `buildPartySheetContext()` (HP, CA, caratteristiche, equipaggiamento reali di tutti i PG) —
+  prima lo aveva solo Groq, e il Master via Ollama narrava "alla cieca". È testo di sistema,
+  mai mostrato in chat.
+
+## Combattimento stile Baldur's Gate 3
+
+`js/23-bg3-combat-hud.js` + `css/06-bg3-combat-hud.css` aggiungono una HUD di combattimento in
+stile **BG3** che mette in scena la meccanica 5e già presente (modulo 06 combat, modulo 19 FSM,
+modulo 05 action economy), **senza modificarli**. Compare solo a combattimento attivo:
+
 ## Combattimento stile Baldur's Gate 3
 
 `js/23-bg3-combat-hud.js` + `css/06-bg3-combat-hud.css` aggiungono una HUD di combattimento in

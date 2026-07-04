@@ -75,13 +75,35 @@
           defaultReply: "Il Master lascia correre la scena per un respiro, poi riporta l'attenzione su di te."
         }
       ];
-      // Modello scelto per stare comodo in ~6GB di VRAM (es. laptop con GPU mobile RTX 4050): un
-      // 12B come mistral-nemo in Q4 richiede piu' di 6GB solo per i pesi e sforerebbe, costringendo
-      // Ollama a scaricare parte del modello su CPU (molto piu' lento). llama3.1:8b in Q4 sta
-      // intorno ai 5GB e lascia margine per il resto del rendering (canvas, dadi 3D) sulla stessa GPU.
+      // ARCHITETTURA "SPLIT-RIG": Ollama NON gira piu' sulla stessa macchina del client. Il client
+      // (questo file) resta un laptop leggero che deve tenere 60+ FPS su canvas/nebbia/dadi 3D; il
+      // Master IA gira su un PC separato in rete locale con una GPU molto piu' potente (es. RTX
+      // 5080, 16GB VRAM), che quindi puo' permettersi modelli ben piu' grandi di llama3.1:8b senza
+      // vincoli di VRAM — il default resta conservativo (compatibile anche con chi usa Ollama in
+      // locale su un laptop), ma la scelta del modello si fa lato server: basta un "ollama pull"
+      // di un modello piu' grosso sulla macchina con la 5080, senza toccare questo file.
+      // L'INDIRIZZO del server e' configurabile (readOllamaHost/writeOllamaHost, persistito in
+      // localStorage) proprio per puntare a un IP diverso da quello del client — vedi il pulsante
+      // "Ollama IP" nel menu Master. tagsEndpoint/endpoint erano stringhe fisse: ora sono derivate
+      // a runtime da ollamaBaseUrl(), cosi' cambiare l'IP non richiede un reload del modulo.
+      const ollamaHostStorageKey = "ultimate-vtt-ollama-host";
+      function readOllamaHost() {
+        try { return window.localStorage.getItem(ollamaHostStorageKey) || "127.0.0.1:11434"; }
+        catch (e) { return "127.0.0.1:11434"; }
+      }
+      function writeOllamaHost(host) {
+        try { window.localStorage.setItem(ollamaHostStorageKey, host); } catch (e) { /* ignora */ }
+      }
+      function ollamaBaseUrl() {
+        var host = readOllamaHost().trim();
+        // Se l'utente incolla gia' uno schema (http://...), usalo cosi' com'e'; altrimenti assume
+        // "ip:porta" (il caso comune per un PC sulla stessa rete locale, niente HTTPS necessario).
+        return /^https?:\/\//i.test(host) ? host.replace(/\/+$/, "") : "http://" + host;
+      }
+      function ollamaTagsEndpoint() { return ollamaBaseUrl() + "/api/tags"; }
+      function ollamaChatEndpoint() { return ollamaBaseUrl() + "/api/chat"; }
+
       const ollamaMasterConfig = {
-        tagsEndpoint: "http://127.0.0.1:11434/api/tags",
-        endpoint: "http://127.0.0.1:11434/api/chat",
         model: "llama3.1:8b",
         pingTimeoutMs: 2500,
         timeoutMs: 45000
@@ -335,6 +357,16 @@
         }
       }
 
+      // Separatore tra la NARRAZIONE (da mostrare parola per parola in chat) e i DATI di gioco
+      // strutturati (roll/spawn/moveTo/...). Prima l'intera risposta era un unico blob JSON
+      // ({"reply":"...", "roll":...}): perfetto per leggerlo tutto insieme, impossibile da
+      // mostrare in streaming senza far comparire sintassi JSON grezza a pezzi sullo schermo
+      // ("{"reply": "Il vento sfe" — illeggibile). Col separatore, tutto cio' che arriva PRIMA
+      // e' garantito essere prosa pura: si puo' mostrare in tempo reale, token dopo token, e
+      // congelare la bolla di chat nel momento esatto in cui il separatore compare, mentre i
+      // dati che seguono si accumulano in silenzio e si interpretano solo a risposta conclusa.
+      var SEPARATORE_DATI_MASTER = "<<DATI>>";
+
       function buildOllamaSystemPrompt(localSuggestion) {
         const activeName = getElement("characterIdentityPill") ? getElement("characterIdentityPill").textContent.trim() : "Player";
         const suggestionText = localSuggestion
@@ -345,6 +377,11 @@
           "Sei il Master di un gioco di ruolo fantasy in italiano, stile Baldur's Gate 3.",
           "Rispondi sempre in italiano con 1-3 frasi narrative, in prima persona come Master.",
           "Giocatore attivo: " + activeName + ".",
+          // Contesto nascosto col party REALE (HP/CA/caratteristiche/equipaggiamento correnti):
+          // prima mancava del tutto lato Ollama (Groq ce l'ha da tempo, buildGroqSystemPrompt piu'
+          // sotto) — il Master locale narrava "alla cieca", senza sapere quanti HP avesse davvero
+          // il party. E' testo di SISTEMA, mai mostrato in chat: il giocatore non lo vede mai.
+          "SCHEDE DEI PERSONAGGI DEL PARTY (gia note, tienine conto — HP, CA, caratteristiche ed equipaggiamento REALI: NON chiedere presentazioni):\n" + buildPartySheetContext(),
           diarioDiCampagna.length
             ? "DIARIO DI CAMPAGNA (eventi chiave di questa sessione, in ordine cronologico, tienine conto anche se lontani nella conversazione): " + diarioDiCampagna.join(" | ")
             : "",
@@ -352,12 +389,58 @@
             ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo): " + ultimoRiepilogoCombattimento.replace(/\n/g, " ")
             : "",
           suggestionText,
-          "Se riesci, rispondi con JSON valido: {\"reply\":\"testo narrativo\",\"roll\":null} oppure {\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}.",
-          "Aggiungi \"teleportCity\":\"nome_luogo\" al JSON se il PG viaggia in citta. Aggiungi \"moveToken\":\"flee\" se fugge in modo tattico.",
-          "Se compaiono nemici o inizia uno scontro, aggiungi \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] al JSON (bestiario: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin). NON risolvere tu gli attacchi ne' contare gli HP: il combattimento lo gestisce il gioco.",
-          "Se non riesci col JSON, scrivi solo il testo narrativo della risposta, senza nient'altro.",
+          "FORMATO RISPOSTA — Rispondi SOLO con testo narrativo semplice (1-3 frasi, italiano), SENZA JSON e senza markdown: e' quello che il giocatore legge parola per parola mentre lo scrivi.",
+          "Se e SOLO se serve segnalare un dato di gioco, aggiungi SUBITO DOPO la narrazione, su una riga a parte, ESATTAMENTE questo separatore: " + SEPARATORE_DATI_MASTER,
+          "e poi, sulla riga successiva, un JSON valido con SOLO i campi che ti servono davvero, tra: {\"roll\":{\"die\":20,\"stat\":\"Forza\"},\"teleportCity\":\"nome_luogo\",\"moveToken\":\"flee\",\"spawn\":[{\"name\":\"Goblin\",\"count\":2}]}.",
+          "Se non hai NESSUN dato di gioco da segnalare, NON scrivere affatto il separatore: fermati dopo la narrazione.",
+          "Bestiario disponibile per spawn: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin. NON risolvere tu gli attacchi ne' contare gli HP: il combattimento lo gestisce il gioco.",
           "Usa il campo roll solo quando l'azione del giocatore ha un rischio reale. Stat consentite: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco."
         ].filter(Boolean).join("\n");
+      }
+
+      // Divide la risposta COMPLETA del Master in { narrazione, dati }, usando il separatore
+      // esplicito richiesto nel prompt di sistema. Funzione pura (testabile senza rete). Se il
+      // modello non rispetta il separatore (es. risponde ancora nel vecchio formato a blob JSON
+      // unico, {"reply":"...", "roll":...}), ricade sull'estrazione euristica esistente
+      // (extractJsonObject) per restare compatibile con modelli/prompt piu' vecchi.
+      function separaNarrazioneEDati(testoCompleto) {
+        const testo = String(testoCompleto || "");
+        const idx = testo.indexOf(SEPARATORE_DATI_MASTER);
+        if (idx >= 0) {
+          const narrazione = testo.slice(0, idx).trim();
+          const datiTesto = testo.slice(idx + SEPARATORE_DATI_MASTER.length).trim();
+          return { narrazione: narrazione || stripThinkingBlocks(testo), dati: extractJsonObject(datiTesto) };
+        }
+        const legacy = extractJsonObject(testo);
+        if (legacy && typeof legacy.reply === "string") {
+          return { narrazione: legacy.reply, dati: legacy };
+        }
+        return { narrazione: stripThinkingBlocks(testo), dati: null };
+      }
+
+      // Quanto della risposta accumulata finora e' SICURO mostrare live in chat: tutto cio' che
+      // precede il separatore (o l'intero accumulato, se il separatore non e' ancora comparso —
+      // non sappiamo se comparira' mai, ma finche' non lo vediamo e' prosa valida). Funzione pura.
+      function testoVisibileDuranteStreaming(accumulato) {
+        const idx = String(accumulato || "").indexOf(SEPARATORE_DATI_MASTER);
+        return idx >= 0 ? accumulato.slice(0, idx) : String(accumulato || "");
+      }
+
+      // Estrae il frammento di testo (delta) da UNA riga NDJSON della risposta streaming di
+      // Ollama ({"message":{"content":"tok"},"done":false}). Righe vuote/incomplete (spezzate a
+      // meta' da un TextDecoder che ha ricevuto un chunk di rete a meta' di un carattere UTF-8, o
+      // l'ultima riga del buffer non ancora terminata da \n) ritornano stringa vuota: si
+      // ricompongono da sole al giro successivo, senza mai lanciare un'eccezione che romperebbe
+      // l'intero streaming per un singolo pacchetto di rete arrivato a meta'.
+      function estraiContenutoRigaOllama(riga) {
+        const r = String(riga || "").trim();
+        if (!r) { return ""; }
+        try {
+          const obj = JSON.parse(r);
+          return (obj && obj.message && typeof obj.message.content === "string") ? obj.message.content : "";
+        } catch (e) {
+          return "";
+        }
       }
 
       async function pingOllamaServer() {
@@ -367,7 +450,7 @@
         }, ollamaMasterConfig.pingTimeoutMs);
 
         try {
-          const response = await fetch(ollamaMasterConfig.tagsEndpoint, {
+          const response = await fetch(ollamaTagsEndpoint(), {
             method: "GET",
             signal: controller.signal
           });
@@ -380,7 +463,13 @@
         }
       }
 
-      async function fetchOllamaMasterReply(playerText, localSuggestion) {
+      // Risposta del Master via Ollama, in STREAMING: onProgress(testoParzialeSicuro) viene
+      // richiamato man mano che arrivano token dal server remoto, cosi' il chiamante puo'
+      // aggiornare la bolla di chat in tempo reale (parola per parola) invece di restare fermo
+      // fino alla fine. Sul laptop (client) questo costa pochissimo: solo un textContent
+      // aggiornato a ogni frammento, nessun lavoro pesante — il calcolo vero (i token del
+      // modello) lo fa la GPU 5080 sul PC remoto, non la 4050 del laptop.
+      async function fetchOllamaMasterReplyStreaming(playerText, localSuggestion, onProgress) {
         await pingOllamaServer();
 
         const controller = new AbortController();
@@ -389,7 +478,7 @@
         }, ollamaMasterConfig.timeoutMs);
 
         try {
-          const response = await fetch(ollamaMasterConfig.endpoint, {
+          const response = await fetch(ollamaChatEndpoint(), {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -397,7 +486,7 @@
             signal: controller.signal,
             body: JSON.stringify({
               model: ollamaMasterConfig.model,
-              stream: false,
+              stream: true,
               messages: [
                 {
                   role: "system",
@@ -421,28 +510,49 @@
             throw new Error("Ollama HTTP " + response.status);
           }
 
-          const data = await response.json();
-          const content = data && data.message && data.message.content ? data.message.content : "";
-          const cleaned = stripThinkingBlocks(content);
-          const parsed = extractJsonObject(cleaned);
-          const fallbackReply = cleaned || createGuidedMasterReply(playerText, localSuggestion);
-
-          // Se il modello non ha risposto in JSON, usa il testo grezzo come risposta narrativa
-          if (!parsed || typeof parsed.reply !== "string") {
-            return {
-              reply: fallbackReply,
-              roll: localSuggestion || null
-            };
+          let accumulato = "";
+          // Lettura incrementale del body (ReadableStream): disponibile in ogni browser moderno
+          // (Chrome/Edge sul laptop di gioco compresi). Se manca — ambiente vecchio o response.body
+          // non supportato — si ricade su response.text() in un colpo solo: la STESSA logica di
+          // parsing NDJSON funziona identica, semplicemente senza onProgress intermedi (l'utente
+          // vede comparire la risposta gia' completa, come nel vecchio comportamento non-streaming).
+          if (response.body && typeof response.body.getReader === "function") {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+            for (;;) {
+              const passo = await reader.read();
+              if (passo.done) { break; }
+              buffer += decoder.decode(passo.value, { stream: true });
+              const righe = buffer.split("\n");
+              buffer = righe.pop(); // ultima riga forse incompleta: si riaccoda al prossimo giro
+              for (let i = 0; i < righe.length; i += 1) {
+                accumulato += estraiContenutoRigaOllama(righe[i]);
+              }
+              if (typeof onProgress === "function") {
+                onProgress(testoVisibileDuranteStreaming(accumulato));
+              }
+            }
+            if (buffer.trim()) { accumulato += estraiContenutoRigaOllama(buffer); }
+          } else {
+            const testoGrezzo = await response.text();
+            testoGrezzo.split("\n").forEach(function (riga) { accumulato += estraiContenutoRigaOllama(riga); });
           }
 
+          const pezzi = separaNarrazioneEDati(accumulato);
+          const dati = pezzi.dati || {};
+          const fallbackReply = pezzi.narrazione || createGuidedMasterReply(playerText, localSuggestion);
+
           return {
-            reply: parsed.reply,
-            teleportCity: parsed.teleportCity || null,
-            moveToken: parsed.moveToken || null,
-            roll: parsed.roll && normalizeDie(parsed.roll.die)
+            reply: fallbackReply,
+            teleportCity: dati.teleportCity || null,
+            moveToken: dati.moveToken || null,
+            moveTo: dati.moveTo || dati.location || null,
+            spawn: dati.spawn || dati.enemies || null,
+            roll: dati.roll && normalizeDie(dati.roll.die)
               ? {
-                die: normalizeDie(parsed.roll.die),
-                stat: String(parsed.roll.stat || (localSuggestion && localSuggestion.stat) || "")
+                die: normalizeDie(dati.roll.die),
+                stat: String(dati.roll.stat || (localSuggestion && localSuggestion.stat) || "")
               }
               : (localSuggestion || null)
           };
@@ -780,14 +890,31 @@
         return model.defaultReply;
       }
 
-      function appendMasterChatMessage(speaker, text) {
+      // opzioni.nodoEsistente: se presente (il paragrafo <p> di una bolla gia' creata in DOM da
+      // creaBollaStreaming), NON crea un secondo messaggio duplicato — si limita a fissare il
+      // testo finale su quel nodo (gia' visibile e aggiornato in tempo reale durante lo
+      // streaming) e a far partire la sintesi vocale una volta sola, a risposta completa
+      // (leggere ad alta voce frammenti a meta' parola suonerebbe rotto).
+      function appendMasterChatMessage(speaker, text, opzioni) {
+        opzioni = opzioni || {};
+        const normalizedSpeaker = speaker === "player" || speaker === "system" ? speaker : "master";
+
+        if (opzioni.nodoEsistente) {
+          opzioni.nodoEsistente.textContent = String(text);
+          const contenitore = opzioni.nodoEsistente.parentNode;
+          if (contenitore && contenitore.classList) { contenitore.classList.remove("is-streaming"); }
+          if (normalizedSpeaker === "master" && window.UltimateVTTAudioVoice && typeof window.UltimateVTTAudioVoice.speakMaster === "function") {
+            if (window.autoSpeechEnabled !== false) window.UltimateVTTAudioVoice.speakMaster(text);
+          }
+          return;
+        }
+
         const log = getElement("masterChatLog");
 
         if (!log || !text) {
           return;
         }
 
-        const normalizedSpeaker = speaker === "player" || speaker === "system" ? speaker : "master";
         const speakerLabels = {
           master: "Master",
           player: "Tu",
@@ -812,6 +939,46 @@
         }
       }
 
+      // Crea SUBITO una bolla di chat vuota (visibile in DOM) e ritorna un handle per aggiornarne
+      // il testo man mano che arrivano i token dal Master in streaming (fetchOllamaMasterReply
+      // Streaming). Separata da appendMasterChatMessage perche' qui la bolla nasce PRIMA di sapere
+      // il testo finale — l'emissione "ufficiale" (che notifica i ponti 29/32/34/39 via
+      // publicaChatMessage) arriva solo alla fine, passando opzioni.nodoEsistente per riusare
+      // questa stessa bolla invece di crearne una seconda duplicata.
+      function creaBollaStreaming(speaker) {
+        const log = getElement("masterChatLog");
+        if (!log) { return { nodo: null, aggiorna() {}, annulla() {} }; }
+
+        const normalizedSpeaker = speaker === "player" || speaker === "system" ? speaker : "master";
+        const speakerLabels = { master: "Master", player: "Tu", system: "Sistema" };
+        const message = document.createElement("div");
+        const label = document.createElement("span");
+        const body = document.createElement("p");
+
+        message.className = "master-chat-message " + normalizedSpeaker + " is-streaming";
+        label.className = "master-chat-speaker";
+        label.textContent = speakerLabels[normalizedSpeaker];
+        body.textContent = "";
+
+        message.appendChild(label);
+        message.appendChild(body);
+        log.appendChild(message);
+        log.scrollTop = log.scrollHeight;
+
+        return {
+          nodo: body,
+          aggiorna(testoParziale) {
+            body.textContent = testoParziale || "";
+            log.scrollTop = log.scrollHeight;
+          },
+          // Se Ollama fallisce PRIMA che arrivi anche un solo token, non lasciare in chat una
+          // bolla fantasma vuota: la si rimuove e il messaggio di errore/fallback la sostituisce.
+          annulla() {
+            if (message.parentNode) { message.parentNode.removeChild(message); }
+          }
+        };
+      }
+
       // Punto di emissione UNICO per ogni messaggio di chat generato qui in js/12 (system/player/
       // master): passa SEMPRE dall'API pubblica (window.UltimateVTTCoreGameplay.appendChatMessage)
       // invece di chiamare appendMasterChatMessage direttamente. Bug reale: le vere risposte del
@@ -820,12 +987,12 @@
       // (34: ponte chat->combattimento; 39: ponte chat->mappa Ventimiglia) — quei ponti non
       // vedevano MAI la narrazione reale, solo le chiamate esterne di altri moduli. Prima che
       // qualcuno avvolga l'API (o se nessuno lo fa mai), ricade sulla funzione di rendering diretta.
-      function publicaChatMessage(speaker, text) {
+      function publicaChatMessage(speaker, text, opzioni) {
         var api = window.UltimateVTTCoreGameplay;
         if (api && typeof api.appendChatMessage === "function") {
-          return api.appendChatMessage(speaker, text);
+          return api.appendChatMessage(speaker, text, opzioni);
         }
-        return appendMasterChatMessage(speaker, text);
+        return appendMasterChatMessage(speaker, text, opzioni);
       }
 
       function normalizeDie(value) {
@@ -1155,18 +1322,23 @@
           ollamaMasterState.lastError = "";
           renderOllamaMasterState();
 
+          // Bolla vuota creata SUBITO: il testo compare parola per parola man mano che arriva
+          // dal server remoto (GPU 5080), invece di restare fermi su "..." fino alla fine.
+          const bolla = creaBollaStreaming("master");
+
           try {
-            const ollamaReply = await fetchOllamaMasterReply(text, request);
-            publicaChatMessage("master", ollamaReply.reply);
+            const ollamaReply = await fetchOllamaMasterReplyStreaming(text, request, bolla.aggiorna);
+            publicaChatMessage("master", ollamaReply.reply, { nodoEsistente: bolla.nodo });
 
             if (ollamaReply.roll) {
               requestDiceRoll(ollamaReply.roll.die, ollamaReply.roll.stat);
             }
             handleAIMovement(ollamaReply);
           } catch (error) {
+            bolla.annulla(); // niente token arrivato: via la bolla fantasma, non lasciarla vuota in chat
             const message = error && error.name === "AbortError"
               ? "Ollama non ha risposto in tempo. Avvia Ollama o usa un modello piu piccolo."
-              : "Ollama non raggiungibile. Avvia Ollama e scarica: ollama pull " + ollamaMasterConfig.model;
+              : "Ollama non raggiungibile su " + readOllamaHost() + ". Verifica IP/porta (menu Master → Ollama IP) e che il server sia acceso.";
             setOllamaMasterError(message);
             publicaChatMessage("system", message + " Uso il Master offline per questa risposta.");
             publicaChatMessage("master", createGuidedMasterReply(text, request));
@@ -1462,12 +1634,38 @@
         renderLocalMasterModel(false);
       }
 
+      // Chiede (window.prompt, stesso schema gia' usato per la API key di Groq) l'indirizzo del
+      // server Ollama remoto e lo persiste. Le richieste successive lo leggono a runtime
+      // (ollamaBaseUrl/ollamaChatEndpoint/ollamaTagsEndpoint): non serve alcun riavvio o
+      // riconnessione esplicita, il prossimo messaggio del giocatore usa gia' il nuovo indirizzo.
+      function renderOllamaHostButton() {
+        const b = getElement("ollamaHostButton");
+        if (!b) { return; }
+        const host = readOllamaHost();
+        b.textContent = "🖧 " + host;
+        b.title = "Server Ollama in rete locale: " + host + ". Clicca per cambiarlo (IP:porta del PC con la GPU).";
+      }
+      function configuraOllamaHost() {
+        const attuale = readOllamaHost();
+        const host = window.prompt("Indirizzo del server Ollama in rete locale (IP:porta, es. 192.168.1.50:11434):", attuale);
+        if (!host || !host.trim()) { return; }
+        writeOllamaHost(host.trim());
+        renderOllamaHostButton();
+        publicaChatMessage("system", "🖧 Server Ollama impostato su " + host.trim() + ".");
+      }
+
       function initializeOllamaMaster() {
         const button = getElement("ollamaMasterButton");
 
         if (button) {
           button.addEventListener("click", toggleOllamaMaster);
         }
+
+        const hostButton = getElement("ollamaHostButton");
+        if (hostButton) {
+          hostButton.addEventListener("click", configuraOllamaHost);
+        }
+        renderOllamaHostButton();
 
         renderOllamaMasterState();
       }
@@ -1498,11 +1696,25 @@
           return cloneData(getActiveLocalMasterModel());
         },
         getOllamaMasterConfig: function getOllamaMasterConfig() {
-          return cloneData(ollamaMasterConfig);
+          var cfg = cloneData(ollamaMasterConfig);
+          cfg.host = readOllamaHost();
+          cfg.tagsEndpoint = ollamaTagsEndpoint();
+          cfg.endpoint = ollamaChatEndpoint();
+          return cfg;
         },
         getOllamaMasterState: function getOllamaMasterState() {
           return cloneData(ollamaMasterState);
         },
+        // Host Ollama remoto (architettura Split-Rig: PC separato con GPU sulla stessa LAN).
+        getOllamaHost: readOllamaHost,
+        setOllamaHost: function setOllamaHost(host) {
+          writeOllamaHost(String(host || ""));
+          renderOllamaHostButton();
+        },
+        // Funzioni pure di streaming/parsing (testabili senza rete: vedi tools/test).
+        separaNarrazioneEDati: separaNarrazioneEDati,
+        testoVisibileDuranteStreaming: testoVisibileDuranteStreaming,
+        estraiContenutoRigaOllama: estraiContenutoRigaOllama,
         switchPartyMember: switchPartyMember,
         addPartyMember: addPartyMember,
         getPartyData: function getPartyData() {
