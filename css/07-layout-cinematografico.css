@@ -74,8 +74,8 @@
 }
 
 .map-tools-close {
-  min-width: 30px;
-  min-height: 26px;
+  min-width: 44px;  /* hit-box touch minima (Task 5) */
+  min-height: 44px;
   padding: 2px 9px;
   font-size: 13px;
   font-weight: 700;

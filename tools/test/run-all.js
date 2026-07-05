@@ -37,6 +37,7 @@ const suite = [
   ["Core: net outbox Supabase-ready — delta coalizzati (Task 2)", "core-net-outbox.js"],
   ["Core: cache offscreen del canvas — solo blit a regime (Task 3)", "core-canvas-cache.js"],
   ["Core: audio/voce non bloccante — coda voce, ducking, riverbero (Task 4)", "core-audio-voice.js"],
+  ["Core: UI/UX anti-clutter — tastiera virtuale, barre scaleX, hit-box 44px (Task 5)", "core-ui-anticlutter.js"],
   ["Core: memoria Master IA sopravvive a backup/ripristino (js/11 + js/12)", "core-backup-master-memory.js"],
   ["Core: Encounter Balancer / scontri bilanciati (modulo 37)", "core-encounter-balancer.js"],
   ["Core: menu Azione Bonus dinamico (modulo 38)", "core-action-menu.js"],

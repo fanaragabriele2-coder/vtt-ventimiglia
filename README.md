@@ -660,6 +660,35 @@ impasterebbe invece di renderli più immersivi.
 `InvalidStateError` da un doppio click prima che il browser finisca di fermare l'istanza
 precedente) — ora è protetta da try/catch, così un doppio click non rompe più l'intero handler.
 
+## UI/UX anti-clutter (Task 5 — transizioni GPU, hit-box touch, tastiera virtuale)
+
+**Barre di riempimento su `transform: scaleX` (niente reflow).** Un'analisi dei CSS ha mostrato
+che cassetti/modali/popup già commutano via `display` o animano `transform`+`opacity` (nessun
+reflow); le uniche transizioni "colpevoli" erano le barre di riempimento (HP iniziativa BG3,
+movimento, HP hub/campagna, XP), che animavano `width` — un ricalcolo del layout **a ogni frame
+della transizione**, proprio nei momenti caldi del combattimento (HP che cambiano, barra movimento
+aggiornata a ogni cella durante un trascinamento). Ora sono larghe il 100% e si scalano con
+`transform: scaleX(frazione)` + `transform-origin: left` — proprietà composita: anima sulla GPU
+senza toccare il layout, in linea con la filosofia del client leggero (Split-Rig).
+
+**Hit-box minime 44×44px (standard touch).** I pulsanti dell'interfaccia di combattimento erano
+sotto la soglia: `.bg3-btn` (Attacca/Spingi/Sposta/Bonus/Termina turno) ~30px, righe di
+combattimento e modalità di tiro 30–32px, X dei modali 34px. Ora tutti hanno `min-height`/
+`min-width` ≥44px; i chip Normale/Vantaggio/Svantaggio restano piccoli a schermo ma un `::after`
+invisibile ne estende l'area di tocco a ~44px (l'alone fa parte del box del bottone: i tocchi
+"vicini" contano). Le liste ally-mode (54px su schermi piccoli) ora includono anche `.bg3-btn`,
+`.combat-row-button` e `.roll-mode-button`, che prima ne erano esclusi.
+
+**Tastiera virtuale che non rompe la flexbox.** Quando la tastiera si apre su un layout alto
+`100vh`, l'app resta a tutto schermo *dietro* la tastiera e l'input col focus finisce nascosto —
+`window.innerHeight` spesso **non cambia**, è proprio questo il problema. Il segnale affidabile è
+`visualViewport`: `js/12` ne ascolta il `resize`, scrive l'altezza visibile nella variabile CSS
+`--vvh` e accende `body.keyboard-aperta` (soglia 140px: la barra URL che si ritrae non è una
+tastiera). Il CSS accorcia `#app` e gli overlay a schermo intero (`#campOverlay`, `#mobileHub`) a
+`var(--vvh)`: la flexbox si ricalcola da sola e il campo col focus resta in vista. La logica è
+esposta come `UltimateVTTViewport` (pura: dipende solo dalle due altezze) per test e diagnostica;
+il test E2E misura l'altezza reale calcolata di `#app` con altezze finte.
+
 ## Net outbox "Supabase-ready" (Task 2 — stato pronto per il multiplayer documentale)
 
 `js/42-net-outbox.js` (`UltimateVTTNetOutbox`) prepara lo stato al sync con un backend

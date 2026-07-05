@@ -51,6 +51,7 @@
 .vtt-sess-head h3 { margin: 0; font-size: 13px; letter-spacing: .04em; color: #f0d472; font-weight: 700; }
 .vtt-sess-close {
   background: none; border: none; color: #d8c7a3; font-size: 16px; cursor: pointer; line-height: 1;
+  min-width: 44px; min-height: 44px; /* hit-box touch minima (Task 5) */
 }
 .vtt-sess-close:hover { color: #fff; }
 

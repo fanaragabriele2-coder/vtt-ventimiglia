@@ -192,7 +192,7 @@
       "#vttXpBar .xb-lvl{font-weight:700;color:#c89b3c;}" +
       "#vttXpBar .xb-name{font-size:11px;color:#b99f6b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:96px;}" +
       "#vttXpBar .xb-track{height:9px;background:rgba(0,0,0,.5);border-radius:5px;overflow:hidden;border:1px solid rgba(216,199,163,.16);}" +
-      "#vttXpBar .xb-fill{height:100%;background:linear-gradient(90deg,#5bb7c8,#c89b3c);transition:width .4s;}" +
+      "#vttXpBar .xb-fill{height:100%;width:100%;transform-origin:left center;background:linear-gradient(90deg,#5bb7c8,#c89b3c);transition:transform .4s;}" +
       "#vttXpBar .xb-bot{display:flex;justify-content:space-between;font-size:10px;color:#b99f6b;margin-top:4px;}" +
       "#vttLootPop{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(6,5,4,.66);font-family:Arial,Helvetica,sans-serif;}" +
       "#vttLootPop.show{display:flex;}" +
@@ -212,7 +212,7 @@
     injectStyle();
     var d = document.createElement("div"); d.id = "vttXpBar";
     d.innerHTML = '<div class="xb-top"><span class="xb-lvl" id="xbLvl">Liv 1</span><span class="xb-name" id="xbName">Eroe</span></div>' +
-      '<div class="xb-track"><div class="xb-fill" id="xbFill" style="width:0%"></div></div>' +
+      '<div class="xb-track"><div class="xb-fill" id="xbFill" style="transform:scaleX(0)"></div></div>' +
       '<div class="xb-bot"><span id="xbXp">0 / 300 XP</span><span id="xbGold">🪙 0</span></div>';
     var host = document.querySelector(".topbar-center") || document.querySelector(".topbar") || document.body;
     host.appendChild(d);
@@ -225,7 +225,8 @@
     set("xbName", nameById(id));
     set("xbXp", p.level >= 20 ? "MAX" : (b.cur + " / " + b.need + " XP"));
     set("xbGold", "🪙 " + (p.gold || 0));
-    var f = document.getElementById("xbFill"); if (f) f.style.width = b.pct + "%";
+    /* scaleX invece di width (Task 5): la barra XP anima in compositing, senza reflow della topbar. */
+    var f = document.getElementById("xbFill"); if (f) f.style.transform = "scaleX(" + (b.pct/100) + ")";
   }
 
   function ensurePop(){

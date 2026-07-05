@@ -46,7 +46,10 @@
   position: absolute; top: 3px; right: 5px; font-size: 10px; color: #c89b3c; font-weight: 700;
 }
 .bg3-init-hptrack { height: 6px; margin-top: 4px; border-radius: 4px; background: rgba(0, 0, 0, .55); overflow: hidden; }
-.bg3-init-hpfill { height: 100%; background: linear-gradient(90deg, #b23b2e, #e0603a); transition: width .25s; }
+/* Le barre di riempimento animano via transform: scaleX (proprieta' composita, GPU) invece di
+   width: animare width forza un reflow del layout a OGNI frame della transizione — proprio nei
+   momenti caldi del combattimento (HP che cambiano, movimento durante un trascinamento). */
+.bg3-init-hpfill { height: 100%; width: 100%; transform-origin: left center; background: linear-gradient(90deg, #b23b2e, #e0603a); transition: transform .25s; }
 .bg3-init-card.is-pc .bg3-init-hpfill { background: linear-gradient(90deg, #3f8f4f, #6fcf6f); }
 .bg3-init-hptext { display: block; margin-top: 2px; font-size: 10px; color: #b8ab90; text-align: right; }
 .bg3-init-cond { display: inline-block; margin-top: 1px; font-size: 11px; letter-spacing: 1px; }
@@ -85,7 +88,7 @@
 /* movimento */
 .bg3-move-val { font-weight: 700; color: #ecdfc2; }
 .bg3-move-track { width: 110px; height: 6px; border-radius: 4px; background: rgba(0,0,0,.55); overflow: hidden; }
-.bg3-move-fill { height: 100%; background: linear-gradient(90deg, #5bb7c8, #9fe0ea); transition: width .2s; }
+.bg3-move-fill { height: 100%; width: 100%; transform-origin: left center; background: linear-gradient(90deg, #5bb7c8, #9fe0ea); transition: transform .2s; }
 
 /* bersaglio + percentuale di colpire (la "70%" di BG3) */
 .bg3-target { min-width: 150px; }
@@ -122,15 +125,22 @@
 .bg3-mode-btn {
   padding: 4px 8px; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .03em; cursor: pointer;
   color: #cdbf9f; background: rgba(40, 36, 30, .85); border: 1px solid rgba(255,255,255,.14); border-radius: 6px;
+  position: relative; min-width: 44px;
 }
+/* Hit-box estesa a ~44px SENZA ingrossare la grafica (Task 5): i chip Normale/Vant/Svant sono
+   volutamente piccoli a schermo, ma il ::after allarga l'area che riceve il tocco sopra e sotto
+   (fa parte del box del bottone, quindi i click sull'alone contano come click sul bottone). */
+.bg3-mode-btn::after { content: ""; position: absolute; left: 0; right: 0; top: -13px; bottom: -13px; }
 .bg3-mode-btn.active { color: #2a1c02; background: #f0d472; border-color: #f0d472; }
 
-/* pulsanti azione principali */
+/* pulsanti azione principali: hit-box minima 44x44px (Task 5) — a portata di pollice su
+   touch screen (ROG Ally / telefono), lo standard delle linee guida touch. */
 .bg3-actions { display: flex; align-items: center; gap: 8px; }
 .bg3-btn {
   padding: 9px 14px; font: 800 12px/1 system-ui, sans-serif; letter-spacing: .03em; cursor: pointer;
   border-radius: 9px; border: 1px solid rgba(200,155,60,.7);
   color: #f0d472; background: linear-gradient(180deg, rgba(80,50,5,.85), rgba(30,18,2,.95));
+  min-width: 44px; min-height: 44px;
 }
 .bg3-btn:hover { border-color: #f0d472; }
 .bg3-btn:disabled { opacity: .4; cursor: not-allowed; }

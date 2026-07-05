@@ -490,8 +490,8 @@
     }
 
     .modal-close-button {
-      width: 34px;
-      height: 34px;
+      width: 44px;  /* hit-box touch minima (Task 5): una X piccola e' facile da mancare */
+      height: 44px;
       padding: 0;
       font-size: 20px;
       line-height: 1;
@@ -898,8 +898,10 @@
       gap: 6px;
     }
 
+    /* Hit-box minima 44px (Task 5): i pulsanti dell'interfaccia di gioco devono restare
+       comodi anche col tocco (ROG Ally / telefono), non solo col mouse. */
     .resource-action-button {
-      min-height: 32px;
+      min-height: 44px;
       padding: 5px 7px;
       font-size: 12px;
       font-weight: 700;
@@ -1244,7 +1246,7 @@
 
     .inventory-action-button,
     .spell-action-button {
-      min-height: 30px;
+      min-height: 44px; /* hit-box touch minima (Task 5) */
       padding: 5px 6px;
       font-size: 11px;
       font-weight: 700;
@@ -1459,7 +1461,7 @@
     }
 
     .combat-row-button {
-      min-height: 30px;
+      min-height: 44px; /* hit-box touch minima (Task 5) */
       padding: 5px 6px;
       font-size: 11px;
       font-weight: 700;
@@ -1472,7 +1474,7 @@
     }
 
     .roll-mode-button {
-      min-height: 32px;
+      min-height: 44px; /* hit-box touch minima (Task 5) */
       padding: 5px 7px;
       border-color: rgba(216, 199, 163, 0.22);
       background: rgba(9, 7, 6, 0.42);
@@ -2180,6 +2182,9 @@
     body.mode-ally .inventory-action-button,
     body.mode-ally .party-add-button,
     body.mode-ally .sheet-tab,
+    body.mode-ally .combat-row-button,
+    body.mode-ally .roll-mode-button,
+    body.mode-ally .bg3-btn,
     body.mode-ally .status-filter-button {
       min-height: 54px;
       padding: 10px 14px;
@@ -2563,6 +2568,9 @@
     body.ally-mode .inventory-action-button,
     body.ally-mode .party-add-button,
     body.ally-mode .sheet-tab,
+    body.ally-mode .combat-row-button,
+    body.ally-mode .roll-mode-button,
+    body.ally-mode .bg3-btn,
     body.ally-mode .status-filter-button,
     body.ally-mode .header-party-select,
     body.ally-mode .scroll-shortcut-button,
@@ -2744,3 +2752,19 @@
     .filter-cavern { filter: contrast(1.3) brightness(0.7) sepia(0.5) hue-rotate(180deg); transition: filter 0.5s; }
     /* --- FINE PATCH 4 CSS: FILTRI VISIVI --- */
   
+    /* --- TASTIERA VIRTUALE (Task 5): il layout si adatta all'area VISIBILE --- */
+    /* js/12 ascolta visualViewport e, quando la tastiera occupa lo schermo, scrive
+       l'altezza visibile in --vvh e accende body.keyboard-aperta. Qui l'app e gli
+       overlay a schermo intero si accorciano a quell'altezza: la flexbox si ricalcola
+       (invece di restare a 100vh con la meta' bassa — input compreso — sotto la
+       tastiera) e il campo col focus resta visibile. In fondo al file APPOSTA: a
+       parita' di specificita' vince sull'ultima regola, ally-mode compreso. */
+    body.keyboard-aperta #app {
+      height: var(--vvh, 100dvh);
+      min-height: 0;
+    }
+    body.keyboard-aperta #campOverlay,
+    body.keyboard-aperta #mobileHub {
+      bottom: auto;
+      height: var(--vvh, 100dvh);
+    }

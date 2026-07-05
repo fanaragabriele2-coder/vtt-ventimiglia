@@ -1994,6 +1994,37 @@
         }
       });
 
+      /* --- Tastiera virtuale (Task 5): quando si apre, il layout flexbox deve adattarsi
+         all'area VISIBILE, non restare alto 100vh con l'input nascosto sotto la tastiera.
+         Il segnale affidabile e' visualViewport: la sua height si riduce quando la tastiera
+         occupa lo schermo (window.innerHeight spesso NON cambia — e' proprio questo che
+         "rompe" i layout basati su 100vh). Qui si scrive l'altezza visibile in una variabile
+         CSS (--vvh) e si accende una classe sul body: il resto lo fanno le regole CSS
+         (height: var(--vvh) su #app e sugli overlay a schermo intero), cosi' la flexbox si
+         ricalcola da sola e l'input col focus resta in vista. */
+      var SOGLIA_TASTIERA_PX = 140; // sotto questa soglia e' solo la barra URL che si ritrae, non la tastiera
+      function tastieraAperta(altezzaFinestra, altezzaVisibile) {
+        return (Number(altezzaFinestra) - Number(altezzaVisibile)) > SOGLIA_TASTIERA_PX;
+      }
+      function applicaViewportVisibile(altezzaFinestra, altezzaVisibile) {
+        var aperta = tastieraAperta(altezzaFinestra, altezzaVisibile);
+        document.documentElement.style.setProperty("--vvh", Math.round(altezzaVisibile) + "px");
+        document.body.classList.toggle("keyboard-aperta", aperta);
+        // Con la tastiera appena aperta, il campo col focus puo' essere finito fuori
+        // dall'area visibile ridotta: lo si riporta in vista.
+        if (aperta && document.activeElement && document.activeElement.scrollIntoView) {
+          try { document.activeElement.scrollIntoView({ block: "nearest" }); } catch (e) { /* vecchi browser */ }
+        }
+        return aperta;
+      }
+      // Esposto per test e diagnostica: la logica e' pura (dipende solo dalle due altezze).
+      window.UltimateVTTViewport = { tastieraAperta: tastieraAperta, applica: applicaViewportVisibile };
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", function () {
+          applicaViewportVisibile(window.innerHeight, window.visualViewport.height);
+        });
+      }
+
       /* Bottone "Passa Turno" nella barra in-page (scheda sinistra) */
       var passTurnBtn = document.getElementById("passTurnButton");
       if (passTurnBtn) {
@@ -2557,7 +2588,9 @@
 
         if (el("hubPgColor")) { el("hubPgColor").textContent=name[0]||"E"; el("hubPgColor").style.background=color; }
         if (el("hubPgNameTxt")) el("hubPgNameTxt").textContent=name;
-        if (el("hubPgHpFill")) { el("hubPgHpFill").style.width=hpPct+"%"; el("hubPgHpFill").style.background=hpColor; }
+        /* scaleX invece di width (Task 5): la barra HP anima in compositing (GPU), senza
+           far ricalcolare il layout della barra superiore a ogni variazione di HP. */
+        if (el("hubPgHpFill")) { el("hubPgHpFill").style.transform="scaleX("+(hpPct/100)+")"; el("hubPgHpFill").style.background=hpColor; }
         if (el("hubPgHpNum")) el("hubPgHpNum").textContent=hp+"/"+maxHp;
 
         /* round combat */
@@ -2764,7 +2797,7 @@
           '<div class="hub-hp-block">'+
             '<div class="hub-hp-top"><span class="hub-hp-name">'+V.name+'</span>'+
             '<span class="hub-hp-vals">❤️ '+hp+'/'+maxHp+' &nbsp;🛡 '+(V.ac!=null?V.ac:'—')+'</span></div>'+
-            '<div class="hub-hp-bar-full"><div class="hub-hp-bar-fill" style="width:'+hpPct+'%;background:'+hpC+'"></div></div>'+
+            '<div class="hub-hp-bar-full"><div class="hub-hp-bar-fill" style="transform:scaleX('+(hpPct/100)+');background:'+hpC+'"></div></div>'+
           '</div>'+
           '<div class="hub-section-title">Caratteristiche</div>'+
           '<div class="hub-stats-grid">'+statsHtml+'</div>'+
@@ -3076,7 +3109,7 @@
         if (el("campPgDot"))    el("campPgDot").style.background = state.pgColor;
         if (el("campPgHpTxt")) el("campPgHpTxt").textContent   = state.pgHp + "/" + state.pgMaxHp;
         var pct = state.pgMaxHp > 0 ? Math.max(0, Math.min(100, (state.pgHp/state.pgMaxHp)*100)) : 0;
-        if (el("campPgHpFill")) el("campPgHpFill").style.width = pct + "%";
+        if (el("campPgHpFill")) el("campPgHpFill").style.transform = "scaleX(" + (pct/100) + ")";
         /* colore barra HP */
         if (el("campPgHpFill")) el("campPgHpFill").style.background = pct>50?"#5d9f45":pct>25?"#c89b3c":"#c9362b";
       }

@@ -158,6 +158,33 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     });
     check("Audio procedurale: impatto/doom/dadi (con e senza riverbero) suonano senza errori sul vero AudioContext", suoniOk === true);
 
+    // --- Tastiera virtuale (Task 5): quando l'area visibile si accorcia (tastiera aperta),
+    // js/12 scrive --vvh e accende body.keyboard-aperta, e il CSS accorcia #app a quell'altezza.
+    // In headless non si puo' aprire una tastiera vera: si pilota l'API esposta con altezze finte
+    // e si misura l'ALTEZZA REALE CALCOLATA di #app (il layout deve ricalcolarsi davvero). ---
+    const esitoTastiera = await gm.evaluate(() => {
+      const V = window.UltimateVTTViewport;
+      if (!V) { return null; }
+      V.applica(window.innerHeight, 400);
+      const conTastiera = {
+        classe: document.body.classList.contains("keyboard-aperta"),
+        vvh: getComputedStyle(document.documentElement).getPropertyValue("--vvh").trim(),
+        altezzaApp: Math.round(document.getElementById("app").getBoundingClientRect().height)
+      };
+      V.applica(window.innerHeight, window.innerHeight);
+      const dopoChiusura = {
+        classe: document.body.classList.contains("keyboard-aperta"),
+        altezzaApp: Math.round(document.getElementById("app").getBoundingClientRect().height)
+      };
+      return { conTastiera: conTastiera, dopoChiusura: dopoChiusura };
+    });
+    check("Tastiera virtuale: classe accesa e --vvh con l'altezza visibile (400px)",
+      !!esitoTastiera && esitoTastiera.conTastiera.classe === true && esitoTastiera.conTastiera.vvh === "400px");
+    check("Tastiera virtuale: #app si accorcia DAVVERO a 400px (la flexbox si ricalcola, niente input sotto la tastiera)",
+      !!esitoTastiera && esitoTastiera.conTastiera.altezzaApp === 400);
+    check("Tastiera virtuale: alla chiusura #app torna a schermo pieno e la classe si spegne",
+      !!esitoTastiera && esitoTastiera.dopoChiusura.classe === false && esitoTastiera.dopoChiusura.altezzaApp > 400);
+
     // --- Net outbox (modulo 42, "Supabase-ready"): una raffica di danni sulla pagina REALE
     // produce UN delta coalizzato con gli HP finali, non un payload per ogni tick dello slider. ---
     const outboxPrima = await gm.evaluate(() => window.UltimateVTTNetOutbox.getOutbox().length);
@@ -338,6 +365,29 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("BG3 HUD: presente il pulsante 'Termina turno'", hasEnd === true);
     await gm.waitForSelector("#bg3ShoveButton", { timeout: 6000 });
     check("BG3 HUD: il modulo 26 inietta il pulsante 'Spingi'", true);
+
+    // --- Anti-clutter (Task 5), misure REALI a combattimento attivo: hit-box dei pulsanti
+    // azione >= 44px e barre HP/movimento che animano su transform (scaleX), non su width. ---
+    const esitoAntiClutter = await gm.evaluate(() => {
+      const btn = document.querySelector(".bg3-btn");
+      const rectBtn = btn ? btn.getBoundingClientRect() : null;
+      const fill = document.querySelector(".bg3-init-hpfill");
+      const movFill = document.querySelector(".bg3-move-fill");
+      return {
+        altezzaBtn: rectBtn ? rectBtn.height : 0,
+        larghezzaBtn: rectBtn ? rectBtn.width : 0,
+        transizioneFill: fill ? getComputedStyle(fill).transitionProperty : "",
+        trasformataFill: fill ? fill.style.transform : "",
+        larghezzaInlineFill: fill ? fill.style.width : "residua",
+        transizioneMov: movFill ? getComputedStyle(movFill).transitionProperty : ""
+      };
+    });
+    check("Anti-clutter: i pulsanti azione BG3 misurano almeno 44x44px reali (" + Math.round(esitoAntiClutter.altezzaBtn) + "px)",
+      esitoAntiClutter.altezzaBtn >= 44 && esitoAntiClutter.larghezzaBtn >= 44);
+    check("Anti-clutter: la barra HP anima su transform con scaleX inline (niente width -> niente reflow)",
+      /transform/.test(esitoAntiClutter.transizioneFill) && /scaleX/.test(esitoAntiClutter.trasformataFill) && esitoAntiClutter.larghezzaInlineFill === "");
+    check("Anti-clutter: la barra movimento anima su transform",
+      /transform/.test(esitoAntiClutter.transizioneMov));
 
     // --- Arena tattica (modulo 40) + menu azioni (modulo 38): a combattimento attivo la scena e'
     // strategica (insegna del luogo, pulsante Sposta per il movimento col click) e la barra azioni

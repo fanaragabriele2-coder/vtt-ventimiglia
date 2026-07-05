@@ -63,7 +63,8 @@
     #hubPgNameTxt { font-size: 13px; font-weight: 700; color: var(--gold-b); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #hubPgHpRow { display: flex; align-items: center; gap: 5px; }
     #hubPgHpBar { width: 60px; height: 5px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
-    #hubPgHpFill { height: 100%; background: var(--ok); transition: width .3s, background .3s; }
+    /* scaleX invece di width (Task 5): la barra anima in compositing, senza reflow della barra hub. */
+    #hubPgHpFill { height: 100%; width: 100%; transform-origin: left center; background: var(--ok); transition: transform .3s, background .3s; }
     #hubPgHpNum { font-size: 11px; color: #d8c7a3; white-space: nowrap; }
     #hubRoundPill {
       flex: none; background: rgba(20,16,10,.8); border: 1px solid var(--line);
@@ -196,7 +197,7 @@
     .hub-hp-name { font-size: 15px; font-weight: 700; color: var(--gold-b); font-family: Georgia, serif; }
     .hub-hp-vals { font-size: 13px; color: #d8c7a3; }
     .hub-hp-bar-full { height: 10px; border-radius: 5px; background: rgba(255,255,255,.1); overflow: hidden; }
-    .hub-hp-bar-fill { height: 100%; transition: width .3s, background .3s; }
+    .hub-hp-bar-fill { height: 100%; width: 100%; transform-origin: left center; transition: transform .3s, background .3s; }
     .hub-stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 8px; }
     .hub-stat { background: rgba(20,16,10,.7); border: 1px solid var(--line); border-radius: 10px; padding: 7px 5px; text-align: center; }
     .hub-stat-label { font-size: 9px; color: var(--gold); text-transform: uppercase; letter-spacing: .4px; display: block; }

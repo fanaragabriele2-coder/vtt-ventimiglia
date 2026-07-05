@@ -378,7 +378,9 @@
       var track = el("div", "bg3-init-hptrack");
       var fill = el("div", "bg3-init-hpfill");
       var max = c.maxHitPoints || c.hitPoints || 1;
-      fill.style.width = Math.max(0, Math.min(100, Math.round((c.hitPoints / max) * 100))) + "%";
+      /* scaleX invece di width (Task 5): la transizione anima in compositing (GPU),
+         senza reflow della barra iniziativa a ogni variazione di HP in combattimento. */
+      fill.style.transform = "scaleX(" + Math.max(0, Math.min(1, c.hitPoints / max)) + ")";
       track.appendChild(fill);
       card.appendChild(track);
       card.appendChild(el("span", "bg3-init-hptext", Math.max(0, c.hitPoints) + " / " + max));
@@ -421,10 +423,12 @@
     if (residuo != null) {
       var vel = velocita || residuo;
       rif.movVal.textContent = Math.round(residuo) + " / " + Math.round(vel) + " m";
-      rif.movFill.style.width = Math.max(0, Math.min(100, vel ? Math.round((residuo / vel) * 100) : 0)) + "%";
+      /* scaleX invece di width (Task 5): la barra movimento cambia a OGNI cella percorsa
+         durante un trascinamento — animarla via transform evita un reflow del tray per passo. */
+      rif.movFill.style.transform = "scaleX(" + Math.max(0, Math.min(1, vel ? residuo / vel : 0)) + ")";
     } else {
       rif.movVal.textContent = "–";
-      rif.movFill.style.width = "0%";
+      rif.movFill.style.transform = "scaleX(0)";
     }
   }
 
