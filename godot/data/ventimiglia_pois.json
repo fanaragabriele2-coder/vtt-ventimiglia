@@ -1,0 +1,29 @@
+{
+	"_comment": "Punti d'interesse (POI) di Ventimiglia — coordinate lat/lng REALI del monolite (Modulo 12/39). L'overworld_map.gd normalizza lat/lng in coordinate schermo. cat: storico|civile|trasporti|natura|militare.",
+	"center": { "lat": 43.7870, "lng": 7.6075 },
+	"pois": [
+		{ "name": "Città Alta",          "lat": 43.7879, "lng": 7.6059, "icon": "🏰", "cat": "storico",    "desc": "Il cuore medievale arroccato: vicoli di pietra, archi e ombre lunghe." },
+		{ "name": "Cattedrale Assunta",   "lat": 43.7877, "lng": 7.6055, "icon": "⛪", "cat": "storico",    "desc": "Navata romanica; sotto l'altare si dice riposino reliquie dimenticate." },
+		{ "name": "Porta Canarda",        "lat": 43.7882, "lng": 7.6063, "icon": "🚪", "cat": "storico",    "desc": "Antica porta nord delle mura, sorvegliata da secoli." },
+		{ "name": "Porta Nino Lamboglia", "lat": 43.7875, "lng": 7.6051, "icon": "🚪", "cat": "storico",    "desc": "Varco occidentale verso il Roya, stretto e facile da difendere." },
+		{ "name": "Teatro Romano",        "lat": 43.7874, "lng": 7.6048, "icon": "🏛", "cat": "storico",    "desc": "Rovine dell'Albintimilium romano: colonne spezzate e alture per il vantaggio." },
+		{ "name": "Cattedrale S.Michele", "lat": 43.7871, "lng": 7.6048, "icon": "⛪", "cat": "storico",    "desc": "Chiesa fortificata; la cripta scende nel buio della roccia." },
+		{ "name": "Piazza Repubblica",    "lat": 43.7868, "lng": 7.6074, "icon": "🏛", "cat": "civile",     "desc": "Slargo affollato, punto d'incontro di mercanti e voci." },
+		{ "name": "Piazza C. Battisti",   "lat": 43.7863, "lng": 7.6091, "icon": "🏛", "cat": "civile",     "desc": "Piazza aperta verso il mercato, ideale per un'imboscata in spazio libero." },
+		{ "name": "Mercato Settimanale",  "lat": 43.7856, "lng": 7.6088, "icon": "🛒", "cat": "civile",     "desc": "Banchi, tende e folla: mille nascondigli e mille orecchie." },
+		{ "name": "Ospedale",             "lat": 43.7901, "lng": 7.6095, "icon": "🏥", "cat": "civile",     "desc": "Rifugio dei feriti; qui si recuperano forze e si spendono Dadi Vita." },
+		{ "name": "Biblioteca",           "lat": 43.7865, "lng": 7.6069, "icon": "📚", "cat": "civile",     "desc": "Scaffali polverosi: prove di Arcano e Storia per chi cerca risposte." },
+		{ "name": "Municipio",            "lat": 43.7866, "lng": 7.6072, "icon": "🏢", "cat": "civile",     "desc": "Sede del potere cittadino, guardie e burocrati." },
+		{ "name": "Stazione FS",          "lat": 43.7861, "lng": 7.6107, "icon": "🚂", "cat": "trasporti",  "desc": "Binari e vapore: la via più rapida per lasciare la città." },
+		{ "name": "Porto Turistico",      "lat": 43.7836, "lng": 7.6052, "icon": "⚓", "cat": "trasporti",  "desc": "Moli e barche; l'odore del sale e affari poco puliti." },
+		{ "name": "Confine Italia-FR",    "lat": 43.7889, "lng": 7.6369, "icon": "🛂", "cat": "trasporti",  "desc": "Il valico verso la Francia: dogana, contrabbando e passaggi segreti." },
+		{ "name": "Ponte sul Roya",       "lat": 43.7862, "lng": 7.6043, "icon": "🌉", "cat": "trasporti",  "desc": "Attraversamento chiave del fiume: un collo di bottiglia tattico." },
+		{ "name": "Lungomare",            "lat": 43.7842, "lng": 7.6072, "icon": "🏖", "cat": "natura",     "desc": "Passeggiata sul mare, aperta e battuta dal vento." },
+		{ "name": "Balzi Rossi",          "lat": 43.7914, "lng": 7.5990, "icon": "🪨", "cat": "natura",     "desc": "Grotte preistoriche a picco sul mare: cunicoli e antichi terrori." },
+		{ "name": "Giardini Hanbury",     "lat": 43.7928, "lng": 7.5975, "icon": "🌿", "cat": "natura",     "desc": "Giardino botanico terrazzato: verde lussureggiante e sentieri nascosti." },
+		{ "name": "Capo Mortola",         "lat": 43.7916, "lng": 7.5963, "icon": "🏔", "cat": "natura",     "desc": "Promontorio roccioso, l'estremo lembo occidentale." },
+		{ "name": "Foce del Roya",        "lat": 43.7835, "lng": 7.6038, "icon": "🌊", "cat": "natura",     "desc": "Dove il fiume incontra il mare: canneti, fango e agguati." },
+		{ "name": "Forte dell'Annunziata","lat": 43.7888, "lng": 7.6044, "icon": "⚔", "cat": "militare",   "desc": "Fortezza sabauda a strapiombo: bastioni, cannoniere e coperture." },
+		{ "name": "Torre dell'Orologio",  "lat": 43.7878, "lng": 7.6060, "icon": "⏰", "cat": "militare",   "desc": "Torre di vedetta che domina la Città Alta." }
+	]
+}

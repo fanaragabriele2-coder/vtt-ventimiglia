@@ -1,9 +1,15 @@
 extends Control
 ## VTTMain — scena radice. Costruisce il layout a 3 colonne del monolite (Scheda PG · Mappa+Combat ·
 ## Chat Master) e una toolbar in alto. Ogni pannello si aggancia da solo ai signal dei manager: qui
-## si fa solo la composizione + qualche pulsante globale (evoca nemici, ecc.).
+## si fa solo la composizione + qualche pulsante globale (evoca nemici, cambio vista, ecc.).
 ##
 ## E' la scena principale del progetto (project.godot -> run/main_scene = res://main.tscn).
+
+var _tactical_map: TacticalMap
+var _overworld_map: OverworldMap
+var _view_tactical_btn: Button
+var _view_overworld_btn: Button
+
 
 func _ready() -> void:
 	_apply_background()
@@ -45,15 +51,26 @@ func _build_layout() -> void:
 	sheet.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(sheet)
 
-	# Centro: placeholder mappa (TileMap arrivera' nello step mappa) + HUD combattimento in basso.
+	# Centro: toggle vista + (mappa tattica | overworld Ventimiglia) + HUD combattimento in basso.
 	var center := VBoxContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.add_theme_constant_override("separation", 8)
 	columns.add_child(center)
 
-	var tactical_map := TacticalMap.new()
-	tactical_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center.add_child(tactical_map)
+	center.add_child(_build_view_toggle())
+
+	# Le due viste convivono nello stesso spazio: solo una e' visibile (un Container salta i figli
+	# nascosti, quindi la visibile riempie tutto). Il toggle scambia la visibilita'.
+	_tactical_map = TacticalMap.new()
+	_tactical_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.add_child(_tactical_map)
+
+	_overworld_map = OverworldMap.new()
+	_overworld_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_overworld_map.visible = false
+	# Quando il party viaggia sull'overworld, annuncialo nella chat (fonte unica: GameState).
+	_overworld_map.party_traveled.connect(_on_party_traveled)
+	center.add_child(_overworld_map)
 
 	var combat_hud := CombatHUD.new()
 	center.add_child(combat_hud)
@@ -115,3 +132,38 @@ func _toolbar_button(text: String, handler: Callable) -> Button:
 	b.custom_minimum_size = Vector2(0, 44)
 	b.pressed.connect(handler)
 	return b
+
+
+# --- Toggle tra mappa tattica e overworld di Ventimiglia (come la transizione del monolite) ---
+
+func _build_view_toggle() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	_view_tactical_btn = _toolbar_button("🗺 Mappa tattica", _show_tactical)
+	_view_overworld_btn = _toolbar_button("🌍 Ventimiglia", _show_overworld)
+	row.add_child(_view_tactical_btn)
+	row.add_child(_view_overworld_btn)
+	_update_toggle_state(true)
+	return row
+
+
+func _show_tactical() -> void:
+	_tactical_map.visible = true
+	_overworld_map.visible = false
+	_update_toggle_state(true)
+
+
+func _show_overworld() -> void:
+	_tactical_map.visible = false
+	_overworld_map.visible = true
+	_update_toggle_state(false)
+
+
+func _update_toggle_state(tactical_active: bool) -> void:
+	_view_tactical_btn.disabled = tactical_active
+	_view_overworld_btn.disabled = not tactical_active
+
+
+func _on_party_traveled(poi_name: String, poi: Dictionary) -> void:
+	# Annota lo spostamento nel log della chat (la posizione vera e' gia' in GameState).
+	print("[Overworld] Il party e' giunto a %s (%s)" % [poi_name, String(poi.get("desc", ""))])

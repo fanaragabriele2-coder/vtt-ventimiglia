@@ -1,0 +1,189 @@
+class_name OverworldMap
+extends Control
+## Overworld di Ventimiglia (vista città) — porting della mappa Leaflet reale (Modulo 12) e del
+## ponte narrazione->POI (Modulo 39).
+##
+## Il monolite usava Leaflet con tile OpenStreetMap: qui, per restare un client Godot autosufficiente
+## (nessuna dipendenza di rete per le tile), i POI con coordinate lat/lng REALI vengono normalizzati
+## in coordinate schermo e disegnati su una mappa stilizzata (terra + mare Ligure a sud). Il party
+## viaggia tra i POI col click; ogni spostamento aggiorna GameState (chiave "party.location"), cosi'
+## chat, HUD e — in futuro — il Master IA leggono la stessa, unica posizione.
+
+signal party_traveled(poi_name: String, poi: Dictionary)
+
+const POIS_PATH: String = "res://data/ventimiglia_pois.json"
+
+# Colore per categoria di POI.
+const CAT_COLORS: Dictionary = {
+	"storico": Color(0.78, 0.61, 0.24),
+	"civile": Color(0.44, 0.56, 0.69),
+	"trasporti": Color(0.36, 0.72, 0.78),
+	"natura": Color(0.36, 0.62, 0.27),
+	"militare": Color(0.7, 0.23, 0.18),
+}
+const COL_LAND: Color = Color(0.09, 0.1, 0.08)
+const COL_LAND_HI: Color = Color(0.12, 0.13, 0.1)
+const COL_SEA: Color = Color(0.06, 0.12, 0.18)
+const COL_ROAD: Color = Color(0.78, 0.61, 0.24, 0.14)
+const COL_PARTY: Color = Color(0.94, 0.83, 0.53)
+
+var _pois: Array[Dictionary] = []
+var _lat_min: float = 0.0
+var _lat_max: float = 0.0
+var _lng_min: float = 0.0
+var _lng_max: float = 0.0
+var _current_index: int = 0
+var _hovered_index: int = -1
+var _pad: float = 40.0
+
+
+func _ready() -> void:
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	_load_pois()
+	# Party di partenza: la Città Alta (o il primo POI).
+	_current_index = _index_of("Città Alta")
+	_publish_location()
+	resized.connect(queue_redraw)
+
+
+func _load_pois() -> void:
+	if not FileAccess.file_exists(POIS_PATH):
+		push_warning("OverworldMap: POI non trovati: " + POIS_PATH)
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(POIS_PATH))
+	if not (parsed is Dictionary and parsed.has("pois")):
+		return
+	for entry: Variant in parsed["pois"]:
+		if entry is Dictionary:
+			_pois.append(entry)
+	# Bounding box lat/lng per la normalizzazione in coordinate schermo.
+	_lat_min = INF; _lat_max = -INF; _lng_min = INF; _lng_max = -INF
+	for p: Dictionary in _pois:
+		_lat_min = minf(_lat_min, float(p["lat"]))
+		_lat_max = maxf(_lat_max, float(p["lat"]))
+		_lng_min = minf(_lng_min, float(p["lng"]))
+		_lng_max = maxf(_lng_max, float(p["lng"]))
+
+
+func _index_of(poi_name: String) -> int:
+	for i: int in range(_pois.size()):
+		if String(_pois[i]["name"]) == poi_name:
+			return i
+	return 0
+
+
+# --- Conversione lat/lng -> pixel (nord in alto) ---
+
+func _latlng_to_pixel(lat: float, lng: float) -> Vector2:
+	var w: float = maxf(1.0, size.x - _pad * 2.0)
+	var h: float = maxf(1.0, size.y - _pad * 2.0)
+	var nx: float = (lng - _lng_min) / maxf(0.0001, _lng_max - _lng_min)
+	var ny: float = (_lat_max - lat) / maxf(0.0001, _lat_max - _lat_min)  # lat alta = alto
+	return Vector2(_pad + nx * w, _pad + ny * h)
+
+
+# --- Disegno ---
+
+func _draw() -> void:
+	# 1) Terra + fascia di mare a sud (le lat piu' basse = parte bassa dello schermo).
+	draw_rect(Rect2(Vector2.ZERO, size), COL_LAND, true)
+	var sea_top: float = size.y * 0.78
+	draw_rect(Rect2(Vector2(0, sea_top), Vector2(size.x, size.y - sea_top)), COL_SEA, true)
+	# Qualche macchia di terra piu' chiara per texture.
+	for i: int in range(6):
+		var cx: float = size.x * (0.12 + 0.14 * i)
+		draw_circle(Vector2(cx, size.y * 0.32), size.x * 0.09, COL_LAND_HI)
+
+	if _pois.is_empty():
+		return
+
+	# 2) Sentieri: collega ogni POI al centro storico (Città Alta) con linee tenui.
+	var hub: Vector2 = _latlng_to_pixel(float(_pois[_index_of("Città Alta")]["lat"]), float(_pois[_index_of("Città Alta")]["lng"]))
+	for p: Dictionary in _pois:
+		draw_line(hub, _latlng_to_pixel(float(p["lat"]), float(p["lng"])), COL_ROAD, 1.0)
+
+	# 3) Marker dei POI.
+	var font: Font = ThemeDB.fallback_font
+	for i: int in range(_pois.size()):
+		var p: Dictionary = _pois[i]
+		var pos: Vector2 = _latlng_to_pixel(float(p["lat"]), float(p["lng"]))
+		var col: Color = CAT_COLORS.get(String(p["cat"]), Color.WHITE)
+		var is_current: bool = i == _current_index
+		var is_hover: bool = i == _hovered_index
+		var r: float = 9.0 if (is_current or is_hover) else 6.0
+		draw_circle(pos, r, col)
+		draw_arc(pos, r, 0, TAU, 24, Color(0, 0, 0, 0.5), 1.5)
+		# Etichetta solo per il POI corrente e quello sotto il mouse (anti-clutter).
+		if is_current or is_hover:
+			draw_string(font, pos + Vector2(-60, -14), String(p["name"]),
+				HORIZONTAL_ALIGNMENT_CENTER, 120, 13, Color(0.9, 0.85, 0.72))
+
+	# 4) Marker del party sul POI corrente (anello dorato pulsante).
+	var party_pos: Vector2 = _latlng_to_pixel(float(_pois[_current_index]["lat"]), float(_pois[_current_index]["lng"]))
+	draw_arc(party_pos, 14.0, 0, TAU, 32, COL_PARTY, 2.5)
+	draw_arc(party_pos, 18.0, 0, TAU, 32, Color(COL_PARTY.r, COL_PARTY.g, COL_PARTY.b, 0.4), 1.5)
+
+	# 5) Barra info in basso: nome + descrizione del POI corrente/hover.
+	var info_index: int = _hovered_index if _hovered_index >= 0 else _current_index
+	var p_info: Dictionary = _pois[info_index]
+	var label: String = "%s  %s — %s" % [String(p_info["icon"]), String(p_info["name"]), String(p_info["desc"])]
+	var bar := Rect2(Vector2(8, size.y - 30), Vector2(size.x - 16, 24))
+	draw_rect(bar, Color(0, 0, 0, 0.55), true)
+	draw_string(font, Vector2(16, size.y - 12), label, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32, 13, Color(0.88, 0.82, 0.68))
+
+
+# --- Input: hover + viaggio ---
+
+func _gui_input(event: InputEvent) -> void:
+	var mm := event as InputEventMouseMotion
+	if mm != null:
+		var idx: int = _poi_near(mm.position)
+		if idx != _hovered_index:
+			_hovered_index = idx
+			queue_redraw()
+		return
+	var mb := event as InputEventMouseButton
+	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+		var idx: int = _poi_near(mb.position)
+		if idx >= 0 and idx != _current_index:
+			_travel_to(idx)
+
+
+func _poi_near(pos: Vector2) -> int:
+	var best: int = -1
+	var best_dist: float = 18.0  # raggio di click/hover in pixel
+	for i: int in range(_pois.size()):
+		var p: Dictionary = _pois[i]
+		var d: float = pos.distance_to(_latlng_to_pixel(float(p["lat"]), float(p["lng"])))
+		if d < best_dist:
+			best_dist = d
+			best = i
+	return best
+
+
+func _travel_to(index: int) -> void:
+	_current_index = index
+	_publish_location()
+	var p: Dictionary = _pois[index]
+	party_traveled.emit(String(p["name"]), p)
+	queue_redraw()
+
+
+func _publish_location() -> void:
+	if _pois.is_empty():
+		return
+	var p: Dictionary = _pois[_current_index]
+	# Unica fonte di verita' della posizione (GameState), come nel monolite (Modulo 36/39).
+	GameState.set_party_location({ "name": String(p["name"]), "lat": float(p["lat"]), "lng": float(p["lng"]) })
+	GameState.publish("party:moved", p)
+
+
+## Sposta il party su un POI per nome (usato dal ponte chat->mappa: la narrazione del Master).
+func travel_to_named(poi_name: String) -> bool:
+	var idx: int = _index_of(poi_name)
+	if idx == _current_index and String(_pois[idx]["name"]) != poi_name:
+		return false
+	_travel_to(idx)
+	return true

@@ -20,7 +20,8 @@ godot/
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
 │   ├── monsters.json                 # bestiario (ex npcCatalog, Modulo 06)
 │   ├── items.json                    # armi/armature/consumabili (ex itemCatalog, Modulo 05)
-│   └── spells.json                   # grimorio (ex spellCatalog, Modulo 05)
+│   ├── spells.json                   # grimorio (ex spellCatalog, Modulo 05)
+│   └── ventimiglia_pois.json         # 23 POI di Ventimiglia con lat/lng reali (ex Modulo 12/39)
 └── scripts/
     ├── data/character_data.gd        # Resource: dati di un PG (ex defaultCharacterState, Mod. 03)
     ├── autoload/
@@ -33,6 +34,7 @@ godot/
         ├── vtt_main.gd               # scena radice: layout 3 colonne + toolbar
         ├── character_sheet_panel.gd  # sinistra: Scheda PG (HP, caratteristiche) ← CharacterManager
         ├── tactical_map.gd           # centro: mappa tattica _draw() (griglia, nebbia, token, click-to-move) ← CombatManager
+        ├── overworld_map.gd          # centro: overworld di Ventimiglia (POI reali, viaggio del party) → GameState
         ├── combat_hud.gd             # centro-basso: HUD combattimento BG3 ← CombatManager
         └── master_chat_panel.gd      # destra: Chat Master streaming + IP server ← AIBridge
 ```
@@ -49,6 +51,10 @@ godot/
      (click-to-move BG3); muovere un PG rivela la nebbia di guerra attorno a lui;
    - seleziona un bersaglio e **⚔ Attacca** / **👐 Spingi** / **⏭ Termina turno** — quando un nemico
      muore, **il suo token sparisce dalla mappa** (come il fix del monolite);
+   - sopra la mappa, il toggle **🗺 Mappa tattica / 🌍 Ventimiglia**: passa all'**overworld** con i
+     23 POI reali di Ventimiglia (coordinate lat/lng vere). Click su un POI = il party ci viaggia;
+     l'anello dorato segna dove si trova, e la posizione finisce in `GameState` (chiave
+     `party.location`) — la stessa fonte che il ponte chat→mappa del Master userà;
    - nella scheda a sinistra, **−5 HP** / **+5 HP**: la barra HP reagisce in tempo reale (signal
      `hp_changed`); **+ PG** aggiunge un membro al party (menu a tendina in alto alla scheda).
 4. Per il Master IA: nella colonna destra scrivi l'**IP della 5080** (es. `192.168.1.50`) → *Imposta*,
