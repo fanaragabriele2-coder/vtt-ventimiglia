@@ -623,6 +623,43 @@ il cassetto 🛠 Strumenti resta cliccabile** — prima veniva spento in blocco 
 un fade su `opacity` (proprietà composita GPU, nessun reflow); al ritorno al canvas tattico un
 repaint esplicito rimette in scena la griglia (che con le cache è un semplice blit).
 
+## Audio/voce non bloccante (Task 4 — coda voce, ducking, riverbero leggero)
+
+**Il limite di piattaforma, detto chiaramente.** La Web Speech API (`speechSynthesis`) sintetizza
+la voce con un motore del sistema operativo/browser: il suo audio **non può** essere instradato nel
+grafo della Web Audio API (niente `MediaStreamAudioSourceNode` da un'utterance) in modo standard e
+cross-browser. Applicare "un leggero riverbero" *alla voce stessa* non è quindi realizzabile senza
+librerie TTS esterne — estranee allo stack vanilla richiesto. La soluzione onesta adottata: il
+riverbero va sul **paesaggio sonoro procedurale** che circonda la voce, e l'ambience si abbassa
+("ducking") mentre il Master parla — l'effetto è realmente udibile, non uno sfondo statico.
+
+**Coda della voce (`js/10`), non più `cancel()` distruttivo.** Prima, ogni nuova battuta troncava
+di netto quella in corso: con lo streaming frase-per-frase del Task 1, due `speak` ravvicinati si
+scavalcavano a vicenda. Ora `speakMaster()` **accoda** (tetto di 6 battute: oltre, si scartano le
+più vecchie non ancora lette, così la voce resta "al presente"); `processaCodaVoce()` legge una
+battuta alla volta e incatena la successiva su `onend`/`onerror`, senza mai bloccare il thread
+principale (la Web Speech API è già asincrona di natura). `getVoiceQueueLength()`/`isSpeaking()`
+espongono lo stato per test e diagnostica; `stopVoice()` (richiamato anche dal mute in `js/13`)
+svuota la coda, cancella la lettura in corso e ripristina l'ambience.
+
+**Ducking dell'ambience.** All'avvio di una battuta (`onstart`), il gain dell'ambience scende al
+28% con una rampa morbida (`setTargetAtTime`, stessa tecnica dei fade esistenti); a fine battuta
+risale al livello di riposo. La voce resta comprensibile sopra il drone invece di doverci competere.
+
+**Bus di riverbero leggero (`assicuraRiverbero()`), creato una volta sola.** Un `ConvolverNode`
+vero richiede generare e tenere in memoria un buffer d'impulso — più pesante, e la GPU/CPU forte in
+architettura Split-Rig sta sul PC remoto con Ollama, non sul laptop. Si usa invece un comb-filter
+smorzato: un `DelayNode` (45ms) in retroazione attraverso un `BiquadFilterNode` passa-basso (le
+frequenze alte si perdono a ogni giro, come un'eco che rimbalza tra pareti di pietra) più un mix
+*wet* al 20%. Il bus si crea alla prima richiesta e si riusa per sempre (mai un secondo `DelayNode`).
+Va solo sui suoni **atmosferici** (`playImpact`, `playSpellPulse`, `playDoom`): i suoni
+**percussivi** ravvicinati (dadi, click UI) restano volutamente a secco, altrimenti il riverbero li
+impasterebbe invece di renderli più immersivi.
+
+**STT (`js/13`):** `recognition.start()` può lanciare un'eccezione **sincrona** (es.
+`InvalidStateError` da un doppio click prima che il browser finisca di fermare l'istanza
+precedente) — ora è protetta da try/catch, così un doppio click non rompe più l'intero handler.
+
 ## Net outbox "Supabase-ready" (Task 2 — stato pronto per il multiplayer documentale)
 
 `js/42-net-outbox.js` (`UltimateVTTNetOutbox`) prepara lo stato al sync con un backend

@@ -9,11 +9,22 @@
       const AudioContextConstructor = window.AudioContext || window.webkitAudioContext || null;
       const speechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
+      // Livello dell'ambience "a riposo": costante condivisa tra startAmbience (che lo imposta) e
+      // il ducking sotto la voce del Master (che lo abbassa temporaneamente e lo ripristina) —
+      // prima era un magic number ripetuto, con lo stesso valore scritto in due punti diversi.
+      const AMBIENCE_LEVEL = 0.065;
+      // Quanta coda di frasi accumulare se il Master (o lo streaming del Task 1, che puo' parlare
+      // frase per frase mano a mano che arriva) manda testo piu' in fretta di quanto la voce lo
+      // legga: oltre questo tetto si scartano le piu' vecchie non ancora lette, cosi' la voce
+      // resta "al presente" invece di recitare un discorso ormai superato.
+      const CODA_VOCE_MAX = 6;
+
       const audioState = {
         context: null,
         masterGain: null,
         ambienceGain: null,
         ambienceOscillators: [],
+        reverbBus: null,
         muted: false,
         volume: 0.55,
         ambienceActive: false,
@@ -27,6 +38,13 @@
         patchedCombat: false
       };
 
+      // Coda della voce del Master: prima ogni nuova battuta chiamava speechSynthesis.cancel() e
+      // troncava di netto quella in corso — due comandi "speak" ravvicinati (frequenti con lo
+      // streaming del Task 1, che puo' invocarla frase per frase) si scavalcavano a vicenda, con
+      // audio spezzato. Ora le battute si ACCODANO e vengono lette una dopo l'altra per intero.
+      var codaVoce = [];
+      var vociInCorso = false;
+
       function getElement(id) {
         return document.getElementById(id);
       }
@@ -39,7 +57,7 @@
 
       function cloneData(value) {
         return JSON.parse(JSON.stringify(value, function stripAudioObjects(key, value) {
-          if (key === "context" || key === "masterGain" || key === "ambienceGain" || key === "ambienceOscillators") {
+          if (key === "context" || key === "masterGain" || key === "ambienceGain" || key === "ambienceOscillators" || key === "reverbBus") {
             return undefined;
           }
           return value;
@@ -123,7 +141,43 @@
         renderAudioUi();
       }
 
-      function createEnvelopeGain(startTime, peak, attack, decay, sustain, release, duration) {
+      // Bus di riverbero LEGGERO ("immersivo", non una sala da concerto): un ConvolverNode vero
+      // richiederebbe generare/tenere in memoria un intero buffer d'impulso — piu' pesante per un
+      // client che deve restare leggero (architettura Split-Rig: la GPU/CPU forte sta sul PC
+      // remoto con Ollama, non qui). Si usa invece un singolo comb-filter smorzato: un DelayNode
+      // in retroazione attraverso un BiquadFilterNode passa-basso. A ogni giro nel loop il segnale
+      // perde le frequenze alte — esattamente come un'eco che rimbalza tra pareti di pietra perde
+      // gli acuti a ogni riflessione — dando un "respiro" ambientale con pochissimo costo. E' il
+      // riverbero "tramite BiquadFilterNode" richiesto: il filtro non e' decorativo, e' lui a
+      // scolpire il decadimento del riverbero ripetizione dopo ripetizione.
+      function assicuraRiverbero() {
+        if (audioState.reverbBus) { return audioState.reverbBus; }
+        const context = audioState.context;
+        if (!context) { return null; }
+
+        const ingresso = context.createGain();
+        const delay = context.createDelay(1.0);
+        delay.delayTime.value = 0.045;
+        const smorzamento = context.createBiquadFilter();
+        smorzamento.type = "lowpass";
+        smorzamento.frequency.value = 2200; // le pareti "assorbono" gli acuti a ogni rimbalzo
+        const feedback = context.createGain();
+        feedback.gain.value = 0.32; // decadimento contenuto: riverbero leggero, non infinito
+        const wet = context.createGain();
+        wet.gain.value = 0.2; // solo ~20% del segnale attraversa il riverbero: resta "leggero"
+
+        ingresso.connect(delay);
+        delay.connect(smorzamento);
+        smorzamento.connect(feedback);
+        feedback.connect(delay); // retroazione: qui nasce la coda del riverbero
+        smorzamento.connect(wet);
+        wet.connect(audioState.masterGain);
+
+        audioState.reverbBus = { ingresso: ingresso, wet: wet, delay: delay, smorzamento: smorzamento, feedback: feedback };
+        return audioState.reverbBus;
+      }
+
+      function createEnvelopeGain(startTime, peak, attack, decay, sustain, release, duration, conRiverbero) {
         const context = ensureAudioContext();
         const gain = context.createGain();
         const endTime = startTime + duration;
@@ -133,6 +187,10 @@
         gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, sustain), startTime + attack + decay);
         gain.gain.setTargetAtTime(0.0001, Math.max(startTime + attack + decay, endTime - release), Math.max(0.001, release / 4));
         gain.connect(audioState.masterGain);
+        if (conRiverbero) {
+          const bus = assicuraRiverbero();
+          if (bus) { gain.connect(bus.ingresso); }
+        }
         return gain;
       }
 
@@ -146,7 +204,7 @@
         const now = context.currentTime;
         const oscillator = context.createOscillator();
         const filter = context.createBiquadFilter();
-        const gain = createEnvelopeGain(now, toneOptions.peak || 0.22, toneOptions.attack || 0.012, toneOptions.decay || 0.08, toneOptions.sustain || 0.04, toneOptions.release || 0.12, duration);
+        const gain = createEnvelopeGain(now, toneOptions.peak || 0.22, toneOptions.attack || 0.012, toneOptions.decay || 0.08, toneOptions.sustain || 0.04, toneOptions.release || 0.12, duration, toneOptions.riverbero);
 
         oscillator.type = toneOptions.type || "sine";
         oscillator.frequency.setValueAtTime(frequency, now);
@@ -189,7 +247,7 @@
         const now = context.currentTime;
         const source = context.createBufferSource();
         const filter = context.createBiquadFilter();
-        const gain = createEnvelopeGain(now, noiseOptions.peak || 0.18, noiseOptions.attack || 0.006, noiseOptions.decay || 0.06, noiseOptions.sustain || 0.03, noiseOptions.release || 0.12, duration);
+        const gain = createEnvelopeGain(now, noiseOptions.peak || 0.18, noiseOptions.attack || 0.006, noiseOptions.decay || 0.06, noiseOptions.sustain || 0.03, noiseOptions.release || 0.12, duration, noiseOptions.riverbero);
 
         source.buffer = createNoiseBuffer(duration + 0.05);
         filter.type = noiseOptions.filterType || "bandpass";
@@ -231,6 +289,11 @@
         return true;
       }
 
+      // riverbero:true qui sotto (impatto/incantesimo/doom): sono i suoni "atmosferici", quelli a
+      // cui un po' di coda ambientale aggiunge profondita' senza sporcarne la leggibilita'. I
+      // click ravvicinati (dadi, click UI, playUiClick) restano SENZA riverbero apposta: sono
+      // percussivi e ripetuti in rapida sequenza — impastarli col riverbero li renderebbe confusi
+      // invece che piu' immersivi.
       function playImpact() {
         playNoise(0.22, {
           peak: 0.22,
@@ -239,13 +302,15 @@
           sustain: 0.025,
           filterType: "lowpass",
           filterFrequency: 520,
-          q: 0.9
+          q: 0.9,
+          riverbero: true
         });
         playTone(84, 0.28, {
           type: "sine",
           peak: 0.16,
           slideTo: 45,
-          filterFrequency: 700
+          filterFrequency: 700,
+          riverbero: true
         });
         audioState.lastCue = "hit";
         pushHistory("cue", "Impact");
@@ -257,14 +322,16 @@
           peak: 0.13,
           slideTo: 660,
           attack: 0.018,
-          filterFrequency: 2800
+          filterFrequency: 2800,
+          riverbero: true
         });
         window.setTimeout(function secondSpellTone() {
           playTone(330, 0.42, {
             type: "triangle",
             peak: 0.1,
             slideTo: 990,
-            filterFrequency: 3600
+            filterFrequency: 3600,
+            riverbero: true
           });
         }, 80);
         playNoise(0.34, {
@@ -287,7 +354,8 @@
           decay: 0.2,
           sustain: 0.07,
           release: 0.48,
-          filterFrequency: 900
+          filterFrequency: 900,
+          riverbero: true
         });
         window.setTimeout(function doomSecondTone() {
           playTone(72, 0.9, {
@@ -295,7 +363,8 @@
             peak: 0.09,
             slideTo: 36,
             attack: 0.05,
-            filterFrequency: 600
+            filterFrequency: 600,
+            riverbero: true
           });
         }, 140);
         audioState.lastCue = "doom";
@@ -347,7 +416,7 @@
         const now = context.currentTime;
         audioState.ambienceGain = context.createGain();
         audioState.ambienceGain.gain.setValueAtTime(0.0001, now);
-        audioState.ambienceGain.gain.exponentialRampToValueAtTime(0.065, now + 0.8);
+        audioState.ambienceGain.gain.exponentialRampToValueAtTime(AMBIENCE_LEVEL, now + 0.8);
         audioState.ambienceGain.connect(audioState.masterGain);
 
         [55, 82, 123].forEach(function createDrone(frequency, index) {
@@ -416,21 +485,31 @@
         return italianVoice || voices[0] || null;
       }
 
-      function speakMaster(text) {
-        const spokenText = String(text || "").trim();
-        if (!spokenText) {
-          audioState.voiceStatus = "empty";
-          renderAudioUi();
-          return false;
+      // Abbassa (o ripristina) l'ambience mentre il Master parla: un "ducking" leggero (il
+      // volume scende al 28% e risale con una rampa morbida, setTargetAtTime — stessa tecnica
+      // gia' usata altrove in questo modulo per i fade) cosi' la voce resta comprensibile sopra
+      // il drone di sottofondo invece di doverci competere. Effetto reale, non decorativo:
+      // ascoltabile subito col drone acceso durante una battuta del Master.
+      function duckAmbience(giu) {
+        if (!audioState.ambienceActive || !audioState.ambienceGain || !audioState.context) {
+          return;
         }
+        const now = audioState.context.currentTime;
+        const bersaglio = giu ? AMBIENCE_LEVEL * 0.28 : AMBIENCE_LEVEL;
+        audioState.ambienceGain.gain.setTargetAtTime(bersaglio, now, giu ? 0.12 : 0.35);
+      }
 
-        if (!speechSupported) {
-          audioState.voiceStatus = "unavailable";
-          pushHistory("voice", "Web Speech API non disponibile.");
-          return false;
+      // Legge la PROSSIMA battuta in coda, se non ne sta gia' leggendo una. Non blocca mai il
+      // main thread: speechSynthesis.speak() e' asincrona di natura (Web Speech API), qui si
+      // aggiunge solo l'incatenamento (onend -> prossima) cosi' piu' battute ravvicinate (es. lo
+      // streaming del Task 1, frase per frase) si susseguono invece di troncarsi a vicenda.
+      function processaCodaVoce() {
+        if (vociInCorso || !codaVoce.length) {
+          return;
         }
+        const spokenText = codaVoce.shift();
+        vociInCorso = true;
 
-        window.speechSynthesis.cancel();
         const utterance = new window.SpeechSynthesisUtterance(spokenText);
         const voice = pickVoice();
 
@@ -448,27 +527,60 @@
           audioState.voiceStatus = "speaking";
           pushHistory("voice", spokenText.slice(0, 72));
           renderAudioUi();
+          duckAmbience(true);
         };
 
         utterance.onend = function handleSpeechEnd() {
-          audioState.voiceStatus = "ready";
+          vociInCorso = false;
+          duckAmbience(false);
+          audioState.voiceStatus = codaVoce.length ? "speaking" : "ready";
           renderAudioUi();
+          processaCodaVoce();
         };
 
         utterance.onerror = function handleSpeechError() {
+          vociInCorso = false;
+          duckAmbience(false);
           audioState.voiceStatus = "error";
           renderAudioUi();
+          processaCodaVoce();
         };
 
         playDoom();
         window.speechSynthesis.speak(utterance);
+      }
+
+      // Accoda una battuta invece di interromperne una in corso (era il comportamento precedente:
+      // speechSynthesis.cancel() ad ogni chiamata tagliava di netto qualunque frase gia' in lettura).
+      function speakMaster(text) {
+        const spokenText = String(text || "").trim();
+        if (!spokenText) {
+          audioState.voiceStatus = "empty";
+          renderAudioUi();
+          return false;
+        }
+
+        if (!speechSupported) {
+          audioState.voiceStatus = "unavailable";
+          pushHistory("voice", "Web Speech API non disponibile.");
+          return false;
+        }
+
+        codaVoce.push(spokenText);
+        if (codaVoce.length > CODA_VOCE_MAX) {
+          codaVoce.splice(0, codaVoce.length - CODA_VOCE_MAX);
+        }
+        processaCodaVoce();
         return true;
       }
 
       function stopVoice() {
+        codaVoce.length = 0;
+        vociInCorso = false;
         if (speechSupported) {
           window.speechSynthesis.cancel();
         }
+        duckAmbience(false);
         audioState.voiceStatus = speechSupported ? "ready" : "unavailable";
         renderAudioUi();
       }
@@ -690,7 +802,10 @@
         setAmbience: setAmbience,
         speakMaster: speakMaster,
         stopVoice: stopVoice,
-        renderAudioUi: renderAudioUi
+        renderAudioUi: renderAudioUi,
+        // Diagnostica/test per la coda voce (Task 4: TTS non bloccante).
+        getVoiceQueueLength: function getVoiceQueueLength() { return codaVoce.length; },
+        isSpeaking: function isSpeaking() { return vociInCorso; }
       };
 
       initializeAudioVoice();

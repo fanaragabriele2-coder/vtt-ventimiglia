@@ -120,6 +120,44 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("Layout: la diagnostica sta in un cassetto richiudibile, chiuso di default", layoutIniziale.diagChiusa === true);
     check("Layout: la colonna destra si intitola 'Chat Master'", layoutIniziale.titoloDestra === "Chat Master");
 
+    // --- Audio/voce non bloccante (modulo 09/13, Task 4): sulla pagina REALE (Web Speech API vera,
+    // non un finto), tre chiamate ravvicinate a speakMaster() (come farebbe lo streaming del Task 1,
+    // frase per frase) si ACCODANO senza cancel() distruttivo. Non si attende onstart/onend reali
+    // (in Chromium headless il motore TTS puo' non avere un backend audio e non emetterli mai): si
+    // verifica solo lo stato SINCRONO subito dopo ogni chiamata, che non dipende da quell'evento. ---
+    const codaVoceReale = await gm.evaluate(() => {
+      const A = window.UltimateVTTAudioVoice;
+      if (!A) { return null; }
+      A.stopVoice(); // stato pulito, non contaminato da eventuali chiamate precedenti
+      const dopo1 = { parla: A.isSpeaking(), coda: A.getVoiceQueueLength() };
+      A.speakMaster("Le ombre si allungano sulla piazza.");
+      const dopo2 = { parla: A.isSpeaking(), coda: A.getVoiceQueueLength() };
+      A.speakMaster("Un fruscio tra le colonne.");
+      const dopo3 = { parla: A.isSpeaking(), coda: A.getVoiceQueueLength() };
+      A.speakMaster("Qualcosa si muove nell'ombra.");
+      const dopo4 = { parla: A.isSpeaking(), coda: A.getVoiceQueueLength() };
+      A.stopVoice();
+      const dopoStop = { parla: A.isSpeaking(), coda: A.getVoiceQueueLength() };
+      return { dopo1, dopo2, dopo3, dopo4, dopoStop };
+    });
+    check("Voce Master: prima battuta parte subito (coda vuota, in corso)", !!codaVoceReale && codaVoceReale.dopo2.parla === true && codaVoceReale.dopo2.coda === 0);
+    check("Voce Master: seconda battuta ravvicinata si ACCODA (niente cancel distruttivo)", !!codaVoceReale && codaVoceReale.dopo3.coda === 1);
+    check("Voce Master: terza battuta ravvicinata si accoda a sua volta", !!codaVoceReale && codaVoceReale.dopo4.coda === 2);
+    check("Voce Master: stopVoice() svuota la coda e ferma la lettura", !!codaVoceReale && codaVoceReale.dopoStop.parla === false && codaVoceReale.dopoStop.coda === 0);
+
+    // I suoni procedurali (impatto/doom/dadi, con e senza riverbero) non devono generare errori
+    // di pagina sul vero AudioContext del browser (la forma del grafo e' gia' provata dalla suite
+    // unit con nodi finti; qui interessa solo che non rompano nulla su un contesto audio reale).
+    const suoniOk = await gm.evaluate(() => {
+      try {
+        window.UltimateVTTAudioVoice.playImpact();
+        window.UltimateVTTAudioVoice.playDoom();
+        window.UltimateVTTAudioVoice.playDiceClatter();
+        return true;
+      } catch (e) { return false; }
+    });
+    check("Audio procedurale: impatto/doom/dadi (con e senza riverbero) suonano senza errori sul vero AudioContext", suoniOk === true);
+
     // --- Net outbox (modulo 42, "Supabase-ready"): una raffica di danni sulla pagina REALE
     // produce UN delta coalizzato con gli HP finali, non un payload per ogni tick dello slider. ---
     const outboxPrima = await gm.evaluate(() => window.UltimateVTTNetOutbox.getOutbox().length);

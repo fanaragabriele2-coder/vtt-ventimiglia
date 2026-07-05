@@ -53,7 +53,15 @@
           stopRecordingUI(btn, inputField);
         };
 
-        recognition.start();
+        // Web Speech Recognition puo' lanciare un'eccezione SINCRONA da start() (es.
+        // InvalidStateError se un doppio click arriva prima che il browser abbia finito di
+        // fermare l'istanza precedente): senza guardia, romperebbe l'intero handler di click.
+        try {
+          recognition.start();
+        } catch (error) {
+          console.warn("STT: impossibile avviare il riconoscimento:", error);
+          stopRecordingUI(btn, inputField);
+        }
       }
 
       const micDesktop = document.getElementById("masterChatMicBtn");
@@ -84,7 +92,16 @@
         const mobBtn = document.getElementById("hubChatTtsBtn");
         if (deskBtn) { deskBtn.classList.toggle("muted", !state); deskBtn.textContent = state ? "🔊" : "🔇"; }
         if (mobBtn) { mobBtn.classList.toggle("muted", !state); mobBtn.textContent = state ? "🔊" : "🔇"; }
-        if (!state && window.speechSynthesis) window.speechSynthesis.cancel();
+        // Passa da UltimateVTTAudioVoice.stopVoice() (se presente) invece di chiamare
+        // speechSynthesis.cancel() direttamente: spegne anche la coda di battute in attesa
+        // (modulo 10) e ripristina l'ambience se era stata abbassata (ducking) a meta' frase.
+        if (!state) {
+          if (window.UltimateVTTAudioVoice && window.UltimateVTTAudioVoice.stopVoice) {
+            window.UltimateVTTAudioVoice.stopVoice();
+          } else if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+          }
+        }
       }
       
       const deskTts = document.getElementById("masterChatTtsBtn");
