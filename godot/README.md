@@ -15,7 +15,8 @@ Godot 4.3+ (`Import` → seleziona `godot/project.godot`).
 
 ```
 godot/
-├── project.godot                     # autoload già registrati (vedi sotto)
+├── project.godot                     # autoload + scena principale già impostati
+├── main.tscn                         # scena principale (root Control + vtt_main.gd)
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
 │   ├── monsters.json                 # bestiario (ex npcCatalog, Modulo 06)
 │   ├── items.json                    # armi/armature/consumabili (ex itemCatalog, Modulo 05)
@@ -27,8 +28,27 @@ godot/
     │   ├── character_manager.gd      # CharacterManager — HP, caratteristiche, dadi vita (Mod. 03)
     │   └── inventory_manager.gd      # InventoryManager — action economy, slot, peso, spellbook (Mod. 05)
     ├── combat/combat_manager.gd      # CombatManager — turni, iniziativa, danni, spinta, reazioni (Mod. 05/24/26)
-    └── network/ai_bridge.gd          # AIBridge — ponte streaming verso Ollama remoto (Mod. 10/11)
+    ├── network/ai_bridge.gd          # AIBridge — ponte streaming verso Ollama remoto (Mod. 10/11)
+    └── ui/                           # Step 5 — UI a 3 colonne (Control auto-costruiti via codice)
+        ├── vtt_main.gd               # scena radice: layout 3 colonne + toolbar
+        ├── character_sheet_panel.gd  # sinistra: Scheda PG (HP, caratteristiche) ← CharacterManager
+        ├── combat_hud.gd             # centro-basso: HUD combattimento BG3 ← CombatManager
+        └── master_chat_panel.gd      # destra: Chat Master streaming + IP server ← AIBridge
 ```
+
+## ▶️ Come avviare
+
+1. Apri il progetto in Godot 4.3+ (`Import` → `godot/project.godot`).
+2. Premi **Play** (F5). La scena principale (`main.tscn`) è già impostata.
+3. Vedrai le 3 colonne. Prova subito, anche **senza** server AI:
+   - toolbar → **⚔ Evoca 2 Goblin**: parte il combattimento, la barra iniziativa si popola, l'HUD
+     in basso appare (tutto guidato dai signal di `CombatManager`);
+   - seleziona un bersaglio e **⚔ Attacca** / **👐 Spingi** / **⏭ Termina turno**;
+   - nella scheda a sinistra, **−5 HP** / **+5 HP**: la barra HP reagisce in tempo reale (signal
+     `hp_changed`); **+ PG** aggiunge un membro al party (menu a tendina in alto alla scheda).
+4. Per il Master IA: nella colonna destra scrivi l'**IP della 5080** (es. `192.168.1.50`) → *Imposta*,
+   poi scrivi un'azione e premi *Invia*. Se Ollama non è raggiungibile, la chat mostra un errore
+   pulito (nessun crash) — è il comportamento atteso finché il server non è acceso.
 
 ## Regole di traduzione applicate
 
