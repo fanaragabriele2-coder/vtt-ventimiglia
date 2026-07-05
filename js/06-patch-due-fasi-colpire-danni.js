@@ -170,6 +170,18 @@
         let activeId = null;
         try { activeId = window.UltimateVTTState.getState().identity.id; } catch (e) { activeId = null; }
 
+        // Dopo un cambio di scheda attiva (hotseat switch), il PG ORA attivo e' rappresentato da
+        // "pc-local": il suo vecchio combattente "pc-party-<id>" (creato quando era un membro non
+        // attivo) resterebbe nel tracker come DOPPIONE dello stesso personaggio — due card in
+        // iniziativa, due bersagli, due token. Va rimosso.
+        if (activeId) {
+          const doppioneId = "pc-party-" + activeId;
+          const indiceDoppione = combatState.combatants.findIndex(function trovaDoppione(c) { return c.id === doppioneId; });
+          if (indiceDoppione >= 0) {
+            combatState.combatants.splice(indiceDoppione, 1);
+          }
+        }
+
         roster.forEach(function syncMember(member) {
           if (!member || !member.identity || !member.identity.id) {
             return;
@@ -200,6 +212,132 @@
             combatState.combatants.push(combatant);
           }
         });
+      }
+
+      // OGNI membro del party ha il SUO token sulla griglia (fix: "nel party siamo in 2 ma nella
+      // mappa vedo solo un player"). Il PG ATTIVO resta "token-pc" (che qui prende anche il nome
+      // reale del personaggio, non piu' "Eroe Locale"); per ogni combattente "pc-party-<id>" senza
+      // token se ne crea uno alleato accanto al PG e lo si collega alla FSM (impostaMappaToken),
+      // cosi' HUD, Spingi, distanze e IA nemica lo trovano sulla griglia come qualunque altro.
+      function assicuraTokenDelParty() {
+        const tp = window.UltimateVTTTokenPhysics;
+        const fsm = window.UltimateVTTCombatFSM;
+        if (!tp || !tp.getState || !tp.addToken) {
+          return;
+        }
+        let tokens;
+        try { tokens = tp.getState().tokens || []; } catch (e) { return; }
+
+        // 1) Il token principale mostra il NOME del PG attivo.
+        let nomeAttivo = "";
+        try { nomeAttivo = String(window.UltimateVTTState.getState().identity.name || ""); } catch (e) { nomeAttivo = ""; }
+        if (nomeAttivo && tp.setTokenName) {
+          tp.setTokenName("token-pc", nomeAttivo);
+        }
+
+        // 2) Dopo un cambio di scheda attiva, il PG ora attivo e' rappresentato da token-pc: il suo
+        //    VECCHIO token da membro (stesso nome, alleato) resterebbe orfano come doppione.
+        if (nomeAttivo) {
+          tokens.filter(function (t) { return t && t.kind === "pc" && t.id !== "token-pc" && t.name === nomeAttivo; })
+            .forEach(function (t) {
+              try { tp.removeToken(t.id); } catch (e) { /* best-effort */ }
+              try { if (fsm && fsm.impostaMappaToken) { fsm.impostaMappaToken(t.id, null); } } catch (e) {}
+            });
+          tokens = tokens.filter(function (t) { return !(t && t.kind === "pc" && t.id !== "token-pc" && t.name === nomeAttivo); });
+        }
+
+        // 3) Ogni "pc-party-<id>" ha un token: se gia' mappato lo si rinomina e basta; se esiste un
+        //    token alleato omonimo non mappato (es. ripristino da backup) lo si adotta; altrimenti
+        //    se ne crea uno su una cella libera accanto al PG.
+        const pcTok = tokens.find(function (t) { return t.id === "token-pc"; });
+        const base = pcTok ? { x: pcTok.cellX, y: pcTok.cellY } : { x: 16, y: 12 };
+        const offsets = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [0, 2]];
+        let prossimoOffset = 0;
+        combatState.combatants.forEach(function (c) {
+          if (c.kind !== "pc" || c.id === "pc-local") {
+            return;
+          }
+          let tokId = null;
+          try { tokId = fsm && fsm.combattenteAToken ? fsm.combattenteAToken(c.id) : null; } catch (e) { tokId = null; }
+          const attuale = tokId ? tokens.find(function (t) { return t.id === tokId; }) : null;
+          if (attuale) {
+            if (tp.setTokenName) { tp.setTokenName(attuale.id, c.name); }
+            return;
+          }
+          const omonimo = tokens.find(function (t) { return t.kind === "pc" && t.id !== "token-pc" && t.name === c.name; });
+          if (omonimo) {
+            try { if (fsm && fsm.impostaMappaToken) { fsm.impostaMappaToken(omonimo.id, c.id); } } catch (e) {}
+            return;
+          }
+          let cella = null;
+          for (; prossimoOffset < offsets.length; prossimoOffset += 1) {
+            const cx = base.x + offsets[prossimoOffset][0];
+            const cy = base.y + offsets[prossimoOffset][1];
+            const occupata = tokens.some(function (t) { return t && t.cellX === cx && t.cellY === cy; });
+            let bloccata = false;
+            try { bloccata = window.UltimateVTTCanvas.isTerrainBlocking(cx, cy); } catch (e) { bloccata = false; }
+            if (!occupata && !bloccata) {
+              cella = { x: cx, y: cy };
+              prossimoOffset += 1;
+              break;
+            }
+          }
+          if (!cella) { cella = { x: base.x + 1, y: base.y + 1 }; }
+          let creato = null;
+          try { creato = tp.addToken(c.name, cella.x, cella.y, "#2e7d9f", "pc"); } catch (e) { creato = null; }
+          if (creato) {
+            try { if (fsm && fsm.impostaMappaToken) { fsm.impostaMappaToken(creato.id, c.id); } } catch (e) {}
+            tokens.push(creato); // cosi' il controllo "cella occupata" vede anche i token appena creati
+          }
+        });
+      }
+
+      // Un PNG sconfitto SPARISCE dalla griglia (fix: "i nemici quando vengono uccisi devono
+      // sparire dalla mappa"): il suo token viene rimosso e la mappatura FSM ripulita. Chiamata
+      // dall'UNICO punto in cui un PNG muore (applyDamageToCombatant): tutti i percorsi di danno
+      // — attacchi, reazioni, superfici, comandi IA e persino gli eventi HP di rete in ingresso —
+      // passano da li', quindi la rimozione vale per ogni tipo di uccisione, anche lato Giocatore.
+      function rimuoviTokenDelCaduto(combatantId) {
+        try {
+          const tp = window.UltimateVTTTokenPhysics;
+          if (!tp || !tp.removeToken || !tp.getState) {
+            return;
+          }
+          const fsm = window.UltimateVTTCombatFSM;
+          const tokenId = fsm && fsm.combattenteAToken ? fsm.combattenteAToken(combatantId) : null;
+          if (!tokenId || tokenId === "token-pc") {
+            return;
+          }
+          const esiste = (tp.getState().tokens || []).some(function (t) { return t.id === tokenId; });
+          if (esiste) {
+            tp.removeToken(tokenId);
+          }
+          // La mappatura FSM NON si tocca qui, DI PROPOSITO. Sul Master, impostaMappaToken emette
+          // subito la mappa autorevole via rete, MENTRE l'evento HP dell'uccisione parte solo DOPO
+          // (il wrapper di rete emette al ritorno di questa funzione): il Giocatore riceverebbe
+          // prima la mappa SENZA la voce del caduto e poi il danno — e non saprebbe piu' quale
+          // token rimuovere. Le voci orfane si ripuliscono in blocco a fine combattimento.
+        } catch (e) { /* best-effort: la rimozione visiva non deve mai bloccare il danno */ }
+      }
+
+      // A fine combattimento, ripulisce le mappature token<->combattente rimaste orfane (token
+      // rimossi alla morte del PNG): igiene dello stato, senza le corse di eventi descritte sopra.
+      function pulisciMappaturaTokenOrfani() {
+        try {
+          const fsm = window.UltimateVTTCombatFSM;
+          const tp = window.UltimateVTTTokenPhysics;
+          if (!fsm || !fsm.getMappa || !fsm.impostaMappaToken || !tp || !tp.getState) {
+            return;
+          }
+          const mappa = fsm.getMappa();
+          const idEsistenti = {};
+          (tp.getState().tokens || []).forEach(function (t) { idEsistenti[t.id] = true; });
+          Object.keys(mappa).forEach(function (tokenId) {
+            if (!idEsistenti[tokenId]) {
+              fsm.impostaMappaToken(tokenId, null);
+            }
+          });
+        } catch (e) { /* best-effort */ }
       }
 
       // Regola 4 (distanze): celle fra due combattenti sulla griglia (Chebyshev, come si muovono i
@@ -450,6 +588,7 @@
       function startCombat() {
         syncPlayerCombatantFromState();
         syncPartyCombatantsFromRoster();
+        assicuraTokenDelParty();
         // Non si combatte con tutto il party a terra: dopo una sconfitta lo scontro puo' ripartire
         // solo quando almeno un PG e' di nuovo cosciente (rianimato/curato DAVVERO), altrimenti si
         // riaprirebbe un combattimento gia' perso in uno stato rotto (turni che girano a vuoto,
@@ -480,6 +619,15 @@
         combatState.round = 0;
         combatState.currentTurnIndex = -1;
         combatState.lastEvent = "Combattimento terminato.";
+        // La pulizia e' RIMANDATA (non sincrona): quando l'ULTIMO nemico muore, endCombat() scatta
+        // DENTRO la stessa applyDamageToCombatant() che lo ha appena ucciso — PRIMA che il wrapper
+        // di rete (modulo 22) emetta l'evento HP di quella morte. Se impostaMappaToken pulisse la
+        // mappa qui, sincrona, la sua TokenMappingEvent (autorevole, sostituisce l'intera mappa)
+        // arriverebbe al Giocatore PRIMA dell'evento HP della morte stessa: il Giocatore perderebbe
+        // proprio la voce che gli serve per capire QUALE suo token rimuovere, e quel token
+        // resterebbe orfano sulla sua griglia per sempre (bug osservato in test multiplayer reali).
+        // Rimandarla al tick successivo garantisce che l'evento HP sia gia' partito per primo.
+        window.setTimeout(pulisciMappaturaTokenOrfani, 0);
         renderCombat();
         appendLog("Combattimento terminato.");
       }
@@ -642,6 +790,10 @@
           return false;
         }
 
+        // Per rilevare la TRANSIZIONE a sconfitto (solo il colpo che uccide rimuove il token,
+        // non ogni danno successivo su un PNG gia' caduto).
+        const eraGiaSconfitto = Boolean(combatant.defeated);
+
         // Routing per ID, non per kind: "pc-local" e' il PG della scheda ATTIVA (state manager);
         // "pc-party-<id>" sono gli ALTRI membri del party in hotseat (HP persistiti nel roster
         // window.partyData, cosi' il danno resta sul personaggio giusto anche cambiando scheda).
@@ -665,6 +817,12 @@
           combatState.lastEvent = combatant.name + " subisce " + damageAmount + " danni e cade INCOSCIENTE!";
         } else {
           combatState.lastEvent = combatant.name + " subisce " + damageAmount + " danni.";
+        }
+
+        // Il colpo che UCCIDE un PNG ne rimuove il token dalla griglia (il caduto sparisce dal
+        // campo; resta nel tracker come "defeated" per XP/loot/riepilogo del Master).
+        if (combatant.kind === "npc" && combatant.defeated && !eraGiaSconfitto) {
+          rimuoviTokenDelCaduto(combatantId);
         }
         renderCombat();
         appendLog(combatState.lastEvent);

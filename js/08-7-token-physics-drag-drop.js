@@ -218,15 +218,18 @@
         return true;
       }
 
-      function addToken(name, cellX, cellY, color) {
+      // kind opzionale ("pc" per i membri del party in hotseat, default "npc"): serve al
+      // combattimento multi-party — ogni membro del roster ha il SUO token sulla griglia,
+      // riconoscibile come alleato (anello chiaro) e non come nemico.
+      function addToken(name, cellX, cellY, color, kind) {
         const clamped = clampCell(cellX, cellY);
         const center = getCellCenter(clamped.cellX, clamped.cellY);
         const token = {
           id: "token-extra-" + tokenState.nextTokenNumber,
           name: name || "PNG " + tokenState.nextTokenNumber,
-          kind: "npc",
+          kind: kind === "pc" ? "pc" : "npc",
           color: color || "#8f1d18",
-          ringColor: "#f0ddb3",
+          ringColor: kind === "pc" ? "#bfe3f0" : "#f0ddb3",
           cellX: clamped.cellX,
           cellY: clamped.cellY,
           x: center.x,
@@ -243,6 +246,19 @@
         setSelectedToken(token.id);
         appendLog("Token aggiunto: " + token.name + ".");
         return token;
+      }
+
+      // Rinomina un token esistente (es. "Eroe Locale" -> nome reale del PG attivo, o il nome
+      // del membro del party sul suo token alleato): il nome e' quello disegnato sulla griglia.
+      function setTokenName(tokenId, name) {
+        const token = getToken(tokenId);
+        if (!token || !name) {
+          return false;
+        }
+        token.name = String(name);
+        renderTokenUi();
+        window.UltimateVTTCanvas.requestRender();
+        return true;
       }
 
       function removeToken(tokenId) {
@@ -674,6 +690,7 @@
         setSelectedToken: setSelectedToken,
         addToken: addToken,
         removeToken: removeToken,
+        setTokenName: setTokenName,
         resetTokens: resetTokens,
         centerSelectedToken: centerSelectedToken,
         moveTokenToCell: moveTokenToCell,

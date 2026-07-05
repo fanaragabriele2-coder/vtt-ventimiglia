@@ -199,6 +199,24 @@ attiva davvero lo spawn e il combattimento (non solo in isolamento).
 l'annuncio "🏆 VITTORIA!" e la chat del Master si riattiva — prima restava tutto appeso finché non
 si premeva "End" a mano. Il controllo scatta solo sul danno a un PNG (l'evento dell'uccisione).
 
+**Un token per ogni membro del party, nemici caduti spariscono dalla griglia (fix, `js/06`+`js/08`).**
+Segnalato giocando in hotseat con 2 PG: sulla mappa si vedeva un solo token, e i nemici uccisi
+restavano visibili sul campo. Ora `assicuraTokenDelParty()` (chiamata da `startCombat`) dà a **ogni**
+membro del roster hotseat il proprio token alleato accanto al PG attivo (collegato alla FSM,
+riconoscibile dall'anello chiaro); il token principale mostra il **nome reale** del PG attivo (non
+più "Eroe Locale"), e un cambio di scheda (hotseat switch) non lascia doppioni — il vecchio token del
+personaggio ora attivo viene rimosso, quello del personaggio non più attivo ne riceve uno nuovo. Il
+colpo che **uccide** un PNG ne rimuove subito il token dalla griglia (resta nel tracker come
+`defeated`, per XP/loot/riepilogo del Master).
+
+Una race di rete meritava attenzione: quando l'ultimo nemico muore, `endCombat()` scatta *dentro* la
+stessa chiamata che lo ha ucciso, **prima** che l'evento di rete di quella morte parta — se la pulizia
+della mappatura token↔combattente (autorevole, sostituisce l'intera mappa) fosse partita subito, il
+Giocatore l'avrebbe ricevuta **prima** dell'evento della morte, perdendo il riferimento a quale token
+rimuovere (il nemico gli restava orfano sulla griglia per sempre). La pulizia è quindi rimandata al
+tick successivo, cosi l'evento della morte è sempre partito per primo. Verificato con 2 pagine reali
+connesse allo stesso relay (Master + Giocatore).
+
 **Arena tattica — `js/40-arena-tattica.js` (`UltimateVTTArena`).** A inizio combattimento la
 griglia diventa un campo di battaglia strategico:
 - **ostacoli/coperture** generati attorno alla zona dello scontro (celle "wall", mai a ridosso dei

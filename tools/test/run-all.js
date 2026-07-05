@@ -43,6 +43,7 @@ const suite = [
   ["Core: menu Azione Bonus dinamico (modulo 38)", "core-action-menu.js"],
   ["Core: ponte chat Master -> mappa POI Ventimiglia (modulo 39)", "core-chat-map-sync.js"],
   ["Core: arena tattica / movimento col click (modulo 40)", "core-arena-tattica.js"],
+  ["Core: token per tutto il party + rimozione dei PNG caduti (moduli 06/08/19)", "core-party-tokens.js"],
   ["Core: armeria con rarita' e drop scalati (modulo 41)", "core-armeria.js"],
   // Livello multiplayer real-time (Fasi 1-3 + hardening).
   ["Smoke moduli 18/19/20", "smoke.js"],

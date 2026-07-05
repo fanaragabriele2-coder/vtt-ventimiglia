@@ -333,6 +333,27 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("BG3 HUD: visibile dopo l'inizio del combattimento", true);
     const nCard = await gm.evaluate(() => document.querySelectorAll(".bg3-init-card").length);
     check("BG3 HUD: barra iniziativa con una card per combattente", nCard >= 2);
+
+    // --- Party multi-token: a combattimento attivo OGNI membro del roster hotseat ha il SUO
+    // token alleato sulla griglia (fix "nel party siamo in 2 ma vedo solo un player"), e il token
+    // principale mostra il nome REALE del PG attivo, non piu' "Eroe Locale". ---
+    const esitoPartyToken = await gm.evaluate(() => {
+      const tokens = window.UltimateVTTTokenPhysics.getState().tokens;
+      const alleati = tokens.filter((t) => t.kind === "pc" && t.id !== "token-pc");
+      const principale = tokens.find((t) => t.id === "token-pc");
+      const nomeAttivo = window.UltimateVTTState.getState().identity.name;
+      const combattentiParty = window.UltimateVTTCombat.getState().combatants.filter((c) => c.kind === "pc" && c.id !== "pc-local");
+      const tuttiMappati = combattentiParty.every((c) => {
+        const tokId = window.UltimateVTTCombatFSM.combattenteAToken(c.id);
+        return tokId && tokens.some((t) => t.id === tokId);
+      });
+      return { alleati: alleati.length, membri: combattentiParty.length, nomePrincipale: principale ? principale.name : "", nomeAttivo: nomeAttivo, tuttiMappati: tuttiMappati };
+    });
+    check("Party: ogni membro del roster ha il suo token alleato sulla griglia (" + esitoPartyToken.alleati + " per " + esitoPartyToken.membri + " membri)",
+      esitoPartyToken.membri >= 1 && esitoPartyToken.alleati >= esitoPartyToken.membri);
+    check("Party: ogni combattente pc-party e' collegato a un token esistente (FSM)", esitoPartyToken.tuttiMappati === true);
+    check("Party: il token principale mostra il nome del PG attivo (" + esitoPartyToken.nomePrincipale + ")",
+      esitoPartyToken.nomePrincipale === esitoPartyToken.nomeAttivo && esitoPartyToken.nomePrincipale !== "Eroe Locale");
     // Una SOLA striscia d'iniziativa: con la barra BG3 presente, la vecchia #initiativeStrip
     // (modulo 06) deve restare spenta anche a combattimento attivo — prima comparivano entrambe,
     // sovrapposte, a dire la stessa cosa.
@@ -611,6 +632,17 @@ async function connettiDaPannello(page, { url, ruolo, id, token }) {
     check("VITTORIA: l'annuncio arriva nella chat del Master (che si riattiva)", vittoriaInChat === true);
     await gm.waitForFunction(() => { const h = document.querySelector(".bg3-hud"); return h && h.hidden === true; }, null, { timeout: 6000 });
     check("BG3 HUD: torna nascosta a fine combattimento", true);
+
+    // --- PNG caduti: i token dei nemici uccisi SPARISCONO dalla griglia (fix "i nemici quando
+    // vengono uccisi devono sparire dalla mappa"), sul Master subito e sul Giocatore via rete
+    // (CombatantHpEvent -> applyDamageToCombatant -> stessa transizione di sconfitta). ---
+    const tokenNemiciGm = await gm.evaluate(() =>
+      window.UltimateVTTTokenPhysics.getState().tokens.filter((t) => t.kind === "npc" && /^token-extra-/.test(t.id)).length);
+    check("PNG caduti: sul Master non resta NESSUN token dei nemici uccisi", tokenNemiciGm === 0);
+    await pl.waitForFunction(() =>
+      window.UltimateVTTTokenPhysics.getState().tokens.filter((t) => t.kind === "npc" && /^token-extra-/.test(t.id)).length === 0,
+      null, { timeout: 6000 });
+    check("PNG caduti: anche sul Giocatore i token dei nemici uccisi spariscono (via rete)", true);
     // Chiudi eventuali popup di bottino aperti dalle uccisioni (per non coprire i passi successivi).
     await gm.evaluate(() => {
       for (let i = 0; i < 8; i++) { const b = document.getElementById("lpTake"); if (b) b.click(); else break; }
