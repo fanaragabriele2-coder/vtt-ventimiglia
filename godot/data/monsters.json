@@ -1,0 +1,13 @@
+{
+	"_comment": "Bestiario — porting del npcCatalog del Modulo 06 (JS). Stesse statistiche D&D 5e del monolite legacy. Caricato da CombatManager via FileAccess+JSON.parse in res://data/.",
+	"monsters": [
+		{ "id": "goblin",    "name": "Goblin",    "armorClass": 15, "hitPoints": 7,  "initiativeBonus": 2,  "attackBonus": 4, "damageFormula": "1d6+2",  "challenge": "1/4" },
+		{ "id": "bandit",    "name": "Bandito",   "armorClass": 12, "hitPoints": 11, "initiativeBonus": 1,  "attackBonus": 3, "damageFormula": "1d6+1",  "challenge": "1/8" },
+		{ "id": "skeleton",  "name": "Scheletro", "armorClass": 13, "hitPoints": 13, "initiativeBonus": 2,  "attackBonus": 4, "damageFormula": "1d6+2",  "challenge": "1/4" },
+		{ "id": "wolf",      "name": "Lupo",      "armorClass": 13, "hitPoints": 11, "initiativeBonus": 2,  "attackBonus": 4, "damageFormula": "2d4+2",  "challenge": "1/4" },
+		{ "id": "orc",       "name": "Orco",      "armorClass": 13, "hitPoints": 15, "initiativeBonus": 1,  "attackBonus": 5, "damageFormula": "1d12+3", "challenge": "1/2" },
+		{ "id": "cultist",   "name": "Cultista",  "armorClass": 12, "hitPoints": 9,  "initiativeBonus": 1,  "attackBonus": 3, "damageFormula": "1d6+1",  "challenge": "1/8" },
+		{ "id": "zombie",    "name": "Zombie",    "armorClass": 8,  "hitPoints": 22, "initiativeBonus": -2, "attackBonus": 3, "damageFormula": "1d6+1",  "challenge": "1/4" },
+		{ "id": "hobgoblin", "name": "Hobgoblin", "armorClass": 18, "hitPoints": 11, "initiativeBonus": 1,  "attackBonus": 3, "damageFormula": "1d8+1",  "challenge": "1/2" }
+	]
+}

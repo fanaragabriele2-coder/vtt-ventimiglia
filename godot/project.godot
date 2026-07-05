@@ -1,0 +1,26 @@
+; Ultimate VTT — progetto Godot 4 (porting del monolite Vanilla JS/HTML).
+; Generato dalla migrazione automatica. Apri questa cartella con Godot 4.3+.
+;
+; Gli autoload sono elencati NELL'ORDINE DI DIPENDENZA: Godot li inizializza dall'alto verso il
+; basso, e i manager piu' in basso usano quelli sopra (CombatManager legge CharacterManager al
+; _ready; AIBridge usa tutti gli altri). Non riordinarli a caso.
+
+config_version=5
+
+[application]
+
+config/name="Ultimate VTT — Tavolo Oscuro di Ventimiglia"
+config/description="Porting Godot 4 del VTT D&D 5e. Client leggero (Split-Rig); il Master IA gira su un PC remoto via Ollama."
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+
+GameState="*res://scripts/autoload/game_state.gd"
+CharacterManager="*res://scripts/autoload/character_manager.gd"
+InventoryManager="*res://scripts/autoload/inventory_manager.gd"
+CombatManager="*res://scripts/combat/combat_manager.gd"
+AIBridge="*res://scripts/network/ai_bridge.gd"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
