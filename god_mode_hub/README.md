@@ -59,39 +59,34 @@ ancora più rapido.
 *(Opzionale, per il vincolo top-down nei token) installa l'estensione
 `sd-webui-controlnet` da Stability Matrix → Extensions, se non è già presente.*
 
-#### 2. Installare TripoSR (Image-to-3D)
+#### 2. Installare/riparare TripoSR (Image-to-3D) — automatico
 
-TripoSR vive in un repo/venv **separato** dall'Hub (dipendenze CUDA/torch
-pesanti che non vogliamo mischiare a Streamlit):
+**Doppio click su `tools\FIX_TRIPOSR.bat`** (o lancialo dal terminale). Lo
+script fa tutto da solo, con retry e fallback:
 
-```powershell
-cd "$env:USERPROFILE\Desktop"
-git clone https://github.com/VAST-AI-Research/TripoSR
-cd TripoSR
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-# Installa PyTorch con supporto CUDA per la tua RTX 5080 (controlla la versione
-# CUDA giusta su https://pytorch.org/get-started/locally/, es. cu121/cu124):
-.\.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
+1. clona TripoSR sul Desktop (se manca) e crea il suo venv;
+2. rileva la GPU e — se è una RTX 50xx (Blackwell, `sm_120`) — **aggiorna
+   PyTorch a una build cu128**, l'unica che la supporta (le cu12.4 crashano
+   a runtime);
+3. importa `vcvars64` e **forza la toolchain MSVC a x64** (il Developer
+   Command Prompt di VS ha come default x86: è la causa del classico
+   `CUDA_CUDART_LIBRARY missing` — la libreria viene cercata in `lib/Win32`);
+4. tenta la build nativa di `torchmcubes`; se fallisce installa lo **shim
+   puro-Python** (`tools/torchmcubes_shim/`), drop-in equivalente basato su
+   PyMCubes/scikit-image: zero compilazione, stessa geometria (verificata:
+   errore < 0.01 voxel, convenzione assi identica al nativo);
+5. installa i requirements TripoSR (filtrando la riga torchmcubes) e
+   `onnxruntime` (richiesto da `rembg` a runtime ma non più dichiarato);
+6. imposta `TRIPOSR_DIR` e `TRIPOSR_PYTHON` (permanenti, utente);
+7. verifica tutto per davvero: op su GPU, import, `run.py --help` e — se non
+   passi `-NoModelTest` — una conversione completa immagine→`.glb`.
 
-Poi imposta due variabili d'ambiente **permanenti** (Windows: cerca
-"Modifica le variabili d'ambiente per il tuo account" nel menu Start):
+Log completo in `tools\fix_triposr.log`. Dopo lo script, riapri l'Hub
+(`RUN_ME_FIRST.bat` o `run_hub.bat`): l'indicatore TripoSR diventa 🟢.
 
-| Variabile | Valore |
-|---|---|
-| `TRIPOSR_DIR` | `C:\Users\<tu>\Desktop\TripoSR` |
-| `TRIPOSR_PYTHON` | `C:\Users\<tu>\Desktop\TripoSR\.venv\Scripts\python.exe` |
-
-Riapri il terminale (o `run_hub.bat`) dopo averle impostate: nella pagina
-🎨 Asset Forge / 👤 Generatore Personaggi l'indicatore TripoSR diventa 🟢 e
-il pulsante "Converti in 3D" si attiva.
-
-> Nota sui percorsi con spazi: se il tuo nome utente Windows contiene spazi
-> (es. `C:\Users\Mario Rossi\...`), l'Hub lancia comunque TripoSR
-> correttamente perché usa liste di argomenti (`subprocess.run`), non
-> stringhe di shell — non serve alcun escaping manuale.
+> Tutti gli script usano `python -m ...` e mai `pip.exe`/`streamlit.exe`:
+> Smart App Control di Windows 11 blocca gli exe non firmati generati nei
+> venv, ma non i moduli eseguiti dentro `python.exe` (firmato).
 
 L'Hub **degrada con grazia**: ogni pagina controlla i backend e mostra cosa
 manca senza mai rompersi (RAG → fallback full-text, SD offline → avviso, ecc.).

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torchmcubes"
+version = "0.1.0+godmodehub.shim"
+description = "Shim puro-Python drop-in di torchmcubes (marching cubes via PyMCubes/scikit-image) per TripoSR su Windows"
+requires-python = ">=3.9"
+dependencies = ["numpy"]
+
+[tool.setuptools]
+packages = ["torchmcubes"]

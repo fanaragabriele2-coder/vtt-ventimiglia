@@ -10,3 +10,7 @@ wiki/wiki_fts.db*
 # asset_forge/**/*.glb
 # asset_forge/**/*.gif
 # asset_forge/**/*.mp4
+
+# Artefatti packaging shim
+tools/torchmcubes_shim/build/
+tools/torchmcubes_shim/*.egg-info/

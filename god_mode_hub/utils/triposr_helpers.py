@@ -68,9 +68,10 @@ def image_to_glb(
     """
     if not triposr_available():
         raise TripoSRError(
-            f"TripoSR non trovato in {TRIPOSR_DIR}. Clona il repo "
-            "(https://github.com/VAST-AI-Research/TripoSR) e imposta la "
-            "variabile d'ambiente TRIPOSR_DIR."
+            f"TripoSR non trovato in {TRIPOSR_DIR}. Esegui la riparazione "
+            "automatica: doppio click su god_mode_hub/tools/FIX_TRIPOSR.bat "
+            "(clona il repo, sistema toolchain/torch/torchmcubes e imposta "
+            "TRIPOSR_DIR/TRIPOSR_PYTHON da solo)."
         )
 
     with tempfile.TemporaryDirectory(prefix="triposr_") as tmp:
