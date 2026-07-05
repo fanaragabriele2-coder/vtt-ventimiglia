@@ -32,6 +32,7 @@ godot/
     └── ui/                           # Step 5 — UI a 3 colonne (Control auto-costruiti via codice)
         ├── vtt_main.gd               # scena radice: layout 3 colonne + toolbar
         ├── character_sheet_panel.gd  # sinistra: Scheda PG (HP, caratteristiche) ← CharacterManager
+        ├── tactical_map.gd           # centro: mappa tattica _draw() (griglia, nebbia, token, click-to-move) ← CombatManager
         ├── combat_hud.gd             # centro-basso: HUD combattimento BG3 ← CombatManager
         └── master_chat_panel.gd      # destra: Chat Master streaming + IP server ← AIBridge
 ```
@@ -42,8 +43,12 @@ godot/
 2. Premi **Play** (F5). La scena principale (`main.tscn`) è già impostata.
 3. Vedrai le 3 colonne. Prova subito, anche **senza** server AI:
    - toolbar → **⚔ Evoca 2 Goblin**: parte il combattimento, la barra iniziativa si popola, l'HUD
-     in basso appare (tutto guidato dai signal di `CombatManager`);
-   - seleziona un bersaglio e **⚔ Attacca** / **👐 Spingi** / **⏭ Termina turno**;
+     in basso appare e **i token compaiono sulla mappa** (party a sinistra, nemici a destra a
+     distanza tattica; tutto guidato dai signal di `CombatManager`);
+   - sulla **mappa**: click su un token per selezionarlo, click su una cella vuota per spostarcelo
+     (click-to-move BG3); muovere un PG rivela la nebbia di guerra attorno a lui;
+   - seleziona un bersaglio e **⚔ Attacca** / **👐 Spingi** / **⏭ Termina turno** — quando un nemico
+     muore, **il suo token sparisce dalla mappa** (come il fix del monolite);
    - nella scheda a sinistra, **−5 HP** / **+5 HP**: la barra HP reagisce in tempo reale (signal
      `hp_changed`); **+ PG** aggiunge un membro al party (menu a tendina in alto alla scheda).
 4. Per il Master IA: nella colonna destra scrivi l'**IP della 5080** (es. `192.168.1.50`) → *Imposta*,

@@ -51,9 +51,9 @@ func _build_layout() -> void:
 	center.add_theme_constant_override("separation", 8)
 	columns.add_child(center)
 
-	var map_placeholder := _build_map_placeholder()
-	map_placeholder.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center.add_child(map_placeholder)
+	var tactical_map := TacticalMap.new()
+	tactical_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.add_child(tactical_map)
 
 	var combat_hud := CombatHUD.new()
 	center.add_child(combat_hud)
@@ -115,22 +115,3 @@ func _toolbar_button(text: String, handler: Callable) -> Button:
 	b.custom_minimum_size = Vector2(0, 44)
 	b.pressed.connect(handler)
 	return b
-
-
-func _build_map_placeholder() -> PanelContainer:
-	var panel := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.06, 0.055, 0.05)
-	sb.border_color = Color(0.78, 0.61, 0.24, 0.25)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(10)
-	panel.add_theme_stylebox_override("panel", sb)
-
-	var center := CenterContainer.new()
-	panel.add_child(center)
-	var lbl := Label.new()
-	lbl.text = "Mappa tattica\n(TileMap / CanvasItem — prossimo step)"
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_color_override("font_color", Color(0.4, 0.37, 0.32))
-	center.add_child(lbl)
-	return panel
