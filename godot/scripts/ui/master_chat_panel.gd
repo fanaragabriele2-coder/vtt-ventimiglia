@@ -9,6 +9,11 @@ extends PanelContainer
 var _log: RichTextLabel
 var _input: LineEdit
 var _host_input: LineEdit
+var _groq_key_input: LineEdit
+var _host_row: HBoxContainer
+var _groq_row: HBoxContainer
+var _ollama_provider_btn: Button
+var _groq_provider_btn: Button
 var _status: Label
 var _send_button: Button
 var _streaming_active: bool = false
@@ -25,7 +30,7 @@ func _ready() -> void:
 	# Canale unico di annuncio (GameState.announce): level-up, bottino, condizioni, superfici,
 	# elevazione, IA nemici... ogni sistema di gioco scrive qui senza conoscere questo pannello.
 	GameState.event_published.connect(_on_game_event)
-	_status.text = "Master remoto: " + AIBridge.get_endpoint_label()
+	_refresh_provider_ui()
 
 
 func _apply_dark_style() -> void:
@@ -52,22 +57,53 @@ func _build_ui() -> void:
 	title.add_theme_color_override("font_color", Color(0.94, 0.83, 0.53))
 	root.add_child(title)
 
+	# --- Scelta del Master: Ollama (Split-Rig LAN) oppure Groq (cloud, serve una API key) ---
+	var provider_row := HBoxContainer.new()
+	provider_row.add_theme_constant_override("separation", 6)
+	root.add_child(provider_row)
+	_ollama_provider_btn = Button.new()
+	_ollama_provider_btn.text = "🖧 Ollama (LAN)"
+	_ollama_provider_btn.pressed.connect(_on_provider_selected.bind("ollama"))
+	provider_row.add_child(_ollama_provider_btn)
+	_groq_provider_btn = Button.new()
+	_groq_provider_btn.text = "☁ Groq (cloud)"
+	_groq_provider_btn.pressed.connect(_on_provider_selected.bind("groq"))
+	provider_row.add_child(_groq_provider_btn)
+
 	# --- Configurazione dell'IP del server remoto (Split-Rig) ---
-	var host_row := HBoxContainer.new()
-	host_row.add_theme_constant_override("separation", 6)
-	root.add_child(host_row)
+	_host_row = HBoxContainer.new()
+	_host_row.add_theme_constant_override("separation", 6)
+	root.add_child(_host_row)
 	var host_lbl := Label.new()
 	host_lbl.text = "IP 5080:"
-	host_row.add_child(host_lbl)
+	_host_row.add_child(host_lbl)
 	_host_input = LineEdit.new()
 	_host_input.placeholder_text = "es. 192.168.1.50"
 	_host_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_host_input.text_submitted.connect(_on_host_submitted)
-	host_row.add_child(_host_input)
+	_host_row.add_child(_host_input)
 	var host_btn := Button.new()
 	host_btn.text = "Imposta"
 	host_btn.pressed.connect(func() -> void: _on_host_submitted(_host_input.text))
-	host_row.add_child(host_btn)
+	_host_row.add_child(host_btn)
+
+	# --- Groq API key (mai salvata nel progetto: resta solo in user://ai_bridge.cfg locale) ---
+	_groq_row = HBoxContainer.new()
+	_groq_row.add_theme_constant_override("separation", 6)
+	root.add_child(_groq_row)
+	var groq_lbl := Label.new()
+	groq_lbl.text = "Groq key:"
+	_groq_row.add_child(groq_lbl)
+	_groq_key_input = LineEdit.new()
+	_groq_key_input.placeholder_text = "gsk_… (gratis su console.groq.com)"
+	_groq_key_input.secret = true
+	_groq_key_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_groq_key_input.text_submitted.connect(_on_groq_key_submitted)
+	_groq_row.add_child(_groq_key_input)
+	var groq_btn := Button.new()
+	groq_btn.text = "Imposta"
+	groq_btn.pressed.connect(func() -> void: _on_groq_key_submitted(_groq_key_input.text))
+	_groq_row.add_child(groq_btn)
 
 	_status = Label.new()
 	_status.add_theme_font_size_override("font_size", 11)
@@ -127,8 +163,32 @@ func _on_host_submitted(ip: String) -> void:
 	if host.is_empty():
 		return
 	AIBridge.set_ollama_host(host)
-	_status.text = "Master remoto: " + AIBridge.get_endpoint_label()
+	_status.text = "Master: " + AIBridge.get_endpoint_label()
 	_append_system("Server AI impostato su " + AIBridge.get_endpoint_label())
+
+
+func _on_groq_key_submitted(key: String) -> void:
+	if key.strip_edges().is_empty():
+		return
+	AIBridge.set_groq_api_key(key)
+	_groq_key_input.clear()
+	_status.text = "Master: " + AIBridge.get_endpoint_label()
+	_append_system("Groq API key impostata (resta solo su questo computer).")
+
+
+func _on_provider_selected(provider: String) -> void:
+	AIBridge.set_provider(provider)
+	_refresh_provider_ui()
+	_append_system("Master impostato su " + ("Groq cloud" if provider == "groq" else "Ollama (LAN)") + ".")
+
+
+func _refresh_provider_ui() -> void:
+	var provider: String = AIBridge.get_provider()
+	_ollama_provider_btn.disabled = provider == "ollama"
+	_groq_provider_btn.disabled = provider == "groq"
+	_host_row.visible = provider == "ollama"
+	_groq_row.visible = provider == "groq"
+	_status.text = "Master: " + AIBridge.get_endpoint_label()
 
 
 # --- Reazioni ai signal di AIBridge ---

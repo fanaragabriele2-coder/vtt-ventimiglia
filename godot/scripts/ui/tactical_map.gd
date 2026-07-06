@@ -37,6 +37,12 @@ var _revealed: Dictionary = {}         # "x,y" -> true
 var _selected_id: String = ""
 var _current_combatant_id: String = ""
 
+# Sfondo personalizzato (facoltativo): una qualunque immagine locale (es. una mappa salvata da
+# Pinterest/Google Immagini/un proprio disegno) al posto della scacchiera generica. Non scarichiamo
+# NULLA da internet qui dentro (niente scraping di Pinterest: e' vietato dai loro termini d'uso e
+# comunque fragile) — l'utente sceglie un file gia' salvato sul proprio computer.
+var _background_texture: Texture2D = null
+
 var _cell_size: float = 32.0
 var _origin: Vector2 = Vector2.ZERO
 
@@ -97,11 +103,15 @@ func _in_bounds(cell: Vector2i) -> bool:
 
 func _draw() -> void:
 	_recompute_geometry()
-	# 1) Terreno a scacchiera + griglia.
-	for y: int in range(GRID_ROWS):
-		for x: int in range(GRID_COLS):
-			var rect := Rect2(_origin + Vector2(x * _cell_size, y * _cell_size), Vector2(_cell_size, _cell_size))
-			draw_rect(rect, COL_CELL_A if (x + y) % 2 == 0 else COL_CELL_B, true)
+	# 1) Sfondo: l'immagine caricata dall'utente se presente, altrimenti la scacchiera generica.
+	if _background_texture != null:
+		var grid_rect := Rect2(_origin, Vector2(_cell_size * GRID_COLS, _cell_size * GRID_ROWS))
+		draw_texture_rect(_background_texture, grid_rect, false)
+	else:
+		for y: int in range(GRID_ROWS):
+			for x: int in range(GRID_COLS):
+				var rect := Rect2(_origin + Vector2(x * _cell_size, y * _cell_size), Vector2(_cell_size, _cell_size))
+				draw_rect(rect, COL_CELL_A if (x + y) % 2 == 0 else COL_CELL_B, true)
 	for x: int in range(GRID_COLS + 1):
 		var px: float = _origin.x + x * _cell_size
 		draw_line(Vector2(px, _origin.y), Vector2(px, _origin.y + GRID_ROWS * _cell_size), COL_GRID, 1.0)
@@ -175,6 +185,25 @@ func _draw_token(token: Dictionary) -> void:
 	var fsize: int = maxi(10, int(_cell_size * 0.32))
 	draw_string(font, Vector2(center.x - _cell_size * 0.5, center.y + radius + fsize),
 		String(token["name"]), HORIZONTAL_ALIGNMENT_CENTER, _cell_size, fsize, Color(0.85, 0.8, 0.7))
+
+
+# --- Sfondo mappa personalizzato (immagine locale scelta dall'utente) ---
+
+## Carica un'immagine locale (PNG/JPG/WEBP) come sfondo della griglia tattica, al posto della
+## scacchiera. Ritorna false se il file non esiste o non e' un'immagine valida.
+func load_background_image(path: String) -> bool:
+	var image := Image.new()
+	var err: int = image.load(path)
+	if err != OK:
+		return false
+	_background_texture = ImageTexture.create_from_image(image)
+	queue_redraw()
+	return true
+
+
+func clear_background_image() -> void:
+	_background_texture = null
+	queue_redraw()
 
 
 # --- Input: seleziona / muovi (click-to-move BG3) ---

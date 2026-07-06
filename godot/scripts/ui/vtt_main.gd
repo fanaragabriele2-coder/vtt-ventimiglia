@@ -10,6 +10,7 @@ var _overworld_map: OverworldMap
 var _view_tactical_btn: Button
 var _view_overworld_btn: Button
 var _ai_toggle_btn: Button
+var _background_dialog: FileDialog
 
 
 func _ready() -> void:
@@ -134,8 +135,32 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_toolbar_button("🏳 Fine scontro", _end_combat))
 	_ai_toggle_btn = _toolbar_button("🐺 IA Nemica: ON", _toggle_enemy_ai)
 	row.add_child(_ai_toggle_btn)
+	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
 	return panel
+
+
+## Apre un selettore file per scegliere un'immagine locale (una mappa salvata da Pinterest, Google
+## Immagini, un proprio disegno...) come sfondo della griglia tattica. Nessuno scraping/rete: e'
+## l'utente a scegliere un file gia' sul proprio computer (regola di traduzione: niente segreti o
+## accessi non autorizzati a servizi terzi incorporati nel gioco).
+func _choose_map_background() -> void:
+	if _background_dialog == null:
+		_background_dialog = FileDialog.new()
+		_background_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		_background_dialog.access = FileDialog.ACCESS_FILESYSTEM
+		_background_dialog.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Immagini"])
+		_background_dialog.size = Vector2i(720, 480)
+		_background_dialog.file_selected.connect(_on_map_background_selected)
+		add_child(_background_dialog)
+	_background_dialog.popup_centered()
+
+
+func _on_map_background_selected(path: String) -> void:
+	if _tactical_map.load_background_image(path):
+		GameState.announce("Sfondo mappa caricato: " + path.get_file())
+	else:
+		GameState.announce("Impossibile caricare l'immagine scelta come sfondo mappa.")
 
 
 func _toggle_enemy_ai() -> void:

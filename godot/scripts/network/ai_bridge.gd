@@ -33,9 +33,20 @@ const DEFAULT_PORT: int = 11434
 const DEFAULT_MODEL: String = "llama3.1"
 const SEPARATORE_DATI_MASTER: String = "<<DATI>>"
 
+# --- Groq cloud (porting di js/12: Master alternativo via https://api.groq.com) ---
+# La API key NON e' MAI scritta nel codice sorgente (sarebbe un segreto in chiaro nel repository):
+# l'utente la incolla una volta nella Chat Master, e da li' in poi vive SOLO in user://ai_bridge.cfg
+# (un file locale sulla macchina di chi gioca, fuori dal progetto Godot e dal controllo versione).
+const GROQ_HOST: String = "api.groq.com"
+const GROQ_PORT: int = 443
+const GROQ_PATH: String = "/openai/v1/chat/completions"
+const GROQ_MODEL: String = "llama-3.3-70b-versatile"
+
 var _host: String = DEFAULT_HOST
 var _port: int = DEFAULT_PORT
 var _model: String = DEFAULT_MODEL
+var _provider: String = "ollama"   # "ollama" (Split-Rig LAN) oppure "groq" (cloud)
+var _groq_api_key: String = ""
 var _busy: bool = false
 # Storico conversazione (ruoli user/assistant) per dare continuita' al Master.
 var _history: Array[Dictionary] = []
@@ -58,7 +69,29 @@ func set_model(model_name: String) -> void:
 	_save_config()
 
 
+## Sceglie il provider del Master: "ollama" (server remoto in LAN) o "groq" (cloud, serve una key).
+func set_provider(provider: String) -> void:
+	_provider = provider if provider == "groq" else "ollama"
+	_save_config()
+
+
+func get_provider() -> String:
+	return _provider
+
+
+func set_groq_api_key(key: String) -> void:
+	_groq_api_key = key.strip_edges()
+	_save_config()
+
+
+func has_groq_key() -> bool:
+	return not _groq_api_key.is_empty()
+
+
 func get_endpoint_label() -> String:
+	if _provider == "groq":
+		var key_state: String = "pronta" if has_groq_key() else "manca la API key"
+		return "Groq cloud (modello: %s) — %s" % [GROQ_MODEL, key_state]
 	return "http://%s:%d  (modello: %s)" % [_host, _port, _model]
 
 
@@ -70,12 +103,17 @@ func _load_config() -> void:
 		_host = String(parsed.get("host", _host))
 		_port = int(parsed.get("port", _port))
 		_model = String(parsed.get("model", _model))
+		_provider = String(parsed.get("provider", _provider))
+		_groq_api_key = String(parsed.get("groqApiKey", _groq_api_key))
 
 
 func _save_config() -> void:
 	var f: FileAccess = FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({ "host": _host, "port": _port, "model": _model }))
+		f.store_string(JSON.stringify({
+			"host": _host, "port": _port, "model": _model,
+			"provider": _provider, "groqApiKey": _groq_api_key,
+		}))
 		f.close()
 
 
@@ -106,8 +144,9 @@ func _build_messages(user_text: String) -> Array:
 
 # --- Invio in streaming al Master remoto (porting di fetchOllamaMasterReplyStreaming) ---
 
-## Invia il prompt del giocatore al Master remoto e trasmette la risposta in streaming.
-## Emette master_chunk mano a mano, poi master_complete con narrazione + comandi estratti.
+## Invia il prompt del giocatore al Master (Ollama o Groq, a seconda del provider scelto) e
+## trasmette la risposta. Emette master_chunk mano a mano (o in un unico blocco per Groq, che non
+## fa streaming — porting fedele: js/12 usa "stream": false anche li'), poi master_complete.
 func send_master_prompt(user_text: String) -> void:
 	if _busy:
 		master_error.emit("Il Master sta gia' rispondendo, attendi.")
@@ -115,7 +154,13 @@ func send_master_prompt(user_text: String) -> void:
 	if user_text.strip_edges().is_empty():
 		return
 	_busy = true
+	if _provider == "groq":
+		_send_groq_prompt(user_text)
+	else:
+		_send_ollama_prompt(user_text)
 
+
+func _send_ollama_prompt(user_text: String) -> void:
 	var http := HTTPClient.new()
 	var err: int = http.connect_to_host(_host, _port)
 	if err != OK:
@@ -180,6 +225,86 @@ func send_master_prompt(user_text: String) -> void:
 
 	http.close()
 	_finish(user_text, full_reply)
+
+
+## Invia il prompt al Master via Groq cloud (porting di fetchGroqMasterReply, js/12): niente
+## streaming (l'API Groq qui e' chiamata con "stream": false, come nel monolite), un'unica
+## risposta JSON con .choices[0].message.content.
+func _send_groq_prompt(user_text: String) -> void:
+	if not has_groq_key():
+		_fail("Inserisci la tua Groq API key (gratuita su console.groq.com) per usare il Master Groq.")
+		return
+
+	var http := HTTPClient.new()
+	var err: int = http.connect_to_host(GROQ_HOST, GROQ_PORT, TLSOptions.client())
+	if err != OK:
+		_fail("Connessione a Groq fallita.")
+		return
+
+	while http.get_status() == HTTPClient.STATUS_CONNECTING or http.get_status() == HTTPClient.STATUS_RESOLVING:
+		http.poll()
+		await get_tree().process_frame
+	if http.get_status() != HTTPClient.STATUS_CONNECTED:
+		_fail("Impossibile raggiungere Groq (controlla la connessione internet).")
+		return
+
+	var body: String = JSON.stringify({
+		"model": GROQ_MODEL, "stream": false, "temperature": 0.85, "max_tokens": 700,
+		"messages": _build_messages(user_text),
+	})
+	var headers: PackedStringArray = [
+		"Content-Type: application/json", "Authorization: Bearer " + _groq_api_key,
+	]
+	err = http.request(HTTPClient.METHOD_POST, GROQ_PATH, headers, body)
+	if err != OK:
+		_fail("Invio della richiesta a Groq fallito.")
+		return
+
+	while http.get_status() == HTTPClient.STATUS_REQUESTING:
+		http.poll()
+		await get_tree().process_frame
+
+	if not http.has_response():
+		_fail("Groq non ha risposto.")
+		return
+	var code: int = http.get_response_code()
+	if code == 401:
+		_fail("API key Groq non valida (401). Reinseriscila nel pannello Master.")
+		return
+	if code < 200 or code >= 300:
+		_fail("Groq ha risposto con errore HTTP %d." % code)
+		return
+
+	var raw: PackedByteArray = PackedByteArray()
+	while http.get_status() == HTTPClient.STATUS_BODY:
+		http.poll()
+		var chunk: PackedByteArray = http.read_response_body_chunk()
+		if chunk.is_empty():
+			await get_tree().process_frame
+			continue
+		raw.append_array(chunk)
+	http.close()
+
+	var parsed: Variant = JSON.parse_string(raw.get_string_from_utf8())
+	var content: String = _extract_groq_content(parsed)
+	if content.is_empty():
+		_fail("Groq ha risposto senza contenuto.")
+		return
+	var split: Dictionary = _separate_narration_and_data(content)
+	master_chunk.emit(String(split["narration"]))
+	_finish(user_text, content)
+
+
+func _extract_groq_content(parsed: Variant) -> String:
+	if not (parsed is Dictionary):
+		return ""
+	var choices: Array = (parsed as Dictionary).get("choices", [])
+	if choices.is_empty() or not (choices[0] is Dictionary):
+		return ""
+	var msg: Variant = (choices[0] as Dictionary).get("message", {})
+	if not (msg is Dictionary):
+		return ""
+	return String((msg as Dictionary).get("content", ""))
 
 
 func _extract_content_from_line(line: String) -> String:
