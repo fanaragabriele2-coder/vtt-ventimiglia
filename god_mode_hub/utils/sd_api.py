@@ -37,11 +37,21 @@ class SDApiError(RuntimeError):
 
 
 def is_available(base_url: str = DEFAULT_BASE_URL, timeout: float = 3.0) -> bool:
-    """True se la WebUI risponde all'endpoint API su questo indirizzo esatto."""
+    """True se su questo indirizzo risponde davvero una WebUI A1111/Forge.
+
+    Non basta uno status HTTP 200: molti servizi locali (proxy, pannelli di
+    amministrazione, altri server di sviluppo) rispondono 200 OK a qualunque
+    percorso e genererebbero falsi positivi durante la scansione delle porte
+    comuni. Verifichiamo quindi che il corpo sia JSON e contenga
+    ``sd_model_checkpoint``, una chiave specifica delle impostazioni A1111/Forge.
+    """
     try:
         response = requests.get(f"{base_url}/sdapi/v1/options", timeout=timeout)
-        return response.ok
-    except requests.RequestException:
+        if not response.ok:
+            return False
+        data = response.json()
+        return isinstance(data, dict) and "sd_model_checkpoint" in data
+    except (requests.RequestException, ValueError):
         return False
 
 
@@ -197,8 +207,6 @@ def txt2img(
         response = requests.post(
             f"{url}/sdapi/v1/txt2img", json=payload, timeout=timeout
         )
-        response.raise_for_status()
-        data = response.json()
     except requests.ConnectionError as exc:
         tried = ", ".join(_candidate_urls())
         raise SDApiError(
@@ -207,9 +215,26 @@ def txt2img(
             "imposta SD_API_URL se usa una porta non elencata."
         ) from exc
     except requests.RequestException as exc:
-        raise SDApiError(f"Errore API Stable Diffusion: {exc}") from exc
+        raise SDApiError(f"Errore di rete verso l'API Stable Diffusion: {exc}") from exc
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        raise SDApiError(f"L'API ha risposto con errore HTTP: {exc}") from exc
+
+    # NB: in requests >= 2.27 JSONDecodeError eredita sia da ValueError sia da
+    # RequestException: un except ValueError separato e mirato (non un ramo
+    # generico RequestException) è l'unico modo per dare qui un messaggio utile.
+    try:
+        data = response.json()
     except ValueError as exc:
-        raise SDApiError("Risposta non-JSON dall'API Stable Diffusion.") from exc
+        raise SDApiError(
+            f"Risposta non-JSON da {url}/sdapi/v1/txt2img. Questa porta è stata "
+            "trovata dalla scansione automatica ma potrebbe non essere davvero "
+            "Stable Diffusion (un altro servizio locale usa la stessa porta), "
+            "oppure la WebUI sta ancora caricando il modello. Verifica l'URL "
+            "reale della WebUI e riprova, o imposta SD_API_URL esplicitamente."
+        ) from exc
 
     images = data.get("images") or []
     if not images:
