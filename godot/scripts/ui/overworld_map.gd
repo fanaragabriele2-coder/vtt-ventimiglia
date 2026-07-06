@@ -36,6 +36,20 @@ var _current_index: int = 0
 var _hovered_index: int = -1
 var _pad: float = 40.0
 
+# --- Modalita' "Campagna a piedi" (porting di js/12 VTTCampagna): invece del solo click-to-travel
+# fra POI, il party si muove liberamente con WASD/frecce e la vicinanza a un POI ("zona") fa scattare
+# l'arrivo da sola, con narrazione automatica — come il joystick+zone-detection del monolite. Niente
+# tile reali/pan di camera qui (l'overworld resta stilizzata, come gia' documentato nel README): la
+# mappa intera e' sempre visibile, cambia solo come ci si sposta dentro di essa.
+const WALK_SPEED_PX: float = 140.0
+const ZONE_RADIUS_PX: float = 42.0
+
+var _walk_mode: bool = false
+var _party_pixel_pos: Vector2 = Vector2.ZERO
+var _last_zone_index: int = -1
+var _walk_toggle_btn: Button
+var _zone_chip: Label
+
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -46,6 +60,8 @@ func _ready() -> void:
 	_current_index = _index_of("Città Alta")
 	_publish_location()
 	resized.connect(queue_redraw)
+	_build_walk_controls()
+	set_process(false)
 
 
 func _load_pois() -> void:
@@ -120,8 +136,9 @@ func _draw() -> void:
 			draw_string(font, pos + Vector2(-60, -14), String(p["name"]),
 				HORIZONTAL_ALIGNMENT_CENTER, 120, 13, Color(0.9, 0.85, 0.72))
 
-	# 4) Marker del party sul POI corrente (anello dorato pulsante).
-	var party_pos: Vector2 = _latlng_to_pixel(float(_pois[_current_index]["lat"]), float(_pois[_current_index]["lng"]))
+	# 4) Marker del party: in modalita' a piedi segue la posizione libera (WASD), altrimenti resta
+	# ancorato al POI corrente (click-to-travel).
+	var party_pos: Vector2 = _party_pixel_pos if _walk_mode else _latlng_to_pixel(float(_pois[_current_index]["lat"]), float(_pois[_current_index]["lng"]))
 	draw_arc(party_pos, 14.0, 0, TAU, 32, COL_PARTY, 2.5)
 	draw_arc(party_pos, 18.0, 0, TAU, 32, Color(COL_PARTY.r, COL_PARTY.g, COL_PARTY.b, 0.4), 1.5)
 
@@ -134,7 +151,83 @@ func _draw() -> void:
 	draw_string(font, Vector2(16, size.y - 12), label, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32, 13, Color(0.88, 0.82, 0.68))
 
 
-# --- Input: hover + viaggio ---
+# --- Modalita' "Campagna a piedi": pulsante toggle + movimento continuo + rilevamento zone ---
+
+func _build_walk_controls() -> void:
+	_walk_toggle_btn = Button.new()
+	_walk_toggle_btn.text = "🚶 Modalità a piedi"
+	_walk_toggle_btn.position = Vector2(10, 10)
+	_walk_toggle_btn.custom_minimum_size = Vector2(0, 36)
+	_walk_toggle_btn.pressed.connect(_toggle_walk_mode)
+	add_child(_walk_toggle_btn)
+
+	_zone_chip = Label.new()
+	_zone_chip.position = Vector2(10, 50)
+	_zone_chip.add_theme_color_override("font_color", Color(0.94, 0.83, 0.53))
+	_zone_chip.add_theme_font_size_override("font_size", 13)
+	_zone_chip.visible = false
+	add_child(_zone_chip)
+
+
+func _toggle_walk_mode() -> void:
+	_walk_mode = not _walk_mode
+	if _walk_mode:
+		_party_pixel_pos = _latlng_to_pixel(float(_pois[_current_index]["lat"]), float(_pois[_current_index]["lng"]))
+		_last_zone_index = _current_index
+		_walk_toggle_btn.text = "🛑 Esci dalla modalità a piedi"
+		_zone_chip.visible = true
+		_zone_chip.text = "📍 " + String(_pois[_current_index]["name"])
+		GameState.announce("🚶 Modalità a piedi attiva: usa WASD o le frecce per muoverti per Ventimiglia.")
+	else:
+		_walk_toggle_btn.text = "🚶 Modalità a piedi"
+		_zone_chip.visible = false
+	set_process(_walk_mode)
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if not _walk_mode or not visible:
+		return
+	var dir := Vector2.ZERO
+	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
+		dir.y -= 1.0
+	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
+		dir.y += 1.0
+	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
+		dir.x -= 1.0
+	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
+		dir.x += 1.0
+	if dir == Vector2.ZERO:
+		return
+	_party_pixel_pos += dir.normalized() * WALK_SPEED_PX * delta
+	_party_pixel_pos.x = clampf(_party_pixel_pos.x, _pad, maxf(_pad, size.x - _pad))
+	_party_pixel_pos.y = clampf(_party_pixel_pos.y, _pad, maxf(_pad, size.y - _pad))
+	_check_zone()
+	queue_redraw()
+
+
+## Rileva il POI piu' vicino alla posizione libera del party: se si entra in una zona nuova,
+## l'arrivo scatta da solo (niente click), con narrazione automatica — porting di checkZones.
+func _check_zone() -> void:
+	var nearest: int = -1
+	var nearest_dist: float = ZONE_RADIUS_PX
+	for i: int in range(_pois.size()):
+		var p: Dictionary = _pois[i]
+		var d: float = _party_pixel_pos.distance_to(_latlng_to_pixel(float(p["lat"]), float(p["lng"])))
+		if d < nearest_dist:
+			nearest_dist = d
+			nearest = i
+	_zone_chip.text = ("📍 " + String(_pois[nearest]["name"])) if nearest >= 0 else "🧭 Tra i vicoli di Ventimiglia"
+	if nearest >= 0 and nearest != _last_zone_index:
+		_last_zone_index = nearest
+		_current_index = nearest
+		_publish_location()
+		var p: Dictionary = _pois[nearest]
+		GameState.announce("➜ Il party arriva a " + String(p["name"]) + ". " + String(p.get("desc", "")))
+		party_traveled.emit(String(p["name"]), p)
+
+
+# --- Input: hover + viaggio (click-to-travel, disattivo durante la modalita' a piedi) ---
 
 func _gui_input(event: InputEvent) -> void:
 	var mm := event as InputEventMouseMotion
@@ -144,6 +237,8 @@ func _gui_input(event: InputEvent) -> void:
 			_hovered_index = idx
 			queue_redraw()
 		return
+	if _walk_mode:
+		return  # in modalita' a piedi ci si muove con WASD/frecce, non col click
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 		var idx: int = _poi_near(mb.position)
@@ -165,8 +260,10 @@ func _poi_near(pos: Vector2) -> int:
 
 func _travel_to(index: int) -> void:
 	_current_index = index
+	_last_zone_index = index
 	_publish_location()
 	var p: Dictionary = _pois[index]
+	GameState.announce("➜ Il party si dirige verso " + String(p["name"]) + ". " + String(p.get("desc", "")))
 	party_traveled.emit(String(p["name"]), p)
 	queue_redraw()
 

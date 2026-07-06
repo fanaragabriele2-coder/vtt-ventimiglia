@@ -52,11 +52,15 @@ godot/
         ├── character_creation_screen.gd # overlay d'avvio: razza/classe/caratteristiche/party (Mod. 14)
         ├── character_sheet_panel.gd  # sinistra: Scheda PG (HP, caratteristiche) ← CharacterManager
         ├── xp_bar.gd                 # sinistra: barra XP/livello/oro ← ProgressionManager
-        ├── tactical_map.gd           # centro: griglia, nebbia, token, elevazione, superfici, click-to-move
-        ├── overworld_map.gd          # centro: overworld di Ventimiglia (POI reali, viaggio del party)
+        ├── tactical_map.gd           # centro: griglia, nebbia, token, elevazione, superfici, click-to-move,
+        │                             #   sfondo mappa da immagine locale
+        ├── overworld_map.gd          # centro: overworld (POI reali, viaggio del party, modalità a
+        │                             #   piedi con WASD + rilevamento zone)
         ├── combat_hud.gd             # centro-basso: HUD BG3 (Attacca/Spingi/Bonus/Termina turno)
+        ├── dice_roller.gd            # centro-basso: tiratore rapido D4-D20 → GameState.announce
+        ├── status_bar.gd             # in fondo: turno/round, combattimento, party, IA nemica
         ├── loot_popup.gd             # overlay: popup di bottino ← ProgressionManager/ArmeriaManager
-        └── master_chat_panel.gd      # destra: Chat Master streaming + IP server + log di sistema
+        └── master_chat_panel.gd      # destra: Chat Master (Ollama LAN o Groq cloud), log di sistema
 ```
 
 ## ▶️ Come avviare
@@ -84,10 +88,19 @@ godot/
      **salire di livello**;
    - sopra la mappa, il toggle **🗺 Mappa tattica / 🌍 Ventimiglia**: passa all'**overworld** con i 23
      POI reali (coordinate lat/lng vere); click su un POI = il party ci viaggia, la posizione finisce
-     in `GameState` (chiave `party.location`).
-4. Per il Master IA: nella colonna destra scrivi l'**IP della 5080** (es. `192.168.1.50`) → *Imposta*,
-   poi scrivi un'azione e premi *Invia*. Se Ollama non è raggiungibile, la chat mostra un errore
-   pulito (nessun crash) — è il comportamento atteso finché il server non è acceso.
+     in `GameState` (chiave `party.location`);
+   - sull'overworld, **🚶 Modalità a piedi**: il party si muove liberamente con **WASD/frecce** invece
+     del solo click; avvicinarsi a un POI fa scattare da solo l'arrivo (narrazione automatica in
+     chat), come lo zone-detection del monolite;
+   - **🖼 Sfondo mappa** in toolbar: carica un'immagine locale (una mappa salvata da Pinterest, un
+     proprio disegno...) al posto della scacchiera generica sulla mappa tattica.
+4. Per il Master IA, nella colonna destra scegli il provider:
+   - **🖧 Ollama (LAN)**: scrivi l'**IP della 5080** (es. `192.168.1.50`) → *Imposta*;
+   - **☁ Groq (cloud)**: incolla la tua **API key Groq** (gratuita su console.groq.com) → *Imposta* —
+     la key resta SOLO sul tuo computer (`user://ai_bridge.cfg`), mai nel progetto o nel repository.
+
+   Poi scrivi un'azione e premi *Invia*. Se il Master non è raggiungibile, la chat mostra un errore
+   pulito (nessun crash) — è il comportamento atteso finché non è configurato/acceso.
 
 ## Regole di traduzione applicate
 
@@ -124,8 +137,16 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   combattimento solo il PG **attivo** (`pc-local`); il monolite JS (dopo un fix successivo) dava un
   combattente/token separato a OGNI membro del party hotseat contemporaneamente. Gli altri membri
   esistono comunque nel roster (`CharacterManager`) e ricevono XP/kit correttamente al loro turno.
-- **Dadi 3D fisici**, **audio procedurale + voce** (Task 4 del monolite), **TTS/STT**, **overworld
-  con tile reali** (qui è stilizzata), **multiplayer** (relay/Supabase): non ancora portati.
+- **Dadi 3D fisici** (qui c'è solo un tiratore rapido D4-D20 non fisico), **audio procedurale + voce**
+  (Task 4 del monolite), **TTS/STT**, **overworld con tile reali** (qui è stilizzata — la modalità a
+  piedi cammina sulla proiezione stilizzata, non su Leaflet/OSM), **multiplayer** (relay/Supabase):
+  non ancora portati.
+- **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio, salvataggi) e il
+  **Sistema dropdown** del monolite (autodiagnosi moduli, "modalità console"): non portati — in
+  Godot un eventuale problema di script lo segnala l'editor stesso, non serve un pannello dedicato.
+- **Incontri casuali durante la camminata**: la modalità a piedi rileva le zone e narra gli arrivi,
+  ma non fa comparire nemici da sola mentre cammini (`VTTCampagna.spawnEnemyNearPg` del monolite
+  era comunque pilotato dal Master IA, non casuale in autonomia).
 - **Memoria di campagna per il Master IA** (Moduli 29/32) e **ponte chat→combattimento/mappa**
   (Modulo 34/39 lato parsing automatico della narrazione): `AIBridge` esegue già i comandi
   strutturati (`<<DATI>>`) ma non estrae ancora spawn/spostamenti dalla sola prosa libera.
@@ -134,7 +155,7 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 25 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 27 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)

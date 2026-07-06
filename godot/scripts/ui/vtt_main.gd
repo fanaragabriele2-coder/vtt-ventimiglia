@@ -227,6 +227,7 @@ func _update_toggle_state(tactical_active: bool) -> void:
 	_view_overworld_btn.disabled = not tactical_active
 
 
-func _on_party_traveled(poi_name: String, poi: Dictionary) -> void:
-	# Annota lo spostamento nel log della chat (la posizione vera e' gia' in GameState).
-	print("[Overworld] Il party e' giunto a %s (%s)" % [poi_name, String(poi.get("desc", ""))])
+func _on_party_traveled(poi_name: String, _poi: Dictionary) -> void:
+	# La narrazione dell'arrivo passa gia' da GameState.announce (OverworldMap la emette anche in
+	# chat); qui basta il log di debug per chi guarda l'output dell'editor.
+	print("[Overworld] Il party e' giunto a %s" % poi_name)
