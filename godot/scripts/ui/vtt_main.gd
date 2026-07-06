@@ -87,6 +87,8 @@ func _build_layout() -> void:
 	_overworld_map.visible = false
 	# Quando il party viaggia sull'overworld, annuncialo nella chat (fonte unica: GameState).
 	_overworld_map.party_traveled.connect(_on_party_traveled)
+	# Un'imboscata casuale durante la camminata: si passa subito alla mappa tattica per combattere.
+	_overworld_map.encounter_triggered.connect(_show_tactical)
 	center.add_child(_overworld_map)
 
 	var combat_hud := CombatHUD.new()

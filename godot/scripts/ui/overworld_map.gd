@@ -10,6 +10,8 @@ extends Control
 ## chat, HUD e — in futuro — il Master IA leggono la stessa, unica posizione.
 
 signal party_traveled(poi_name: String, poi: Dictionary)
+## Un'imboscata casuale e' scattata durante la camminata: la vista deve passare alla mappa tattica.
+signal encounter_triggered()
 
 const POIS_PATH: String = "res://data/ventimiglia_pois.json"
 
@@ -44,11 +46,22 @@ var _pad: float = 40.0
 const WALK_SPEED_PX: float = 140.0
 const ZONE_RADIUS_PX: float = 42.0
 
+# --- Incontri casuali durante la camminata: ogni ENCOUNTER_CHECK_SEC secondi di movimento attivo si
+# tira una probabilita' di imboscata, piu' alta nelle zone selvatiche/militari che in quelle civili
+# (tocco 5e: non e' lo stesso rischio ovunque). Il monolite faceva comparire nemici vicino al PG solo
+# su comando del Master IA (VTTCampagna.spawnEnemyNearPg) — qui e' un'aggiunta autonoma del gioco.
+const ENCOUNTER_CHECK_SEC: float = 5.0
+const ENCOUNTER_CHANCE_PER_CAT: Dictionary = {
+	"natura": 0.30, "militare": 0.30, "trasporti": 0.16, "storico": 0.12, "civile": 0.05,
+}
+const ENCOUNTER_CHANCE_DEFAULT: float = 0.12
+
 var _walk_mode: bool = false
 var _party_pixel_pos: Vector2 = Vector2.ZERO
 var _last_zone_index: int = -1
 var _walk_toggle_btn: Button
 var _zone_chip: Label
+var _encounter_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -203,7 +216,40 @@ func _process(delta: float) -> void:
 	_party_pixel_pos.x = clampf(_party_pixel_pos.x, _pad, maxf(_pad, size.x - _pad))
 	_party_pixel_pos.y = clampf(_party_pixel_pos.y, _pad, maxf(_pad, size.y - _pad))
 	_check_zone()
+	_update_encounter_timer(delta)
 	queue_redraw()
+
+
+## Ogni ENCOUNTER_CHECK_SEC secondi di camminata attiva, tira una probabilita' di imboscata (piu'
+## alta nelle zone selvatiche/militari). Non tira nulla se un combattimento e' gia' in corso.
+func _update_encounter_timer(delta: float) -> void:
+	if CombatManager.is_active():
+		return
+	_encounter_timer += delta
+	if _encounter_timer < ENCOUNTER_CHECK_SEC:
+		return
+	_encounter_timer = 0.0
+	var categoria: String = String(_pois[_last_zone_index].get("cat", "")) if _last_zone_index >= 0 else ""
+	var chance: float = float(ENCOUNTER_CHANCE_PER_CAT.get(categoria, ENCOUNTER_CHANCE_DEFAULT))
+	if randf() < chance:
+		_trigger_random_encounter()
+
+
+## Fa comparire un piccolo gruppo di nemici casuali (scalati sul party dall'Encounter Balancer) e
+## passa la mano alla mappa tattica: non si puo' restare a camminare durante un'imboscata.
+func _trigger_random_encounter() -> void:
+	var catalog: Array[Dictionary] = CombatManager.get_monster_catalog()
+	if catalog.is_empty():
+		return
+	var pick: Dictionary = catalog[randi() % catalog.size()]
+	var count: int = randi_range(1, 3)
+	GameState.announce("⚔ Imboscata! Un gruppo di " + String(pick["name"]) + " emerge dall'ombra mentre attraversate Ventimiglia.")
+	EncounterBalancer.spawn_bilanciato([{ "name": String(pick["name"]), "count": count }])
+	_walk_mode = false
+	_walk_toggle_btn.text = "🚶 Modalità a piedi"
+	_zone_chip.visible = false
+	set_process(false)
+	encounter_triggered.emit()
 
 
 ## Rileva il POI piu' vicino alla posizione libera del party: se si entra in una zona nuova,
