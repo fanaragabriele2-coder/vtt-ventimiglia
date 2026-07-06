@@ -26,7 +26,8 @@ st.caption(
     "Output in `asset_forge/characters/<slug>/`."
 )
 
-sd_online = sd_api.is_available()
+sd_url = sd_api.resolve_base_url()
+sd_online = sd_url is not None
 backends = triposr_helpers.backend_status()
 
 # ---------------------------------------------------------------------------
@@ -59,10 +60,12 @@ with st.expander("⚙️ Parametri generazione 2D"):
         "che dà i risultati migliori nella ricostruzione 3D."
     )
 
-if not sd_online:
+if sd_online:
+    st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
+else:
     st.error(
-        f"🔴 Stable Diffusion offline su `{sd_api.DEFAULT_BASE_URL}`: avvia la "
-        "WebUI con `--api` per generare.",
+        "🔴 Stable Diffusion non raggiungibile su nessuna porta comune: avvia "
+        "la WebUI con `--api` nelle Launch Options per generare.",
         icon="👤",
     )
 

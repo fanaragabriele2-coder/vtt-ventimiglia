@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 
@@ -28,13 +29,15 @@ ensure_dirs()
 
 
 @st.cache_data(ttl=30)
-def _component_status() -> dict[str, bool]:
+def _component_status() -> dict[str, Any]:
     """Verifica lo stato dei componenti locali (cache 30s per non pesare)."""
     from utils import chroma_rag, llm_wiki, sd_api, triposr_helpers
 
+    sd_url = sd_api.resolve_base_url()
     return {
         "chromadb": chroma_rag.is_available(),
-        "sd_api": sd_api.is_available(),
+        "sd_api": sd_url is not None,
+        "sd_port": sd_url.rsplit(":", 1)[-1] if sd_url else None,
         "triposr": triposr_helpers.triposr_available(),
         "trellis": triposr_helpers.trellis_available(),
         "wiki_index": llm_wiki.index_size() > 0,
@@ -53,17 +56,18 @@ ICONS = {True: "🟢", False: "🔴"}
 
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("ChromaDB", ICONS[status["chromadb"]] + " installato" if status["chromadb"] else "🔴 assente")
-col2.metric("Stable Diffusion", ICONS[status["sd_api"]] + (" :7860" if status["sd_api"] else " offline"))
+col2.metric("Stable Diffusion", ICONS[status["sd_api"]] + (f" :{status['sd_port']}" if status["sd_api"] else " offline"))
 col3.metric("TripoSR", ICONS[status["triposr"]] + (" pronto" if status["triposr"] else " non trovato"))
 col4.metric("TRELLIS.2", ICONS[status["trellis"]] + (" configurato" if status["trellis"] else " opzionale"))
 col5.metric("Indice Wiki", ICONS[status["wiki_index"]] + (" attivo" if status["wiki_index"] else " da costruire"))
 
 if not status["sd_api"]:
     st.info(
-        "💡 **Stable Diffusion offline** — avvia la WebUI da Stability Matrix "
-        "con `--api` sulla porta 7860 per abilitare Asset Forge e Generatore "
-        "Personaggi. L'Hub resta comunque utilizzabile per RAG, Wiki e "
-        "Orchestratore.",
+        "💡 **Stable Diffusion non trovato** — l'Hub ha provato automaticamente "
+        "le porte comuni (7860-7866, 8000, 8080) senza successo. Avvia la WebUI "
+        "da Stability Matrix con `--api` nelle Launch Options per abilitare "
+        "Asset Forge e Generatore Personaggi. L'Hub resta comunque utilizzabile "
+        "per RAG, Wiki e Orchestratore.",
         icon="🎨",
     )
 

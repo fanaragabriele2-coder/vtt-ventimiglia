@@ -38,12 +38,12 @@ tab_sprite, tab_rig, tab_export = st.tabs(
 # TAB 1 — Sprite sheet 2D
 # ---------------------------------------------------------------------------
 with tab_sprite:
-    sd_online = sd_api.is_available()
-    if not sd_online:
-        st.error(
-            f"🔴 Stable Diffusion offline su `{sd_api.DEFAULT_BASE_URL}`.",
-            icon="🎞️",
-        )
+    sd_url = sd_api.resolve_base_url()
+    sd_online = sd_url is not None
+    if sd_online:
+        st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
+    else:
+        st.error("🔴 Stable Diffusion non raggiungibile su nessuna porta comune.", icon="🎞️")
     subject = st.text_input(
         "Soggetto dell'animazione",
         placeholder="es. fiamma magica viola che pulsa, vista dall'alto",

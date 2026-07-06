@@ -21,16 +21,21 @@ ensure_dirs()
 
 st.title("🎨 Asset Forge — Token VTT")
 st.caption(
-    "Genera token top-down con Stable Diffusion locale (porta 7860) e "
-    "convertili in modelli 3D `.glb` con TripoSR. Output in `asset_forge/tokens/`."
+    "Genera token top-down con Stable Diffusion locale (rilevata in autonomia "
+    "su più porte) e convertili in modelli 3D `.glb` con TripoSR. Output in "
+    "`asset_forge/tokens/`."
 )
 
-sd_online = sd_api.is_available()
-if not sd_online:
+sd_url = sd_api.resolve_base_url()
+sd_online = sd_url is not None
+if sd_online:
+    st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
+else:
     st.error(
-        "🔴 **API Stable Diffusion non raggiungibile** su "
-        f"`{sd_api.DEFAULT_BASE_URL}`. Avvia la WebUI da Stability Matrix con "
-        "`--api`. Puoi comunque preparare i parametri qui sotto.",
+        "🔴 **Stable Diffusion non raggiungibile** su nessuna porta comune "
+        f"({', '.join(str(p) for p in sd_api.COMMON_PORTS)}). Avvia la WebUI "
+        "da Stability Matrix con `--api` nelle Launch Options. Puoi comunque "
+        "preparare i parametri qui sotto.",
         icon="🎨",
     )
 
