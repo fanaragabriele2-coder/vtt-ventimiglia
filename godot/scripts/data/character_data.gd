@@ -47,6 +47,9 @@ const SKILL_ABILITY: Dictionary = {
 @export var hit_dice_total: int = 1
 @export var hit_dice_remaining: int = 1
 
+## Note libere del giocatore (scheda "Note") — non tocca alcuna regola, solo testo persistito.
+@export var notes: String = ""
+
 
 func _init() -> void:
 	if skills.is_empty():
@@ -104,6 +107,7 @@ func to_dict() -> Dictionary:
 		"hitDice": {
 			"formula": hit_dice_formula, "total": hit_dice_total, "remaining": hit_dice_remaining,
 		},
+		"notes": notes,
 	}
 
 
@@ -132,4 +136,5 @@ static func from_dict(data: Dictionary) -> CharacterData:
 	c.hit_dice_formula = String(hd.get("formula", c.hit_dice_formula))
 	c.hit_dice_total = int(hd.get("total", c.hit_dice_total))
 	c.hit_dice_remaining = int(hd.get("remaining", c.hit_dice_total))
+	c.notes = String(data.get("notes", ""))
 	return c

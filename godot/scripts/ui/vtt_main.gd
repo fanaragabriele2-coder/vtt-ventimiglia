@@ -9,6 +9,7 @@ var _tactical_map: TacticalMap
 var _overworld_map: OverworldMap
 var _view_tactical_btn: Button
 var _view_overworld_btn: Button
+var _ai_toggle_btn: Button
 
 
 func _ready() -> void:
@@ -90,10 +91,16 @@ func _build_layout() -> void:
 	var combat_hud := CombatHUD.new()
 	center.add_child(combat_hud)
 
+	center.add_child(DiceRoller.new())
+
 	# Destra: Chat Master.
 	var chat := MasterChatPanel.new()
 	chat.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(chat)
+
+	# Barra di stato in fondo a tutta la finestra (fuori dalle 3 colonne, come il session panel
+	# del monolite): turno/combattimento/party/IA nemica a colpo d'occhio.
+	col.add_child(StatusBar.new())
 
 	# Overlay globale (sopra tutto): popup di bottino (Modulo 15/41).
 	add_child(LootPopup.new())
@@ -125,7 +132,22 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_toolbar_button("⚔ Evoca 2 Goblin", _spawn_goblins))
 	row.add_child(_toolbar_button("💀 Evoca Orco", _spawn_orc))
 	row.add_child(_toolbar_button("🏳 Fine scontro", _end_combat))
+	_ai_toggle_btn = _toolbar_button("🐺 IA Nemica: ON", _toggle_enemy_ai)
+	row.add_child(_ai_toggle_btn)
+	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
 	return panel
+
+
+func _toggle_enemy_ai() -> void:
+	EnemyAI.set_enabled(not EnemyAI.is_enabled())
+	_ai_toggle_btn.text = "🐺 IA Nemica: ON" if EnemyAI.is_enabled() else "🐺 IA Nemica: OFF"
+
+
+func _toggle_fullscreen() -> void:
+	var fullscreen: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	DisplayServer.window_set_mode(
+		DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN
+	)
 
 
 func _spawn_goblins() -> void:
