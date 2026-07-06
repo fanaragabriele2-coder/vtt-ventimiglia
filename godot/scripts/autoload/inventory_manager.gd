@@ -63,10 +63,21 @@ var _spellbook: Array[Dictionary] = [
 ]
 var _next_inventory_number: int = 8
 
+# --- Inventario per-PG (porting del Modulo 17): un solo inventario "vivo" alla volta, salvato e
+# ripristinato al cambio di scheda attiva, cosi' ogni personaggio mantiene il proprio zaino.
+var _snapshots: Dictionary = {}       # character_id -> stato completo salvato
+var _pending_kits: Dictionary = {}    # character_id -> { equip, spells, slots } non ancora applicato
+var _current_owner_id: String = ""
+var _initial_snapshot: Dictionary = {}
+
 
 func _ready() -> void:
 	_item_catalog = _load_catalog_indexed(ITEMS_PATH, "items")
 	_spell_catalog = _load_catalog_indexed(SPELLS_PATH, "spells")
+	_initial_snapshot = get_full_state()
+	var active: CharacterData = CharacterManager.get_active()
+	_current_owner_id = active.id if active else ""
+	CharacterManager.active_character_changed.connect(_on_active_character_changed)
 
 
 func _load_catalog_indexed(path: String, key: String) -> Dictionary:
@@ -223,6 +234,65 @@ func get_inventory() -> Array[Dictionary]:
 	return _inventory.duplicate(true)
 
 
+## Toglie UNA unita' di un oggetto dallo zaino (porting fedele di dropInventoryItem): se la
+## quantita' e' >1 e non e' equipaggiato, scala di 1; altrimenti (ultima unita' o equipaggiato)
+## rimuove del tutto la voce e libera lo slot. Ritorna false se l'oggetto non esiste.
+func drop_item(inventory_id: String) -> bool:
+	var idx: int = -1
+	for i: int in range(_inventory.size()):
+		if _inventory[i]["inventoryId"] == inventory_id:
+			idx = i
+			break
+	if idx == -1:
+		return false
+	var entry: Dictionary = _inventory[idx]
+	if int(entry["quantity"]) > 1 and entry["equippedSlot"] == null:
+		entry["quantity"] = int(entry["quantity"]) - 1
+	else:
+		var slot: Variant = entry["equippedSlot"]
+		if slot != null:
+			_equipment_slots[slot] = null
+			equipment_changed.emit(String(slot), null)
+		_inventory.remove_at(idx)
+	inventory_changed.emit(_inventory.duplicate(true))
+	_recompute_armor_class()
+	return true
+
+
+## Svuota completamente zaino e slot (porting di clearInventory, usato prima di applicare un kit).
+func clear_inventory() -> void:
+	_inventory.clear()
+	for key: String in _equipment_slots.keys():
+		_equipment_slots[key] = null
+	inventory_changed.emit(_inventory.duplicate(true))
+	_recompute_armor_class()
+
+
+## Sostituisce lo zaino col kit di partenza di una classe (creazione personaggio, Modulo 14):
+## svuota tutto e aggiunge+equipaggia ogni voce. kit_items: Array di { c: catalogId, q: quantita', slot? }.
+func apply_kit(kit_items: Array) -> void:
+	clear_inventory()
+	for it: Variant in kit_items:
+		if not (it is Dictionary):
+			continue
+		var entry: Dictionary = add_item(String(it.get("c", "")), int(it.get("q", 1)))
+		var slot_key: String = String(it.get("slot", ""))
+		if not slot_key.is_empty() and not entry.is_empty():
+			equip(String(entry["inventoryId"]), slot_key)
+
+
+## Registra nuovi oggetti nel catalogo a runtime (porting di registerCatalogItems): usato
+## dall'Armeria per aggiungere armi/armature rare senza toccare items.json. Non sovrascrive
+## voci gia' esistenti con lo stesso id.
+func register_catalog_items(items: Array) -> int:
+	var added: int = 0
+	for item: Variant in items:
+		if item is Dictionary and item.has("id") and not _item_catalog.has(item["id"]):
+			_item_catalog[item["id"]] = item
+			added += 1
+	return added
+
+
 # --- Grimorio e slot incantesimo ---
 
 func spell_definition(spell_id: String) -> Dictionary:
@@ -238,6 +308,56 @@ func set_spell_prepared(spell_id: String, prepared: bool) -> void:
 		if s["spellId"] == spell_id:
 			s["prepared"] = prepared
 			return
+
+
+## Aggiunge un incantesimo al grimorio (trucchetti sempre preparati). Porting di addSpell.
+func add_spell(spell_id: String) -> bool:
+	var def: Dictionary = spell_definition(spell_id)
+	if def.is_empty():
+		return false
+	for s: Dictionary in _spellbook:
+		if s["spellId"] == spell_id:
+			return false  # gia' conosciuto
+	_spellbook.append({ "spellId": spell_id, "prepared": int(def.get("level", 0)) == 0 })
+	return true
+
+
+## Alterna preparato/non preparato (i trucchetti restano sempre preparati). Porting di togglePreparedSpell.
+func toggle_prepared_spell(spell_id: String) -> bool:
+	var def: Dictionary = spell_definition(spell_id)
+	if def.is_empty():
+		return false
+	for s: Dictionary in _spellbook:
+		if s["spellId"] == spell_id:
+			s["prepared"] = true if int(def.get("level", 0)) == 0 else not bool(s["prepared"])
+			return true
+	return false
+
+
+## Imposta max o remaining di uno slot di livello. Porting di setSpellSlot.
+func set_spell_slot(level: int, field: String, value: int) -> bool:
+	if not _spell_slots.has(level):
+		return false
+	var slot: Dictionary = _spell_slots[level]
+	if field == "max":
+		slot["max"] = clampi(value, 0, 9)
+		slot["remaining"] = mini(int(slot["remaining"]), int(slot["max"]))
+	else:
+		slot["remaining"] = clampi(value, 0, int(slot["max"]))
+	spell_slots_changed.emit(_spell_slots.duplicate(true))
+	return true
+
+
+## Installa il grimorio di partenza di una classe incantatrice (creazione personaggio).
+func apply_spellbook(spells: Array, slots: Dictionary) -> void:
+	_spellbook.clear()
+	for spell_id: Variant in spells:
+		add_spell(String(spell_id))
+	for level_key: Variant in slots.keys():
+		var level: int = int(level_key)
+		var max_slots: int = int(slots[level_key])
+		_spell_slots[level] = { "max": max_slots, "remaining": max_slots }
+	spell_slots_changed.emit(_spell_slots.duplicate(true))
 
 
 ## Lancia un incantesimo consumando uno slot del suo livello (i trucchetti, livello 0, sono gratis).
@@ -261,3 +381,82 @@ func cast_spell(spell_id: String) -> bool:
 
 func get_spell_slots() -> Dictionary:
 	return _spell_slots.duplicate(true)
+
+
+# --- Inventario per-PG (porting del Modulo 17): al cambio di scheda attiva, salva l'inventario del
+# PG uscente e ripristina quello del PG entrante (o lo materializza dal kit "in attesa", o ricade
+# sull'inventario iniziale se il PG non ha ne' l'uno ne' l'altro — es. aggiunto con "+ PG" veloce). ---
+
+## Snapshot completo dello stato (equipaggiamento, zaino, economia azioni, grimorio, slot).
+func get_full_state() -> Dictionary:
+	return {
+		"actionEconomy": _action_economy.duplicate(true),
+		"equipmentSlots": _equipment_slots.duplicate(true),
+		"inventory": _inventory.duplicate(true),
+		"spellSlots": _spell_slots.duplicate(true),
+		"spellbook": _spellbook.duplicate(true),
+		"nextInventoryNumber": _next_inventory_number,
+	}
+
+
+## Ripristina uno snapshot completo (l'opposto di get_full_state), notificando tutti i signal.
+func hydrate_full_state(state: Dictionary) -> void:
+	_action_economy = (state.get("actionEconomy", _action_economy) as Dictionary).duplicate(true)
+	_equipment_slots = (state.get("equipmentSlots", _equipment_slots) as Dictionary).duplicate(true)
+	_inventory.clear()
+	for e: Variant in state.get("inventory", []):
+		if e is Dictionary:
+			_inventory.append((e as Dictionary).duplicate(true))
+	_spell_slots = (state.get("spellSlots", _spell_slots) as Dictionary).duplicate(true)
+	_spellbook.clear()
+	for s: Variant in state.get("spellbook", []):
+		if s is Dictionary:
+			_spellbook.append((s as Dictionary).duplicate(true))
+	_next_inventory_number = int(state.get("nextInventoryNumber", _next_inventory_number))
+	action_economy_changed.emit(get_action_economy())
+	inventory_changed.emit(_inventory.duplicate(true))
+	spell_slots_changed.emit(_spell_slots.duplicate(true))
+	_recompute_armor_class()
+
+
+func _on_active_character_changed(_index: int, active: CharacterData) -> void:
+	if active == null:
+		return
+	if not _current_owner_id.is_empty():
+		_snapshots[_current_owner_id] = get_full_state()
+	_restore_for(active.id)
+	_current_owner_id = active.id
+
+
+func _restore_for(character_id: String) -> void:
+	if _snapshots.has(character_id):
+		hydrate_full_state(_snapshots[character_id])
+		return
+	if _pending_kits.has(character_id):
+		var kit: Dictionary = _pending_kits[character_id]
+		apply_kit(Array(kit.get("equip", [])))
+		if not Array(kit.get("spells", [])).is_empty():
+			apply_spellbook(Array(kit.get("spells", [])), kit.get("slots", {}))
+		_pending_kits.erase(character_id)
+		return
+	hydrate_full_state(_initial_snapshot)
+
+
+## Dice a chi appartiene ORA l'inventario vivo, senza salvare/ripristinare nulla (usato subito dopo
+## aver applicato manualmente il kit del primo PG in un nuovo party: da questo momento in poi, il
+## normale swap automatico sa a chi accreditare l'inventario in uscita).
+func set_current_owner(character_id: String) -> void:
+	_current_owner_id = character_id
+
+
+## Mette in attesa il kit di un PG che non e' ancora mai stato attivo: si materializza (add_item +
+## equip) alla PRIMA volta che diventa il PG attivo, esattamente come js/17 con VTTCharacters.byId.
+func stage_kit_for_character(character_id: String, equip_list: Array, spells: Array, slots: Dictionary) -> void:
+	_pending_kits[character_id] = { "equip": equip_list, "spells": spells, "slots": slots }
+
+
+## Azzera ogni snapshot/kit in attesa (nuova partita: niente inventari del party precedente).
+func reset_snapshots() -> void:
+	_snapshots.clear()
+	_pending_kits.clear()
+	_current_owner_id = ""

@@ -71,6 +71,14 @@ func publish(event_name: String, payload: Variant = null) -> void:
 	event_published.emit(event_name, payload)
 
 
+## Annuncio di sistema (porting del pattern annuncia() ripetuto in ogni modulo JS — level-up,
+## loot, condizioni, superfici, ecc.): un canale UNICO per messaggi narrativi di sistema, cosi'
+## qualunque manager puo' scrivere in chat senza conoscere MasterChatPanel. La UI vi si connette
+## ascoltando event_published e filtrando "system:message".
+func announce(text: String) -> void:
+	publish("system:message", text)
+
+
 # --- Setter tipizzati di comodo (i sistemi preferiscono questi alle stringhe) ---
 
 func set_combat_active(active: bool) -> void:

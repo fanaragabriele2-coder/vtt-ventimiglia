@@ -1,0 +1,63 @@
+{
+	"_comment": "Classi — porting di CLASSES del Modulo 14. arr: array standard delle caratteristiche assegnato di default alla classe. equip: kit di partenza (c=catalogId, q=quantita', slot=equipaggiato-in). spellcaster/spells/slots solo per Mago e Chierico.",
+	"classes": [
+		{
+			"id": "guerriero", "name": "Guerriero", "hitDie": 10, "saves": ["str", "con"], "skills": ["athletics", "perception"],
+			"arr": { "str": 15, "con": 14, "dex": 13, "wis": 12, "cha": 10, "int": 8 },
+			"equip": [
+				{ "c": "longsword", "q": 1, "slot": "mainHand" }, { "c": "shield", "q": 1, "slot": "offHand" },
+				{ "c": "chainShirt", "q": 1, "slot": "armor" }, { "c": "healingPotion", "q": 2 },
+				{ "c": "rations", "q": 5 }, { "c": "torch", "q": 4 }
+			],
+			"desc": "d10 HP, mischia robusta"
+		},
+		{
+			"id": "barbaro", "name": "Barbaro", "hitDie": 12, "saves": ["str", "con"], "skills": ["athletics", "intimidation"],
+			"arr": { "str": 15, "con": 14, "dex": 13, "wis": 10, "cha": 8, "int": 8 },
+			"equip": [
+				{ "c": "longsword", "q": 1, "slot": "mainHand" }, { "c": "dagger", "q": 2, "slot": "offHand" },
+				{ "c": "leatherArmor", "q": 1, "slot": "armor" }, { "c": "healingPotion", "q": 2 }, { "c": "rations", "q": 5 }
+			],
+			"desc": "d12 HP, ira e forza"
+		},
+		{
+			"id": "ladro", "name": "Ladro", "hitDie": 8, "saves": ["dex", "int"], "skills": ["stealth", "sleightOfHand"],
+			"arr": { "dex": 15, "int": 14, "con": 13, "wis": 12, "cha": 10, "str": 8 },
+			"equip": [
+				{ "c": "shortsword", "q": 1, "slot": "mainHand" }, { "c": "dagger", "q": 2, "slot": "offHand" },
+				{ "c": "leatherArmor", "q": 1, "slot": "armor" }, { "c": "thievesTools", "q": 1 },
+				{ "c": "healingPotion", "q": 1 }, { "c": "rope", "q": 1 }
+			],
+			"desc": "d8 HP, furtivita' e colpi precisi"
+		},
+		{
+			"id": "ranger", "name": "Ranger", "hitDie": 10, "saves": ["str", "dex"], "skills": ["survival", "nature"],
+			"arr": { "dex": 15, "con": 14, "wis": 13, "str": 12, "int": 10, "cha": 8 },
+			"equip": [
+				{ "c": "shortbow", "q": 1, "slot": "mainHand" }, { "c": "shortsword", "q": 1, "slot": "offHand" },
+				{ "c": "leatherArmor", "q": 1, "slot": "armor" }, { "c": "healingPotion", "q": 1 }, { "c": "rations", "q": 5 }
+			],
+			"desc": "d10 HP, distanza e natura"
+		},
+		{
+			"id": "mago", "name": "Mago", "hitDie": 6, "saves": ["int", "wis"], "skills": ["arcana", "investigation"],
+			"arr": { "int": 15, "con": 14, "dex": 13, "wis": 12, "cha": 10, "str": 8 },
+			"spellcaster": true, "spells": ["fireBolt", "mageHand", "magicMissile", "shieldSpell"], "slots": { "1": 2 },
+			"equip": [
+				{ "c": "quarterstaff", "q": 1, "slot": "mainHand" }, { "c": "arcaneFocus", "q": 1, "slot": "offHand" },
+				{ "c": "healingPotion", "q": 1 }, { "c": "torch", "q": 2 }
+			],
+			"desc": "d6 HP, incantesimi arcani"
+		},
+		{
+			"id": "chierico", "name": "Chierico", "hitDie": 8, "saves": ["wis", "cha"], "skills": ["medicine", "religion"],
+			"arr": { "wis": 15, "con": 14, "str": 13, "cha": 12, "int": 10, "dex": 8 },
+			"spellcaster": true, "spells": ["cureWounds", "guidance", "healingWord", "bless"], "slots": { "1": 2 },
+			"equip": [
+				{ "c": "quarterstaff", "q": 1, "slot": "mainHand" }, { "c": "shield", "q": 1, "slot": "offHand" },
+				{ "c": "chainShirt", "q": 1, "slot": "armor" }, { "c": "healingPotion", "q": 2 }
+			],
+			"desc": "d8 HP, cure divine"
+		}
+	]
+}

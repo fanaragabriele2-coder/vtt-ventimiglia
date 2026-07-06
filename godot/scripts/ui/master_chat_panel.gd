@@ -22,6 +22,9 @@ func _ready() -> void:
 	AIBridge.master_complete.connect(_on_master_complete)
 	AIBridge.master_error.connect(_on_master_error)
 	AIBridge.speak_requested.connect(_on_speak_requested)
+	# Canale unico di annuncio (GameState.announce): level-up, bottino, condizioni, superfici,
+	# elevazione, IA nemici... ogni sistema di gioco scrive qui senza conoscere questo pannello.
+	GameState.event_published.connect(_on_game_event)
 	_status.text = "Master remoto: " + AIBridge.get_endpoint_label()
 
 
@@ -145,6 +148,11 @@ func _on_master_error(message: String) -> void:
 	_streaming_active = false
 	_send_button.disabled = false
 	_log.append_text("\n[color=#c9362b]⚠ " + message + "[/color]")
+
+
+func _on_game_event(event_name: String, payload: Variant) -> void:
+	if event_name == "system:message":
+		_append_system(String(payload))
 
 
 func _on_speak_requested(text: String) -> void:

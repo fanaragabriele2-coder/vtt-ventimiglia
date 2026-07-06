@@ -49,6 +49,32 @@ func get_party() -> Array[CharacterData]:
 	return _party
 
 
+## Trova un membro del party per id, sia attivo che no (usato da ProgressionManager per accreditare
+## XP/level-up a chi ha davvero sferrato il colpo, non solo al PG mostrato in hotseat ora).
+func get_character_by_id(character_id: String) -> CharacterData:
+	for c: CharacterData in _party:
+		if c.id == character_id:
+			return c
+	return null
+
+
+## Applica un level-up a QUALUNQUE membro del party (non solo l'attivo): usato da ProgressionManager.
+## Emette i signal solo se il personaggio e' quello attualmente attivo (altrimenti la UI non lo
+## mostra comunque, ma party_changed avvisa chi tiene traccia dei livelli in generale).
+func apply_level_up(character_id: String, hp_gain: int, new_level: int, new_proficiency: int) -> void:
+	var c: CharacterData = get_character_by_id(character_id)
+	if c == null:
+		return
+	c.hp_max += hp_gain
+	c.hp_current = c.hp_max
+	c.level = new_level
+	c.proficiency_bonus = new_proficiency
+	if c == get_active():
+		character_changed.emit(c, "levelUp")
+		hp_changed.emit(c.hp_current, c.hp_max, c.hp_temporary)
+	party_changed.emit(_party)
+
+
 func get_active_index() -> int:
 	return _active_index
 
@@ -62,6 +88,20 @@ func set_active_index(index: int) -> void:
 	active_character_changed.emit(_active_index, active)
 	character_changed.emit(active, "activeSwitch")
 	hp_changed.emit(active.hp_current, active.hp_max, active.hp_temporary)
+
+
+## Sostituisce l'INTERO roster (usato dalla creazione personaggio: "Inizia l'avventura"). A
+## differenza di set_active_index, NON emette active_character_changed — e' un reset pulito, non
+## uno switch da un PG a un altro (chi applica il kit del primo membro e' CharacterCreation).
+func set_party(new_party: Array[CharacterData]) -> void:
+	_party = new_party
+	_active_index = 0
+	_next_player_number = _party.size() + 1
+	party_changed.emit(_party)
+	var active: CharacterData = get_active()
+	if active:
+		character_changed.emit(active, "newGame")
+		hp_changed.emit(active.hp_current, active.hp_max, active.hp_temporary)
 
 
 ## Aggiunge un nuovo PG al party (variante ciclica Guerriero/Ladro/Mago) e lo restituisce.

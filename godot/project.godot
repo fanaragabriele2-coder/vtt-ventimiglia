@@ -19,7 +19,17 @@ config/features=PackedStringArray("4.3", "Forward Plus")
 GameState="*res://scripts/autoload/game_state.gd"
 CharacterManager="*res://scripts/autoload/character_manager.gd"
 InventoryManager="*res://scripts/autoload/inventory_manager.gd"
+ArmeriaManager="*res://scripts/autoload/armeria_manager.gd"
+CharacterCreation="*res://scripts/autoload/character_creation.gd"
 CombatManager="*res://scripts/combat/combat_manager.gd"
+ProgressionManager="*res://scripts/autoload/progression_manager.gd"
+ConditionsManager="*res://scripts/combat/conditions_manager.gd"
+FlankingSystem="*res://scripts/combat/flanking_system.gd"
+ElevationManager="*res://scripts/combat/elevation_manager.gd"
+SurfacesManager="*res://scripts/combat/surfaces_manager.gd"
+EnemyAI="*res://scripts/combat/enemy_ai.gd"
+EncounterBalancer="*res://scripts/combat/encounter_balancer.gd"
+ActionMenuManager="*res://scripts/combat/action_menu_manager.gd"
 AIBridge="*res://scripts/network/ai_bridge.gd"
 
 [rendering]

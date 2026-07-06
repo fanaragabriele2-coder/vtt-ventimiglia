@@ -14,6 +14,17 @@ var _view_overworld_btn: Button
 func _ready() -> void:
 	_apply_background()
 	_build_layout()
+	_show_character_creation()
+
+
+## All'avvio, prima di qualunque altra cosa: crea il party (Modulo 14). Il layout di gioco e'
+## gia' costruito sotto (con il PG "Eroe Locale" di default), ma la creazione lo sostituisce
+## SUBITO che si preme "Inizia l'avventura" — coerente col comportamento del monolite.
+func _show_character_creation() -> void:
+	var screen := CharacterCreationScreen.new()
+	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	screen.adventure_started.connect(func() -> void: screen.queue_free())
+	add_child(screen)
 
 
 func _apply_background() -> void:
@@ -46,10 +57,14 @@ func _build_layout() -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(columns)
 
-	# Sinistra: Scheda PG.
+	# Sinistra: Scheda PG + barra XP.
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 8)
+	columns.add_child(left)
+	left.add_child(XpBar.new())
 	var sheet := CharacterSheetPanel.new()
 	sheet.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	columns.add_child(sheet)
+	left.add_child(sheet)
 
 	# Centro: toggle vista + (mappa tattica | overworld Ventimiglia) + HUD combattimento in basso.
 	var center := VBoxContainer.new()
@@ -79,6 +94,9 @@ func _build_layout() -> void:
 	var chat := MasterChatPanel.new()
 	chat.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(chat)
+
+	# Overlay globale (sopra tutto): popup di bottino (Modulo 15/41).
+	add_child(LootPopup.new())
 
 
 func _build_toolbar() -> PanelContainer:
@@ -111,15 +129,13 @@ func _build_toolbar() -> PanelContainer:
 
 
 func _spawn_goblins() -> void:
-	CombatManager.add_npc("goblin")
-	CombatManager.add_npc("goblin")
-	CombatManager.start_combat()
+	# Encounter Balancer (Modulo 37): la quantita'/statistiche si scalano sul party REALE, non sono
+	# fisse — con un party forte potrebbero comparire piu' goblin, con uno debole/ferito meno.
+	EncounterBalancer.spawn_bilanciato([{ "name": "Goblin", "count": 2 }])
 
 
 func _spawn_orc() -> void:
-	CombatManager.add_npc("orc")
-	if not CombatManager.is_active():
-		CombatManager.start_combat()
+	EncounterBalancer.spawn_bilanciato([{ "name": "Orco", "count": 1 }])
 
 
 func _end_combat() -> void:

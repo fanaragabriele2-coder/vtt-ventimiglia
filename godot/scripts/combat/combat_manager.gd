@@ -17,7 +17,7 @@ signal combat_ended()
 signal turn_changed(combatant_id: String, round_number: int)
 signal combatant_added(combatant: Dictionary)
 signal combatant_damaged(combatant_id: String, amount: int, current_hp: int)
-signal combatant_defeated(combatant_id: String)
+signal combatant_defeated(combatant_id: String, source_id: String)
 signal combatant_healed(combatant_id: String, amount: int, current_hp: int)
 signal initiative_rolled(order: Array)
 signal attack_resolved(result: Dictionary)
@@ -35,6 +35,13 @@ var _round: int = 0
 var _current_turn_index: int = -1
 var _next_npc_number: int = 1
 var _last_event: String = ""
+
+# Posizione sulla griglia di ogni combattente (combattente_id -> cella). Vive QUI, non nella UI
+# (TacticalMap), cosi' la logica di gioco (fiancheggiamento, elevazione, IA nemici) puo' leggerla
+# senza dipendere da un nodo di scena. TacticalMap la scrive quando un token si muove (click o IA)
+# e vi si aggancia per riflettere gli spostamenti che ha causato il gioco (es. l'IA nemica).
+signal combatant_position_changed(combatant_id: String, cell: Vector2i)
+var _positions: Dictionary = {}
 
 
 func _ready() -> void:
@@ -75,6 +82,11 @@ func _load_catalog(path: String, key: String) -> Array[Dictionary]:
 
 # --- Stato / lettura ---
 
+## Il bestiario caricato (usato dall'Encounter Balancer per risalire a CR/id dal nome).
+func get_monster_catalog() -> Array[Dictionary]:
+	return _monster_catalog
+
+
 func get_state() -> Dictionary:
 	return {
 		"active": _active, "round": _round,
@@ -97,8 +109,27 @@ func is_active() -> bool:
 
 # --- Spawn nemici (porting di addNpc del Modulo 05) ---
 
-## Aggiunge un PNG dal bestiario. `overrides` puo' scalare hitPoints/armorClass/attackBonus
-## (usato dall'Encounter Balancer). Ritorna il combattente creato (o {} se il catalogo non ha l'id).
+## Sposta il bonus fisso di una formula di danno ("1d6+2" con delta -1 -> "1d6+1"); usato
+## dall'Encounter Balancer (damageBonusDelta) per indebolire/rinforzare i nemici senza toccare il
+## bestiario. Il dado resta invariato, solo il bonus fisso si sposta.
+func _applica_delta_danno(formula: String, delta: int) -> String:
+	var regex := RegEx.new()
+	regex.compile("^(.*?d\\d+)\\s*([+-]\\s*\\d+)?$")
+	var m: RegExMatch = regex.search(formula.strip_edges())
+	if not m:
+		return formula
+	var dado: String = m.get_string(1).replace(" ", "")
+	var bonus_str: String = m.get_string(2).replace(" ", "")
+	var bonus_attuale: int = int(bonus_str) if not bonus_str.is_empty() else 0
+	var nuovo: int = bonus_attuale + delta
+	if nuovo == 0:
+		return dado
+	return dado + (("+" + str(nuovo)) if nuovo > 0 else str(nuovo))
+
+
+## Aggiunge un PNG dal bestiario. `overrides` puo' scalare hitPoints/armorClass/attackBonus/
+## damageBonusDelta (usato dall'Encounter Balancer). Ritorna il combattente creato (o {} se il
+## catalogo non ha l'id).
 func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 	var template: Dictionary = {}
 	for m: Dictionary in _monster_catalog:
@@ -113,6 +144,9 @@ func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 		if c["kind"] == "npc" and String(c["name"]).begins_with(String(template["name"])):
 			same_type += 1
 	var hp: int = int(overrides.get("hitPoints", template["hitPoints"]))
+	var damage_formula: String = String(template["damageFormula"])
+	if overrides.has("damageBonusDelta"):
+		damage_formula = _applica_delta_danno(damage_formula, int(overrides["damageBonusDelta"]))
 	var combatant: Dictionary = {
 		"id": "npc-%d" % _next_npc_number,
 		"kind": "npc",
@@ -124,7 +158,7 @@ func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 		"initiative": 0,
 		"initiativeBonus": int(template["initiativeBonus"]),
 		"attackBonus": int(overrides.get("attackBonus", template["attackBonus"])),
-		"damageFormula": String(template["damageFormula"]),
+		"damageFormula": damage_formula,
 		"defeated": false,
 	}
 	_next_npc_number += 1
@@ -279,7 +313,11 @@ func roll_damage_formula(formula: String, critical: bool = false) -> Dictionary:
 
 # --- Applicazione di danno/cura (porting di applyDamageToCombatant / healCombatant) ---
 
-func apply_damage_to_combatant(combatant_id: String, amount: int) -> bool:
+## source_id: chi ha inferto il danno (attaccante, superficie, comando IA...), se noto. Serve a
+## ProgressionManager per accreditare l'XP a chi ha DAVVERO sferrato il colpo, non a chi e' mostrato
+## in hotseat quando il PNG cade (porting del problema che js/15 risolveva parsando lastRoll.title —
+## qui e' diretto, perche' resolve_attack conosce gia' l'attaccante).
+func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: String = "") -> bool:
 	var combatant: Dictionary = get_combatant(combatant_id)
 	if combatant.is_empty():
 		return false
@@ -296,7 +334,7 @@ func apply_damage_to_combatant(combatant_id: String, amount: int) -> bool:
 
 	combatant_damaged.emit(combatant_id, damage, int(combatant["hitPoints"]))
 	if combatant["kind"] == "npc" and combatant["defeated"] and not was_defeated:
-		combatant_defeated.emit(combatant_id)
+		combatant_defeated.emit(combatant_id, source_id)
 
 	_check_end_conditions(combatant)
 	return true
@@ -340,25 +378,52 @@ func _check_end_conditions(last_hit: Dictionary) -> void:
 
 # --- Attacco completo (d20 vs CA, danno a segno; crit su 20 naturale) ---
 
+## Compone la modalita' di tiro EFFETTIVA da tutte le fonti di vantaggio/svantaggio del gioco:
+## condizioni di stato (Modulo 30), fiancheggiamento (Modulo 25) ed elevazione (Modulo 28), oltre
+## alla modalita' scelta dal giocatore. Regola di sovrapposizione 5e: una fonte di vantaggio E una
+## di svantaggio si annullano a "normal" (ElevationManager.componi_modalita la applica).
+func modalita_effettiva_per_attacco(attacker_id: String, target_id: String, mode_richiesta: String) -> String:
+	var vantaggio_extra: bool = false
+	var svantaggio_extra: bool = false
+
+	var cond: Dictionary = ConditionsManager.valuta_condizioni(attacker_id, target_id)
+	if bool(cond.get("vantaggio", false)):
+		vantaggio_extra = true
+	if bool(cond.get("svantaggio", false)):
+		svantaggio_extra = true
+
+	if bool(FlankingSystem.valuta_fiancheggiamento(attacker_id, target_id).get("fiancheggiato", false)):
+		vantaggio_extra = true
+
+	var elev: String = ElevationManager.valuta_elevazione(attacker_id, target_id)
+	if elev == "advantage":
+		vantaggio_extra = true
+	elif elev == "disadvantage":
+		svantaggio_extra = true
+
+	return ElevationManager.componi_modalita(mode_richiesta, vantaggio_extra, svantaggio_extra)
+
+
 func resolve_attack(attacker_id: String, target_id: String, mode: String = "normal") -> Dictionary:
 	var attacker: Dictionary = get_combatant(attacker_id)
 	var target: Dictionary = get_combatant(target_id)
 	if attacker.is_empty() or target.is_empty():
 		return { "ok": false }
-	var d20: Dictionary = roll_d20_with_mode(mode)
+	var modalita_finale: String = modalita_effettiva_per_attacco(attacker_id, target_id, mode)
+	var d20: Dictionary = roll_d20_with_mode(modalita_finale)
 	var attack_total: int = int(d20["chosen"]) + int(attacker["attackBonus"])
 	var critical: bool = bool(d20["naturalTwenty"])
 	# 1 naturale sbaglia sempre; 20 naturale colpisce sempre (e critica); altrimenti d20+bonus vs CA.
 	var hit: bool = not bool(d20["naturalOne"]) and (critical or attack_total >= int(target["armorClass"]))
 	var result: Dictionary = {
-		"ok": true, "attacker": attacker_id, "target": target_id,
+		"ok": true, "attacker": attacker_id, "target": target_id, "mode": modalita_finale,
 		"roll": d20["chosen"], "attackTotal": attack_total,
 		"targetAc": int(target["armorClass"]), "critical": critical, "hit": hit, "damage": 0,
 	}
 	if hit:
 		var dmg: Dictionary = roll_damage_formula(String(attacker["damageFormula"]), critical)
 		result["damage"] = int(dmg["total"])
-		apply_damage_to_combatant(target_id, int(dmg["total"]))
+		apply_damage_to_combatant(target_id, int(dmg["total"]), attacker_id)
 	attack_resolved.emit(result)
 	return result
 
@@ -410,3 +475,33 @@ func opportunity_attack(reactor_id: String, target_id: String) -> Dictionary:
 	if reactor_id == PC_LOCAL_ID and not InventoryManager.spend_action_resource("reaction"):
 		return { "ok": false, "reason": "Reazione gia' spesa." }
 	return resolve_attack(reactor_id, target_id, "normal")
+
+
+# --- Posizioni sulla griglia (letta da fiancheggiamento/elevazione/superfici/IA nemici) ---
+
+## Registra/aggiorna la cella di un combattente ed emette il signal (la UI mappa si allinea da sola).
+func set_combatant_cell(combatant_id: String, cell: Vector2i) -> void:
+	_positions[combatant_id] = cell
+	combatant_position_changed.emit(combatant_id, cell)
+
+
+## Cella corrente di un combattente, o null se non ancora nota (nessun token piazzato per lui).
+func get_combatant_cell(combatant_id: String) -> Variant:
+	return _positions.get(combatant_id)
+
+
+func has_combatant_cell(combatant_id: String) -> bool:
+	return _positions.has(combatant_id)
+
+
+func clear_combatant_cell(combatant_id: String) -> void:
+	_positions.erase(combatant_id)
+
+
+## Distanza Chebyshev in celle tra due combattenti, o -1 se una posizione non e' nota.
+func cell_distance(id_a: String, id_b: String) -> int:
+	if not (_positions.has(id_a) and _positions.has(id_b)):
+		return -1
+	var a: Vector2i = _positions[id_a]
+	var b: Vector2i = _positions[id_b]
+	return maxi(absi(a.x - b.x), absi(a.y - b.y))

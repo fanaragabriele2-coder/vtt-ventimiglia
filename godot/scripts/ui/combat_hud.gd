@@ -12,6 +12,8 @@ var _round_label: Label
 var _last_event: Label
 var _attack_button: Button
 var _shove_button: Button
+var _bonus_button: Button
+var _bonus_popup: PopupPanel
 var _cards: Dictionary = {}   # combatant_id -> PanelContainer (per l'evidenziazione di turno)
 var _current_id: String = ""
 
@@ -83,7 +85,11 @@ func _build_ui() -> void:
 	actions.add_child(_attack_button)
 	_shove_button = _make_action("👐 Spingi", Color(0.11, 0.24, 0.31), _on_shove_pressed)
 	actions.add_child(_shove_button)
+	_bonus_button = _make_action("⚡ Bonus", Color(0.42, 0.32, 0.08), _on_bonus_pressed)
+	actions.add_child(_bonus_button)
 	actions.add_child(_make_action("⏭ Termina turno", Color(0.16, 0.31, 0.16), _on_end_turn_pressed))
+
+	_build_bonus_popup()
 
 
 func _make_action(text: String, tint: Color, handler: Callable) -> Button:
@@ -261,3 +267,52 @@ func _actor_id() -> String:
 	if not c.is_empty() and c["kind"] == "pc":
 		return _current_id
 	return CombatManager.PC_LOCAL_ID
+
+
+# --- Menu Azione Bonus dinamico (porting del Modulo 38): opzioni generate da classe/razza/
+# inventario del PG attivo, in una griglia a comparsa sopra il pulsante "⚡ Bonus". ---
+
+func _build_bonus_popup() -> void:
+	_bonus_popup = PopupPanel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.06)
+	sb.border_color = Color(0.78, 0.61, 0.24, 0.6)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	_bonus_popup.add_theme_stylebox_override("panel", sb)
+	add_child(_bonus_popup)
+
+
+func _on_bonus_pressed() -> void:
+	for child: Node in _bonus_popup.get_children():
+		child.queue_free()
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	_bonus_popup.add_child(col)
+
+	var opzioni: Array[Dictionary] = ActionMenuManager.get_current_options()
+	if opzioni.is_empty():
+		var lbl := Label.new()
+		lbl.text = "Nessuna azione bonus disponibile."
+		col.add_child(lbl)
+	else:
+		for o: Dictionary in opzioni:
+			var btn := Button.new()
+			var fonte: String = "Classe" if o["fonte"] == "classe" else ("Razza" if o["fonte"] == "razza" else "Zaino")
+			btn.text = "%s  [%s]" % [String(o["etichetta"]), fonte]
+			btn.custom_minimum_size = Vector2(220, 40)
+			btn.tooltip_text = String(o.get("descrizione", ""))
+			btn.pressed.connect(_on_bonus_option_chosen.bind(o))
+			col.add_child(btn)
+
+	_bonus_popup.position = Vector2i(_bonus_button.get_screen_position()) + Vector2i(0, -220)
+	_bonus_popup.popup()
+
+
+func _on_bonus_option_chosen(opzione: Dictionary) -> void:
+	ActionMenuManager.esegui(opzione, _selected_target_id())
+	_bonus_popup.hide()

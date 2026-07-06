@@ -50,6 +50,9 @@ func _ready() -> void:
 	CombatManager.combatant_defeated.connect(_on_combatant_defeated)
 	CombatManager.turn_changed.connect(_on_turn_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
+	# L'IA nemica (o qualunque altro sistema) puo' spostare un combattente SENZA passare dal click
+	# sulla mappa: questo signal tiene il token a schermo allineato alla posizione autorevole.
+	CombatManager.combatant_position_changed.connect(_on_combatant_position_changed)
 	resized.connect(queue_redraw)
 
 
@@ -106,16 +109,52 @@ func _draw() -> void:
 		var py: float = _origin.y + y * _cell_size
 		draw_line(Vector2(_origin.x, py), Vector2(_origin.x + GRID_COLS * _cell_size, py), COL_GRID, 1.0)
 
-	# 2) Token (sotto la nebbia: i nemici in celle non rivelate resteranno nascosti dall'overlay).
+	# 2) Elevazione (Modulo 28): riquadro + numero di quota sulle celle dipinte dal Master/IA.
+	_draw_elevation()
+
+	# 3) Superfici (Modulo 27): cerchi tratteggiati fuoco/veleno.
+	_draw_surfaces()
+
+	# 4) Token (sotto la nebbia: i nemici in celle non rivelate resteranno nascosti dall'overlay).
 	for id: String in _tokens.keys():
 		_draw_token(_tokens[id])
 
-	# 3) Nebbia di guerra: overlay scuro sulle celle non ancora rivelate.
+	# 5) Nebbia di guerra: overlay scuro sulle celle non ancora rivelate.
 	for y: int in range(GRID_ROWS):
 		for x: int in range(GRID_COLS):
 			if not _revealed.has("%d,%d" % [x, y]):
 				var rect := Rect2(_origin + Vector2(x * _cell_size, y * _cell_size), Vector2(_cell_size, _cell_size))
 				draw_rect(rect, COL_FOG, true)
+
+
+func _draw_elevation() -> void:
+	var quote: Dictionary = ElevationManager.celle_dipinte()
+	for chiave: String in quote.keys():
+		var livello: int = int(quote[chiave])
+		if livello == 0:
+			continue
+		var parti: PackedStringArray = chiave.split(",")
+		var cell := Vector2i(int(parti[0]), int(parti[1]))
+		if not _in_bounds(cell):
+			continue
+		var center: Vector2 = _cell_to_pixel_center(cell)
+		var lato: float = _cell_size * 0.86
+		var col: Color = Color(0.94, 0.83, 0.53, 0.75) if livello > 0 else Color(0.62, 0.77, 0.88, 0.75)
+		draw_rect(Rect2(center - Vector2(lato, lato) * 0.5, Vector2(lato, lato)), col, false, 2.0)
+		var font: Font = ThemeDB.fallback_font
+		var fsize: int = maxi(10, int(_cell_size * 0.34))
+		var testo: String = ("+%d" % livello) if livello > 0 else str(livello)
+		draw_string(font, center - Vector2(fsize * 0.3, -fsize * 0.3), testo, HORIZONTAL_ALIGNMENT_CENTER, lato, fsize, col)
+
+
+func _draw_surfaces() -> void:
+	for s: Dictionary in SurfacesManager.elenco_attivo():
+		var centro: Vector2 = _cell_to_pixel_center(Vector2i(int(s["cellX"]), int(s["cellY"])))
+		var raggio_px: float = (float(s["raggio"]) + 0.5) * _cell_size
+		var col: Color = Color(0.88, 0.38, 0.23, 0.22) if s["tipo"] == "fuoco" else Color(0.48, 0.77, 0.35, 0.22)
+		var bordo: Color = Color(0.88, 0.38, 0.23, 0.75) if s["tipo"] == "fuoco" else Color(0.48, 0.77, 0.35, 0.75)
+		draw_circle(centro, raggio_px, col)
+		draw_arc(centro, raggio_px, 0, TAU, 40, bordo, 2.0)
 
 
 func _draw_token(token: Dictionary) -> void:
@@ -156,6 +195,8 @@ func _gui_input(event: InputEvent) -> void:
 	if _selected_id != "" and _tokens.has(_selected_id):   # click su cella vuota: sposta il selezionato
 		var t: Dictionary = _tokens[_selected_id]
 		t["cell"] = cell
+		# Posizione autorevole per il gioco (fiancheggiamento/elevazione/IA nemici la leggono da qui).
+		CombatManager.set_combatant_cell(String(t["combatant_id"]), cell)
 		if t["kind"] == "pc":
 			_reveal_around(cell, FOG_REVEAL_RADIUS)
 		token_moved.emit(_selected_id, cell)
@@ -202,10 +243,22 @@ func _on_combatant_defeated(combatant_id: String) -> void:
 	for id: String in _tokens.keys():
 		if _tokens[id].get("combatant_id", "") == combatant_id and _tokens[id]["kind"] == "npc":
 			_tokens.erase(id)
+			CombatManager.clear_combatant_cell(combatant_id)
 			break
 	if _selected_id != "" and not _tokens.has(_selected_id):
 		_selected_id = ""
 	queue_redraw()
+
+
+## L'IA nemica (o qualunque altro sistema di gioco) ha spostato un combattente senza passare dal
+## click sulla mappa: allinea il token a schermo alla posizione autorevole di CombatManager.
+func _on_combatant_position_changed(combatant_id: String, cell: Vector2i) -> void:
+	var token_id: String = "tok-" + combatant_id
+	if _tokens.has(token_id):
+		_tokens[token_id]["cell"] = cell
+		if _tokens[token_id]["kind"] == "pc":
+			_reveal_around(cell, FOG_REVEAL_RADIUS)
+		queue_redraw()
 
 
 func _on_turn_changed(combatant_id: String, _round: int) -> void:
@@ -241,6 +294,7 @@ func _rebuild_tokens() -> void:
 			"id": token_id, "name": String(c["name"]), "cell": cell,
 			"kind": String(c["kind"]), "combatant_id": cid,
 		}
+		CombatManager.set_combatant_cell(cid, cell)
 	# Rimuove token di combattenti spariti dal tracker (oltre a quelli uccisi).
 	for id: String in _tokens.keys():
 		if not seen.has(id):
