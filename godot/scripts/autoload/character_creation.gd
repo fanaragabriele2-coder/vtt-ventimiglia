@@ -46,7 +46,7 @@ func get_race(race_id: String) -> Dictionary:
 	return races[0] if not races.is_empty() else {}
 
 
-func get_class(class_id: String) -> Dictionary:
+func get_class_def(class_id: String) -> Dictionary:
 	for c: Dictionary in classes:
 		if c["id"] == class_id:
 			return c
@@ -98,7 +98,7 @@ func compute_hp(final_abils: Dictionary, cls: Dictionary) -> int:
 ## punteggio BASE (3-18) scelto dal giocatore per ciascuna caratteristica, prima dei bonus di razza.
 func build_character(character_name: String, race_id: String, class_id: String, base_scores: Dictionary) -> Dictionary:
 	var race: Dictionary = get_race(race_id)
-	var cls: Dictionary = get_class(class_id)
+	var cls: Dictionary = get_class_def(class_id)
 	var fa: Dictionary = final_abilities(base_scores, race_id)
 	var skills: PackedStringArray = PackedStringArray(cls.get("skills", []))
 	if race.has("skill"):

@@ -41,7 +41,7 @@ func _apply_style() -> void:
 
 
 func _set_class_defaults(class_id: String) -> void:
-	var cls: Dictionary = CharacterCreation.get_class(class_id)
+	var cls: Dictionary = CharacterCreation.get_class_def(class_id)
 	var arr: Dictionary = cls.get("arr", {})
 	for key: String in ABILITY_KEYS:
 		_base_scores[key] = int(arr.get(key, 10))
@@ -241,7 +241,7 @@ func _refresh_all() -> void:
 		var mod_txt: String = ("+%d" % m) if m >= 0 else str(m)
 		(_ability_final_labels[key] as Label).text = "→ %d (%s)%s" % [f, mod_txt, suffix]
 
-	var cls: Dictionary = CharacterCreation.get_class(_class_id)
+	var cls: Dictionary = CharacterCreation.get_class_def(_class_id)
 	var hp: int = CharacterCreation.compute_hp(fa, cls)
 	var ac: int = CharacterCreation.compute_ac(fa, cls.get("equip", []))
 	var spd: float = float(race.get("speed", 9.0))
