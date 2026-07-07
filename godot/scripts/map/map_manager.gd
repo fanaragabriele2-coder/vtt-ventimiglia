@@ -62,8 +62,7 @@ var _token_tex: Texture2D
 var _dati: Dictionary = {}
 var _tokens: Dictionary = {}      # combatant_id -> Node2D
 var _pc_light: PointLight2D
-var _camera: Camera2D
-var _pan_attivo: bool = false
+var _camera: VTTCamera
 
 
 func _ready() -> void:
@@ -72,10 +71,10 @@ func _ready() -> void:
 	_token_tex = _crea_texture_token(CELL_PX)
 	_costruisci_layers()
 	_costruisci_ambiente()
-	_camera = Camera2D.new()
-	_camera.zoom = Vector2(1.2, 1.2)
+	# Camera dedicata (pan/zoom fluidi + limiti mappa): la gestione della camera vive nel suo nodo,
+	# non qui — il MapManager si occupa SOLO di griglia/token/luci (disaccoppiamento).
+	_camera = VTTCamera.new()
 	add_child(_camera)
-	_camera.make_current()
 
 
 # --- Costruzione dei 4 TileMapLayer + contenitori Y-sortati ---
@@ -188,7 +187,10 @@ func genera_dungeon(tema: String = "cripta", seme: int = -1) -> void:
 	_piazza_luci_torce()
 	_piazza_luce_party()
 	if _camera:
-		_camera.position = _centro_cella(_dati.get("spawn", Vector2i(2, 2)))
+		var w: int = int(_dati["larghezza"])
+		var h: int = int(_dati["altezza"])
+		_camera.imposta_limiti(Rect2(0, 0, w * CELL_PX, h * CELL_PX))
+		_camera.centra_su(_centro_cella(_dati.get("spawn", Vector2i(2, 2))))
 	EventBus.dungeon_generated.emit(tema, _dati)
 
 
@@ -359,29 +361,20 @@ func cella_spawn() -> Vector2i:
 	return _dati.get("spawn", Vector2i(2, 2))
 
 
-# --- Input dal mondo. Girando dentro un SubViewport con Camera2D, get_global_mouse_position()
-# restituisce gia' le coordinate MONDO sotto il cursore: nessuna conversione schermo->mondo a mano.
+# --- Input dal mondo. Il pan/zoom li gestisce VTTCamera (tasto dx/centrale + rotellina); qui resta
+# SOLO il click sinistro = selezione cella. Girando dentro un SubViewport con Camera2D,
+# get_global_mouse_position() restituisce gia' le coordinate MONDO sotto il cursore.
 
 func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
-	if mb != null:
-		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			click_su_mondo(get_global_mouse_position())
-		elif mb.button_index == MOUSE_BUTTON_MIDDLE or mb.button_index == MOUSE_BUTTON_RIGHT:
-			_pan_attivo = mb.pressed  # trascina col tasto centrale/destro per spostare la camera
-		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
-			_zoom_camera(1.1)
-		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
-			_zoom_camera(1.0 / 1.1)
-		return
-	var mm := event as InputEventMouseMotion
-	if mm != null and _pan_attivo and _camera:
-		_camera.position -= mm.relative / _camera.zoom
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+		click_su_mondo(get_global_mouse_position())
 
 
-func _zoom_camera(fattore: float) -> void:
-	if _camera:
-		_camera.zoom = (_camera.zoom * fattore).clampf(0.4, 3.0)
+## Aggancia le celle del mondo alla griglia D&D: dato un punto qualunque, ritorna il CENTRO della
+## cella che lo contiene (snap dei token). Utile a chi piazza token da coordinate libere.
+func snap_a_cella(world_pos: Vector2) -> Vector2:
+	return _centro_cella(mondo_a_cella(world_pos))
 
 
 func click_su_mondo(world_pos: Vector2) -> void:
