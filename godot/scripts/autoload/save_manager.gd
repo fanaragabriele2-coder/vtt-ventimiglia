@@ -51,12 +51,16 @@ func list_slots() -> Array[String]:
 
 
 func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
+	# Il dungeon Nexus si salva "seme+delta": il MapManager pubblica il suo stato minimo in
+	# GameState (chiave "nexus.save") a ogni movimento — qui lo si raccoglie senza conoscerlo.
+	var nexus_stato: Variant = GameState.get_value("nexus.save")
 	var state: Dictionary = {
 		"savedAt": Time.get_datetime_string_from_system(),
 		"character": CharacterManager.serialize_party(),
 		"inventory": InventoryManager.get_save_state(),
 		"progression": ProgressionManager.get_save_state(),
 		"partyLocation": GameState.get_party_location(),
+		"nexus": nexus_stato if nexus_stato is Dictionary else {},
 	}
 	var f: FileAccess = FileAccess.open(_slot_path(slot_name), FileAccess.WRITE)
 	if f == null:
@@ -91,6 +95,12 @@ func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	var location: Variant = state.get("partyLocation")
 	if location is Dictionary and location.has("name"):
 		GameState.set_party_location(location)
+	# Ripristino del dungeon Nexus (se il salvataggio ne ha uno): l'evento lo raccoglie la vista,
+	# che rigenera dal seme e riapplica i delta (fog, livello, posizione del party).
+	var nexus_stato: Variant = state.get("nexus")
+	if nexus_stato is Dictionary and not (nexus_stato as Dictionary).is_empty():
+		GameState.set_value("nexus.save", nexus_stato)
+		GameState.publish("nexus:restore", nexus_stato)
 	GameState.announce("📂 Partita caricata (" + slot_name + ").")
 	game_loaded.emit(slot_name)
 	return true

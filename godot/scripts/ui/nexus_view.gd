@@ -38,8 +38,28 @@ func _ready() -> void:
 	CombatManager.combatant_defeated.connect(_on_combatant_defeated)
 	# Hook esplicito per il Master IA: "spawna sulla cella X" (il token nasce comunque da combatant_added).
 	EventBus.nexus_spawn_requested.connect(_on_spawn_requested)
+	# Ripristino da salvataggio (SaveManager pubblica l'evento; qui non si conosce chi salva).
+	GameState.event_published.connect(_on_game_event)
 	# Primo dungeon all'apparizione della vista.
 	rigenera()
+
+
+func _on_game_event(event_name: String, payload: Variant) -> void:
+	if event_name == "nexus:restore" and payload is Dictionary:
+		_ripristina(payload)
+
+
+## Un salvataggio e' stato caricato: rigenera il complesso dal seme e riapplica fog/livello/party.
+func _ripristina(stato: Dictionary) -> void:
+	var pc: Vector2i = _map.ripristina_da_salvataggio(stato)
+	_party_cell = pc
+	_map.spawn_token(PC_TOKEN_ID, pc, true, COL_PC)
+	_map.aggiorna_visione(pc)
+	var tema_salvato: String = String(stato.get("tema", "cripta"))
+	for i: int in range(TEMI.size()):
+		if String(TEMI[i][0]) == tema_salvato:
+			_tema_option.select(i)
+			break
 
 
 func _build_viewport() -> void:
@@ -114,9 +134,26 @@ func _on_cella_cliccata(cell: Vector2i) -> void:
 	if percorso.is_empty():
 		return
 	_party_cell = cell
-	_map.muovi_token_lungo_percorso(PC_TOKEN_ID, percorso)
+	var tw: Tween = _map.muovi_token_lungo_percorso(PC_TOKEN_ID, percorso)
 	_map.aggiorna_visione(cell)  # la nebbia si dirada dove il party arriva
 	EventBus.nexus_party_moved.emit(cell)
+	# Fase 3: se la destinazione e' una scala, all'ARRIVO del token si cambia piano.
+	var direzione: int = _map.direzione_scala(cell)
+	if direzione != 0:
+		if tw != null:
+			await tw.finished
+		_usa_scala(direzione)
+
+
+func _usa_scala(direzione: int) -> void:
+	var arrivo: Vector2i = _map.cambia_livello_via_scala(direzione)
+	if arrivo.x < 0:
+		return  # il piano non esiste (scala decorativa ai margini del complesso)
+	_party_cell = arrivo
+	_map.spawn_token(PC_TOKEN_ID, arrivo, true, COL_PC)
+	_map.aggiorna_visione(arrivo)
+	var verbo: String = "scende" if direzione > 0 else "risale"
+	GameState.announce("🪜 Il party %s: livello %d del complesso." % [verbo, _map.livello_corrente() + 1])
 
 
 ## Ogni combattente registrato nel CombatManager (PNG) ottiene un token sul dungeon, piazzato su una

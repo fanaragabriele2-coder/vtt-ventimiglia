@@ -24,7 +24,10 @@ const MACERIE: int = 6
 const PILASTRO: int = 7
 const PONTE: int = 8
 const ARCO: int = 9
-const TILE_COUNT: int = 10
+const SCALA_GIU: int = 10   # scende al livello successivo del complesso
+const SCALA_SU: int = 11    # risale al livello precedente
+const TETTO: int = 12       # tetto di stanza (layer a scomparsa)
+const TILE_COUNT: int = 13
 
 const LARGHEZZA_DEFAULT: int = 48
 const ALTEZZA_DEFAULT: int = 36
@@ -67,6 +70,42 @@ static func genera(tema: String = "cripta", seme: int = -1) -> Dictionary:
 	_piazza_porte(dati, rng)
 	_piazza_props_e_torce(dati, tema, rng)
 	return dati
+
+
+## Collega verticalmente due livelli di un complesso multi-piano (roccaforte nanica): una SCALA_GIU
+## sull'ultima stanza del livello sopra, una SCALA_SU sullo spawn del livello sotto. Chi scende
+## arriva sulla scala che risale — coerenza spaziale del viaggio.
+static func collega_livelli(sopra: Dictionary, sotto: Dictionary) -> void:
+	var giu: Vector2i = _cella_per_scala(sopra)
+	_imposta_scala(sopra, giu, SCALA_GIU)
+	sopra["scala_giu"] = giu
+	var su: Vector2i = sotto.get("spawn", Vector2i(2, 2))
+	_imposta_scala(sotto, su, SCALA_SU)
+	sotto["scala_su"] = su
+
+
+static func _cella_per_scala(dati: Dictionary) -> Vector2i:
+	var stanze: Array = dati["stanze"]
+	if not stanze.is_empty():
+		return (stanze[stanze.size() - 1] as Rect2i).get_center()
+	# Caverna (nessuna stanza): l'ultima cella di pavimento trovata scandendo la griglia — che per
+	# costruzione del flood-fill e' lontana dal punto di partenza.
+	var w: int = int(dati["larghezza"])
+	var h: int = int(dati["altezza"])
+	var celle: PackedInt32Array = dati["celle"]
+	for i: int in range(w * h - 1, -1, -1):
+		if celle[i] == PAVIMENTO:
+			return Vector2i(i % w, i / w)
+	return dati.get("spawn", Vector2i(2, 2))
+
+
+static func _imposta_scala(dati: Dictionary, cell: Vector2i, tipo: int) -> void:
+	var w: int = int(dati["larghezza"])
+	var idx: int = cell.y * w + cell.x
+	var celle: PackedInt32Array = dati["celle"]
+	var props: PackedInt32Array = dati["props"]
+	celle[idx] = tipo
+	props[idx] = 0  # niente pilastri/macerie sopra una scala
 
 
 # --- BSP: strutture costruite ---

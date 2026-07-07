@@ -1,3 +1,6 @@
+# gdlint: disable=max-public-methods
+# (E' la facciata del Map Engine: griglia, token, luci, fog, livelli — l'API pubblica e' ampia
+# per design, documentata nel design doc; spezzarla ora creerebbe indirection senza valore.)
 class_name NexusMapManager
 extends Node2D
 ## Nexus Map Engine (Priorita' 1) — motore mappa a TileMapLayer multipli con illuminazione dinamica,
@@ -42,11 +45,14 @@ const COLORI_TILE: Array[Color] = [
 	Color(0.28, 0.25, 0.22),       # 7 PILASTRO
 	Color(0.24, 0.19, 0.13),       # 8 PONTE
 	Color(0.14, 0.12, 0.16),       # 9 ARCO (overhead)
+	Color(0.3, 0.26, 0.18),        # 10 SCALA_GIU
+	Color(0.42, 0.37, 0.26),       # 11 SCALA_SU
+	Color(0.11, 0.11, 0.15),       # 12 TETTO (layer a scomparsa)
 ]
 
 # Terreni su cui si puo' camminare. L'acqua e' percorribile ma LENTA (peso 2.0 nell'A*), le
 # macerie rallentano (1.5); muri e pilastri bloccano del tutto (vedi cella_percorribile).
-const CALPESTABILI: Array[int] = [G.PAVIMENTO, G.PORTA, G.PONTE, G.ACQUA]
+const CALPESTABILI: Array[int] = [G.PAVIMENTO, G.PORTA, G.PONTE, G.ACQUA, G.SCALA_GIU, G.SCALA_SU]
 
 const FOG_SHADER := preload("res://scripts/map/fog_of_war.gdshader")
 const RAGGIO_VISIONE: int = 10  # celle di vista del party (per la memoria dell'esplorato)
@@ -65,6 +71,17 @@ var _fog_esplorata: PackedByteArray = PackedByteArray()
 var _fog_lava: PackedByteArray = PackedByteArray()
 var _fog_image: Image
 var _fog_sprite: Sprite2D
+
+# Fase 3: complesso multi-livello, tetti a scomparsa, stato per il salvataggio "seme+delta".
+var _livelli: Array[Dictionary] = []
+var _fog_per_livello: Array[PackedByteArray] = []
+var _livello_corrente: int = 0
+var _tema_corrente: String = "cripta"
+var _seme_base: int = 0
+var _ultima_cella_party: Vector2i = Vector2i.ZERO
+var _tetti: Array[TileMapLayer] = []
+var _tetti_stanze: Array[Rect2i] = []
+var _tetti_alpha: Array[float] = []
 
 var _tile_source_id: int = 0
 var _luce_tex: Texture2D
@@ -139,6 +156,10 @@ func _costruisci_tileset() -> TileSet:
 				# Bordo piu' scuro per leggere la griglia; leggera variazione per texture.
 				var bordo: bool = x == 0 or y == 0 or x == CELL_PX - 1 or y == CELL_PX - 1
 				var c: Color = col.darkened(0.35) if bordo else col
+				# Muro bicolore: la fascia bassa e' la "faccia" visibile (piu' chiara), la parte
+				# alta e' la cima — lettura 2.5D dei muri senza tile 32x64 (che richiedono arte vera).
+				if tipo == G.MURO and not bordo and y >= int(CELL_PX * 0.62):
+					c = col.lightened(0.4)
 				img.set_pixel(px, y, c)
 
 	var atlas := TileSetAtlasSource.new()
@@ -197,27 +218,51 @@ func _crea_texture_token(dim: int) -> Texture2D:
 
 # --- Generazione e disegno del dungeon ---
 
-## Genera e dipinge un dungeon del tema dato. tema: cripta|roccaforte|tempio_lava|caverna.
-func genera_dungeon(tema: String = "cripta", seme: int = -1) -> void:
-	_dati = G.genera(tema, seme)
+## Genera e dipinge un COMPLESSO del tema dato: n_livelli piani collegati da scale (Fase 3).
+## Il seme base e' fissato QUI (anche quando casuale): livello i = seme_base + i, cosi' la coppia
+## (tema, seme) rigenera l'intero complesso identico al bit — e' cio' che rende possibile il
+## salvataggio "seme+delta". tema: cripta|roccaforte|tempio_lava|caverna.
+func genera_dungeon(tema: String = "cripta", seme: int = -1, n_livelli: int = 2) -> void:
+	_tema_corrente = tema
+	_seme_base = seme if seme >= 0 else (randi() % 2000000000)
+	_livelli.clear()
+	_fog_per_livello.clear()
+	for i: int in range(maxi(1, n_livelli)):
+		_livelli.append(G.genera(tema, _seme_base + i))
+		_fog_per_livello.append(PackedByteArray())
+	for i: int in range(_livelli.size() - 1):
+		G.collega_livelli(_livelli[i], _livelli[i + 1])
+	_livello_corrente = 0
+	_applica_livello()
+	aggiorna_visione(_dati.get("spawn", Vector2i(2, 2)))
+	EventBus.dungeon_generated.emit(tema, _dati)
+
+
+## Dipinge il livello corrente (usato da genera_dungeon, dal cambio livello e dal ripristino).
+func _applica_livello() -> void:
+	_dati = _livelli[_livello_corrente]
 	_pulisci()
 	_dipingi_layers()
+	_costruisci_tetti()
 	_piazza_luci_torce()
 	_piazza_luce_party()
 	_ricostruisci_astar()
 	_inizializza_fog()
-	aggiorna_visione(_dati.get("spawn", Vector2i(2, 2)))
 	if _camera:
 		var w: int = int(_dati["larghezza"])
 		var h: int = int(_dati["altezza"])
 		_camera.imposta_limiti(Rect2(0, 0, w * CELL_PX, h * CELL_PX))
 		_camera.centra_su(_centro_cella(_dati.get("spawn", Vector2i(2, 2))))
-	EventBus.dungeon_generated.emit(tema, _dati)
 
 
 func _pulisci() -> void:
 	for layer: TileMapLayer in [_ground, _walls, _props, _overhead]:
 		layer.clear()
+	for tetto: TileMapLayer in _tetti:
+		tetto.queue_free()
+	_tetti.clear()
+	_tetti_stanze.clear()
+	_tetti_alpha.clear()
 	for gruppo: Node2D in [_lights, _tokens_root]:
 		for figlio: Node in gruppo.get_children():
 			figlio.queue_free()
@@ -244,6 +289,113 @@ func _dipingi_layers() -> void:
 				_props.set_cell(pos, _tile_source_id, Vector2i(props[idx], 0))
 			if overhead[idx] != 0:
 				_overhead.set_cell(pos, _tile_source_id, Vector2i(overhead[idx], 0))
+
+
+# --- Tetti a scomparsa (Fase 3): un mini-TileMapLayer di tetto PER STANZA, perche' il fading in
+# Godot e' per-layer, non per-cella. Quando il party entra nella stanza k, il tetto k svanisce. ---
+
+func _costruisci_tetti() -> void:
+	for stanza_v: Variant in _dati.get("stanze", []):
+		var stanza: Rect2i = stanza_v
+		var layer := TileMapLayer.new()
+		layer.tile_set = _ground.tile_set
+		layer.z_index = 5
+		for y: int in range(stanza.position.y, stanza.end.y):
+			for x: int in range(stanza.position.x, stanza.end.x):
+				layer.set_cell(Vector2i(x, y), _tile_source_id, Vector2i(G.TETTO, 0))
+		add_child(layer)
+		_tetti.append(layer)
+		_tetti_stanze.append(stanza)
+		_tetti_alpha.append(1.0)
+
+
+func _aggiorna_tetti(cella_party: Vector2i) -> void:
+	for i: int in range(_tetti.size()):
+		var dentro: bool = _tetti_stanze[i].has_point(cella_party)
+		var alpha_target: float = 0.0 if dentro else 1.0
+		if not is_equal_approx(_tetti_alpha[i], alpha_target):
+			_tetti_alpha[i] = alpha_target
+			create_tween().tween_property(_tetti[i], "modulate:a", alpha_target, 0.25)
+
+
+# --- Complesso multi-livello (Fase 3): scale su/giu' fra i piani ---
+
+func numero_livelli() -> int:
+	return _livelli.size()
+
+
+func livello_corrente() -> int:
+	return _livello_corrente
+
+
+## +1 se la cella e' una scala che scende, -1 se risale, 0 altrimenti.
+func direzione_scala(cell: Vector2i) -> int:
+	if not in_mappa(cell):
+		return 0
+	var tipo: int = (_dati["celle"] as PackedInt32Array)[cell.y * int(_dati["larghezza"]) + cell.x]
+	if tipo == G.SCALA_GIU:
+		return 1
+	if tipo == G.SCALA_SU:
+		return -1
+	return 0
+
+
+## Cambia piano seguendo una scala. Ritorna la cella d'arrivo sul nuovo livello (la scala
+## complementare), o (-1,-1) se il piano non esiste. La fog di ogni piano e' persistente.
+func cambia_livello_via_scala(direzione: int) -> Vector2i:
+	var destinazione: int = _livello_corrente + direzione
+	if destinazione < 0 or destinazione >= _livelli.size():
+		return Vector2i(-1, -1)
+	_fog_per_livello[_livello_corrente] = _fog_esplorata
+	_livello_corrente = destinazione
+	_applica_livello()
+	var arrivo: Vector2i = _dati.get("scala_su" if direzione > 0 else "scala_giu", _dati.get("spawn", Vector2i(2, 2)))
+	aggiorna_visione(arrivo)
+	if _camera:
+		_camera.centra_su(_centro_cella(arrivo))
+	return arrivo
+
+
+# --- Salvataggio "seme+delta" (Fase 3): il mondo si rigenera dal seme, si persiste solo il resto ---
+
+## Pubblica in GameState lo stato minimo per ricostruire il dungeon: tema+seme (rigenerano le mappe
+## identiche al bit), fog esplorata per livello (il "delta"), livello e cella del party. SaveManager
+## lo raccoglie da li' senza conoscere questo nodo (disaccoppiamento).
+func _pubblica_stato_salvataggio() -> void:
+	if _livelli.is_empty():
+		return
+	_fog_per_livello[_livello_corrente] = _fog_esplorata
+	var fogs: Array[String] = []
+	for f: PackedByteArray in _fog_per_livello:
+		fogs.append(Marshalls.raw_to_base64(f) if not f.is_empty() else "")
+	GameState.set_value("nexus.save", {
+		"tema": _tema_corrente, "seme": _seme_base, "livelli": _livelli.size(),
+		"livelloCorrente": _livello_corrente, "fog": fogs,
+		"partyCell": [_ultima_cella_party.x, _ultima_cella_party.y],
+	})
+
+
+## Ricostruisce il complesso da uno stato salvato: rigenera dal seme, poi riapplica i delta
+## (fog esplorata, livello corrente). Ritorna la cella dove rimettere il token del party.
+func ripristina_da_salvataggio(stato: Dictionary) -> Vector2i:
+	genera_dungeon(String(stato.get("tema", "cripta")), int(stato.get("seme", 0)), int(stato.get("livelli", 2)))
+	var fogs: Array = stato.get("fog", [])
+	for i: int in range(mini(fogs.size(), _fog_per_livello.size())):
+		var b64: String = String(fogs[i])
+		if not b64.is_empty():
+			_fog_per_livello[i] = Marshalls.base64_to_raw(b64)
+	var livello: int = clampi(int(stato.get("livelloCorrente", 0)), 0, _livelli.size() - 1)
+	if livello != _livello_corrente:
+		_livello_corrente = livello
+		_applica_livello()
+	else:
+		_inizializza_fog()  # ricarica la fog del livello 0 appena ripristinata
+	var pc_raw: Array = stato.get("partyCell", [])
+	var pc: Vector2i = Vector2i(int(pc_raw[0]), int(pc_raw[1])) if pc_raw.size() == 2 else _dati.get("spawn", Vector2i(2, 2))
+	aggiorna_visione(pc)
+	if _camera:
+		_camera.centra_su(_centro_cella(pc))
+	return pc
 
 
 func _piazza_luci_torce() -> void:
@@ -309,14 +461,16 @@ func muovi_token(combatant_id: String, cell: Vector2i) -> void:
 
 
 ## Anima il token lungo un percorso di celle (l'output di trova_percorso): un piccolo tween per
-## tappa, in sequenza. La luce di vista del party segue da sola (e' figlia del token).
-func muovi_token_lungo_percorso(combatant_id: String, percorso: Array[Vector2i]) -> void:
+## tappa, in sequenza. La luce di vista del party segue da sola (e' figlia del token). Ritorna il
+## Tween cosi' il chiamante puo' attendere l'arrivo (await tw.finished) — es. per le scale.
+func muovi_token_lungo_percorso(combatant_id: String, percorso: Array[Vector2i]) -> Tween:
 	if not _tokens.has(combatant_id) or percorso.is_empty():
-		return
+		return null
 	var token := _tokens[combatant_id] as Sprite2D
 	var tw: Tween = create_tween()
 	for cell: Vector2i in percorso:
 		tw.tween_property(token, "position", _centro_cella(cell), 0.09)
+	return tw
 
 
 func rimuovi_token(combatant_id: String) -> void:
@@ -418,11 +572,15 @@ func _inizializza_fog() -> void:
 	for i: int in range(w * h):
 		if celle[i] == G.LAVA:
 			_fog_lava[i] = 1
+	# Fog persistente per livello (Fase 3): tornando su un piano gia' visitato, la memoria resta.
+	var salvata: PackedByteArray = _fog_per_livello[_livello_corrente] if _livello_corrente < _fog_per_livello.size() else PackedByteArray()
+	if salvata.size() == w * h:
+		_fog_esplorata = salvata.duplicate()
 	_fog_image = Image.create(w, h, false, Image.FORMAT_RGB8)
 	if _fog_sprite == null:
 		_fog_sprite = Sprite2D.new()
 		_fog_sprite.centered = false
-		_fog_sprite.z_index = 6  # sopra TUTTO (anche l'overhead): la nebbia copre il mondo
+		_fog_sprite.z_index = 6  # sopra TUTTO (anche tetti e overhead): la nebbia copre il mondo
 		_fog_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR  # bordi morbidi via upscale
 		var mat := ShaderMaterial.new()
 		mat.shader = FOG_SHADER
@@ -450,6 +608,9 @@ func aggiorna_visione(origine: Vector2i) -> void:
 				visibili[idx] = true
 				_fog_esplorata[idx] = 1
 	_ridisegna_fog(visibili)
+	_ultima_cella_party = origine
+	_aggiorna_tetti(origine)         # entrando in una stanza, il suo tetto svanisce
+	_pubblica_stato_salvataggio()    # stato sempre pronto per SaveManager (seme+delta)
 
 
 ## Bresenham intero da->a: false se una cella INTERMEDIA e' un muro (il muro stesso, come

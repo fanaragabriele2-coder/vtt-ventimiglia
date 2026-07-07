@@ -107,5 +107,6 @@ MapData (Resource)                          ← evoluzione del Dictionary gia' i
 |---|---|---|
 | **1b** | VTTCamera dedicata (pan/zoom smorzati, zoom-to-cursor, limiti mappa) | ✅ |
 | **2** | Occluder nel TileSet + fog a doppio canale con shader + AStarGrid2D + `valida_movimento` unico | ✅ |
-| **3** | Tetti a scomparsa per stanza + muri alti + multi-livello + `MapData` Resource + save seme+delta | 🔧 |
+| **3** | Tetti a scomparsa per stanza + multi-livello con scale + save seme+delta | ✅ |
+| **3-resto** | Muri alti 32x64 veri (per ora: muro bicolore faccia/cima — servono tile artistici) + `MapData` come Resource formale (per ora resta il Dictionary del generatore, che gia' funziona) | 🔧 |
 | **4** | Rete seed-sync host-authoritative su WebSocket/Supabase | 🔧 |
