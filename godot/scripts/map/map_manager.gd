@@ -44,17 +44,27 @@ const COLORI_TILE: Array[Color] = [
 	Color(0.14, 0.12, 0.16),       # 9 ARCO (overhead)
 ]
 
-# Celle su cui si puo' camminare (le altre bloccano il movimento e la linea di vista).
-const CALPESTABILI: Array[int] = [G.PAVIMENTO, G.PORTA, G.PONTE]
+# Terreni su cui si puo' camminare. L'acqua e' percorribile ma LENTA (peso 2.0 nell'A*), le
+# macerie rallentano (1.5); muri e pilastri bloccano del tutto (vedi cella_percorribile).
+const CALPESTABILI: Array[int] = [G.PAVIMENTO, G.PORTA, G.PONTE, G.ACQUA]
+
+const FOG_SHADER := preload("res://scripts/map/fog_of_war.gdshader")
+const RAGGIO_VISIONE: int = 10  # celle di vista del party (per la memoria dell'esplorato)
 
 var _ground: TileMapLayer
 var _walls: TileMapLayer
 var _props: TileMapLayer
 var _overhead: TileMapLayer
-var _occluders: Node2D
 var _lights: Node2D
 var _tokens_root: Node2D
 var _canvas_modulate: CanvasModulate
+
+# Fase 2: pathfinding e nebbia a doppio canale.
+var _astar: AStarGrid2D
+var _fog_esplorata: PackedByteArray = PackedByteArray()
+var _fog_lava: PackedByteArray = PackedByteArray()
+var _fog_image: Image
+var _fog_sprite: Sprite2D
 
 var _tile_source_id: int = 0
 var _luce_tex: Texture2D
@@ -86,11 +96,8 @@ func _costruisci_layers() -> void:
 	_props = _nuovo_layer(tileset, "Props", 2, true)     # Y-sort: i props si ordinano coi token
 	_overhead = _nuovo_layer(tileset, "Overhead", 4, false)
 
-	# Contenitori (tra Props e Overhead) per occlusori, luci e token — tutti Y-sortati insieme.
-	_occluders = Node2D.new()
-	_occluders.name = "Occluders"
-	add_child(_occluders)
-
+	# Contenitori (tra Props e Overhead) per luci e token. Gli occlusori NON hanno piu' un nodo:
+	# vivono nel TileSet (occlusion layer per-tile) — dipingere un muro porta l'ombra con se'.
 	_lights = Node2D.new()
 	_lights.name = "Lights"
 	add_child(_lights)
@@ -142,7 +149,19 @@ func _costruisci_tileset() -> TileSet:
 
 	var tileset := TileSet.new()
 	tileset.tile_size = Vector2i(CELL_PX, CELL_PX)
+	# Occlusion layer PER-TILE: muri e pilastri portano l'occlusore con se' quando vengono dipinti.
+	# Niente piu' un nodo LightOccluder2D per cella: la luce non attraversa la pietra "gratis".
+	# (Nota 4.4+: set_occluder e' rinominata set_occluder_polygon; su 4.3 e' questa.)
+	tileset.add_occlusion_layer()
 	_tile_source_id = tileset.add_source(atlas, 0)
+	var mezzo: float = CELL_PX * 0.5
+	var quad := OccluderPolygon2D.new()
+	quad.polygon = PackedVector2Array([
+		Vector2(-mezzo, -mezzo), Vector2(mezzo, -mezzo), Vector2(mezzo, mezzo), Vector2(-mezzo, mezzo),
+	])
+	for tipo_occlusore: int in [G.MURO, G.PILASTRO]:
+		var td: TileData = atlas.get_tile_data(Vector2i(tipo_occlusore, 0), 0)
+		td.set_occluder(0, quad)
 	return tileset
 
 
@@ -183,9 +202,11 @@ func genera_dungeon(tema: String = "cripta", seme: int = -1) -> void:
 	_dati = G.genera(tema, seme)
 	_pulisci()
 	_dipingi_layers()
-	_piazza_occlusori()
 	_piazza_luci_torce()
 	_piazza_luce_party()
+	_ricostruisci_astar()
+	_inizializza_fog()
+	aggiorna_visione(_dati.get("spawn", Vector2i(2, 2)))
 	if _camera:
 		var w: int = int(_dati["larghezza"])
 		var h: int = int(_dati["altezza"])
@@ -197,7 +218,7 @@ func genera_dungeon(tema: String = "cripta", seme: int = -1) -> void:
 func _pulisci() -> void:
 	for layer: TileMapLayer in [_ground, _walls, _props, _overhead]:
 		layer.clear()
-	for gruppo: Node2D in [_occluders, _lights, _tokens_root]:
+	for gruppo: Node2D in [_lights, _tokens_root]:
 		for figlio: Node in gruppo.get_children():
 			figlio.queue_free()
 	_tokens.clear()
@@ -223,28 +244,6 @@ func _dipingi_layers() -> void:
 				_props.set_cell(pos, _tile_source_id, Vector2i(props[idx], 0))
 			if overhead[idx] != 0:
 				_overhead.set_cell(pos, _tile_source_id, Vector2i(overhead[idx], 0))
-
-
-## Un LightOccluder2D quadrato per ogni cella-muro: la luce non passa oltre la pietra (raycasting).
-## Per mappe enormi si potrebbero fondere i muri contigui in polilinee — qui, a 48x36, un occlusore
-## per cella e' semplice e piu' che sostenibile su hardware moderno (nota di scalabilita').
-func _piazza_occlusori() -> void:
-	var w: int = int(_dati["larghezza"])
-	var h: int = int(_dati["altezza"])
-	var muri: PackedInt32Array = _dati["muri"]
-	var quad := PackedVector2Array([
-		Vector2(0, 0), Vector2(CELL_PX, 0), Vector2(CELL_PX, CELL_PX), Vector2(0, CELL_PX),
-	])
-	for y: int in range(h):
-		for x: int in range(w):
-			if muri[y * w + x] != G.MURO:
-				continue  # le porte lasciano passare la luce (aperte)
-			var occ := LightOccluder2D.new()
-			var poly := OccluderPolygon2D.new()
-			poly.polygon = quad
-			occ.occluder = poly
-			occ.position = Vector2(x * CELL_PX, y * CELL_PX)
-			_occluders.add_child(occ)
 
 
 func _piazza_luci_torce() -> void:
@@ -309,6 +308,17 @@ func muovi_token(combatant_id: String, cell: Vector2i) -> void:
 		(_tokens[combatant_id] as Sprite2D).position = _centro_cella(cell)
 
 
+## Anima il token lungo un percorso di celle (l'output di trova_percorso): un piccolo tween per
+## tappa, in sequenza. La luce di vista del party segue da sola (e' figlia del token).
+func muovi_token_lungo_percorso(combatant_id: String, percorso: Array[Vector2i]) -> void:
+	if not _tokens.has(combatant_id) or percorso.is_empty():
+		return
+	var token := _tokens[combatant_id] as Sprite2D
+	var tw: Tween = create_tween()
+	for cell: Vector2i in percorso:
+		tw.tween_property(token, "position", _centro_cella(cell), 0.09)
+
+
 func rimuovi_token(combatant_id: String) -> void:
 	if _tokens.has(combatant_id):
 		(_tokens[combatant_id] as Node2D).queue_free()
@@ -335,11 +345,150 @@ func cella_percorribile(cell: Vector2i) -> bool:
 	if not in_mappa(cell):
 		return false
 	var w: int = int(_dati["larghezza"])
+	var idx: int = cell.y * w + cell.x
 	var celle: PackedInt32Array = _dati["celle"]
 	var muri: PackedInt32Array = _dati["muri"]
-	if muri[cell.y * w + cell.x] == G.MURO:
+	var props: PackedInt32Array = _dati["props"]
+	if muri[idx] == G.MURO or props[idx] == G.PILASTRO:
 		return false
-	return CALPESTABILI.has(celle[cell.y * w + cell.x]) or muri[cell.y * w + cell.x] == G.PORTA
+	return CALPESTABILI.has(celle[idx]) or muri[idx] == G.PORTA
+
+
+# --- Pathfinding (AStarGrid2D nativa) + cancello unico di validazione del movimento ---
+
+## Ricostruita UNA volta a fine generazione dalla maschera di percorribilita'. E' il "cancello
+## unico": giocatore, IA nemica e comandi del Master IA muovono i token SOLO lungo percorsi che
+## esistono qui — un muro non si attraversa perche' nessun percorso lo attraversa.
+func _ricostruisci_astar() -> void:
+	var w: int = int(_dati["larghezza"])
+	var h: int = int(_dati["altezza"])
+	_astar = AStarGrid2D.new()
+	_astar.region = Rect2i(0, 0, w, h)
+	_astar.cell_size = Vector2(CELL_PX, CELL_PX)
+	_astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	_astar.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_astar.update()
+	var celle: PackedInt32Array = _dati["celle"]
+	var props: PackedInt32Array = _dati["props"]
+	for y: int in range(h):
+		for x: int in range(w):
+			var cell := Vector2i(x, y)
+			if not cella_percorribile(cell):
+				_astar.set_point_solid(cell, true)
+			elif celle[y * w + x] == G.ACQUA:
+				_astar.set_point_weight_scale(cell, 2.0)   # guadare rallenta
+			elif props[y * w + x] == G.MACERIE:
+				_astar.set_point_weight_scale(cell, 1.5)   # terreno accidentato
+
+
+## Percorso da->a come lista di TAPPE (la cella di partenza e' esclusa). Vuoto = irraggiungibile.
+func trova_percorso(da: Vector2i, a: Vector2i) -> Array[Vector2i]:
+	var vuoto: Array[Vector2i] = []
+	if _astar == null or not in_mappa(da) or not in_mappa(a) or not cella_percorribile(a):
+		return vuoto
+	var percorso: Array[Vector2i] = _astar.get_id_path(da, a)
+	if percorso.size() <= 1:
+		return vuoto  # nessun percorso (o gia' sul posto)
+	percorso.remove_at(0)
+	return percorso
+
+
+## true se un movimento da->a e' possibile lungo un percorso reale (per validazioni esterne: IA,
+## comandi del Master, futura rete host-authoritative).
+func valida_movimento(da: Vector2i, a: Vector2i) -> bool:
+	return not trova_percorso(da, a).is_empty()
+
+
+## Costo in METRI del percorso (per l'Action Economy): tappe x 1,5 m.
+func costo_percorso_metri(percorso: Array[Vector2i]) -> float:
+	return celle_in_metri(percorso.size())
+
+
+# --- Fog of War a doppio canale (Fase 2): memoria dell'esplorato su griglia + shader ---
+
+func _inizializza_fog() -> void:
+	var w: int = int(_dati["larghezza"])
+	var h: int = int(_dati["altezza"])
+	_fog_esplorata = PackedByteArray()
+	_fog_esplorata.resize(w * h)
+	# Canale "autoilluminato": la lava scrive un bagliore che filtra anche oltre la nebbia.
+	_fog_lava = PackedByteArray()
+	_fog_lava.resize(w * h)
+	var celle: PackedInt32Array = _dati["celle"]
+	for i: int in range(w * h):
+		if celle[i] == G.LAVA:
+			_fog_lava[i] = 1
+	_fog_image = Image.create(w, h, false, Image.FORMAT_RGB8)
+	if _fog_sprite == null:
+		_fog_sprite = Sprite2D.new()
+		_fog_sprite.centered = false
+		_fog_sprite.z_index = 6  # sopra TUTTO (anche l'overhead): la nebbia copre il mondo
+		_fog_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR  # bordi morbidi via upscale
+		var mat := ShaderMaterial.new()
+		mat.shader = FOG_SHADER
+		_fog_sprite.material = mat
+		add_child(_fog_sprite)
+	_fog_sprite.scale = Vector2(CELL_PX, CELL_PX)  # 1 texel -> 1 cella
+	_fog_sprite.texture = ImageTexture.create_from_image(_fog_image)
+
+
+## Ricalcola la linea di vista dalla cella data (event-driven: SOLO quando il party si muove, mai
+## per frame). Raggi di Bresenham verso ogni cella nel raggio di visione: i muri bloccano; le celle
+## viste entrano per sempre nella memoria dell'esplorato.
+func aggiorna_visione(origine: Vector2i) -> void:
+	if _dati.is_empty() or not in_mappa(origine):
+		return
+	var w: int = int(_dati["larghezza"])
+	var visibili: Dictionary = {}
+	for dy: int in range(-RAGGIO_VISIONE, RAGGIO_VISIONE + 1):
+		for dx: int in range(-RAGGIO_VISIONE, RAGGIO_VISIONE + 1):
+			if dx * dx + dy * dy > RAGGIO_VISIONE * RAGGIO_VISIONE:
+				continue  # cerchio, non quadrato
+			var c := Vector2i(origine.x + dx, origine.y + dy)
+			if in_mappa(c) and _linea_vista_libera(origine, c):
+				var idx: int = c.y * w + c.x
+				visibili[idx] = true
+				_fog_esplorata[idx] = 1
+	_ridisegna_fog(visibili)
+
+
+## Bresenham intero da->a: false se una cella INTERMEDIA e' un muro (il muro stesso, come
+## bersaglio finale, resta visibile: e' il primo ostacolo che vedi).
+func _linea_vista_libera(da: Vector2i, a: Vector2i) -> bool:
+	var w: int = int(_dati["larghezza"])
+	var muri: PackedInt32Array = _dati["muri"]
+	var dx: int = absi(a.x - da.x)
+	var dy: int = -absi(a.y - da.y)
+	var sx: int = 1 if da.x < a.x else -1
+	var sy: int = 1 if da.y < a.y else -1
+	var err: int = dx + dy
+	var cur: Vector2i = da
+	while cur != a:
+		var e2: int = err * 2
+		if e2 >= dy:
+			err += dy
+			cur.x += sx
+		if e2 <= dx:
+			err += dx
+			cur.y += sy
+		if cur == a:
+			break
+		if muri[cur.y * w + cur.x] == G.MURO:
+			return false
+	return true
+
+
+func _ridisegna_fog(visibili: Dictionary) -> void:
+	var w: int = int(_dati["larghezza"])
+	var h: int = int(_dati["altezza"])
+	for y: int in range(h):
+		for x: int in range(w):
+			var idx: int = y * w + x
+			_fog_image.set_pixel(x, y, Color8(
+				255 if _fog_esplorata[idx] == 1 else 0,
+				255 if visibili.has(idx) else 0,
+				255 if _fog_lava[idx] == 1 else 0))
+	(_fog_sprite.texture as ImageTexture).update(_fog_image)
 
 
 ## Action Economy (Priorita' 3.2): converte i metri di movimento in celle di questa griglia.

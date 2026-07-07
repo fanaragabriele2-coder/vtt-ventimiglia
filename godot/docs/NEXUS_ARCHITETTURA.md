@@ -103,8 +103,9 @@ MapData (Resource)                          ← evoluzione del Dictionary gia' i
 
 ## Roadmap di costruzione (ogni fase giocabile da sola)
 
-| Fase | Contenuto |
-|---|---|
-| **2** | Occluder nel TileSet + fog a doppio canale con shader + AStarGrid2D + `validate_move` unico |
-| **3** | Tetti a scomparsa per stanza + muri alti + multi-livello + `MapData` Resource + save seme+delta |
-| **4** | Rete seed-sync host-authoritative su WebSocket/Supabase |
+| Fase | Contenuto | Stato |
+|---|---|---|
+| **1b** | VTTCamera dedicata (pan/zoom smorzati, zoom-to-cursor, limiti mappa) | ✅ |
+| **2** | Occluder nel TileSet + fog a doppio canale con shader + AStarGrid2D + `valida_movimento` unico | ✅ |
+| **3** | Tetti a scomparsa per stanza + muri alti + multi-livello + `MapData` Resource + save seme+delta | 🔧 |
+| **4** | Rete seed-sync host-authoritative su WebSocket/Supabase | 🔧 |

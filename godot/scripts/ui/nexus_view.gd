@@ -108,11 +108,14 @@ func rigenera() -> void:
 
 
 func _on_cella_cliccata(cell: Vector2i) -> void:
-	# Click-to-move sul dungeon: il PG si sposta solo su celle percorribili (no muri/lava/acqua).
-	if not _map.cella_percorribile(cell):
+	# Click-to-move con PATHFINDING (Fase 2): il token segue il percorso A* — se una cella non e'
+	# raggiungibile (oltre un muro, in mezzo alla lava), il movimento e' rifiutato, non teletrasporta.
+	var percorso: Array[Vector2i] = _map.trova_percorso(_party_cell, cell)
+	if percorso.is_empty():
 		return
 	_party_cell = cell
-	_map.muovi_token(PC_TOKEN_ID, cell)
+	_map.muovi_token_lungo_percorso(PC_TOKEN_ID, percorso)
+	_map.aggiorna_visione(cell)  # la nebbia si dirada dove il party arriva
 	EventBus.nexus_party_moved.emit(cell)
 
 
