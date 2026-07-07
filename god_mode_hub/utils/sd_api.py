@@ -31,46 +31,90 @@ DEFAULT_NEGATIVE = (
     "deformed, extra limbs, worst quality"
 )
 
+#: Endpoint ``/sdapi/v1/*`` provati in sequenza per il rilevamento. Build
+#: diverse (A1111, Forge, reForge, SD.Next, fork vari) espongono sottoinsiemi
+#: diversi: verificato dal vivo che alcune rimuovono ``/options`` e ``/sd-models``
+#: pur avendo ``--api`` attivo (restano comunque ``/loras``, ``/samplers``…).
+#: Basta che UNO risponda 200 con JSON valido perché l'indirizzo sia
+#: riconosciuto come Stable Diffusion. Un percorso ``/sdapi/v1/...`` che
+#: risponde JSON è una firma affidabile: i servizi generici (che davano falsi
+#: positivi guardando solo lo status) restituiscono 404 o HTML, non JSON.
+_PROBE_ENDPOINTS: tuple[str, ...] = ("sd-models", "samplers", "loras", "options", "progress")
+
 
 class SDApiError(RuntimeError):
     """Errore nella comunicazione con l'API di Stable Diffusion."""
 
 
 def is_available(base_url: str = DEFAULT_BASE_URL, timeout: float = 3.0) -> bool:
-    """True se su questo indirizzo risponde davvero una WebUI A1111/Forge.
+    """True se su questo indirizzo risponde davvero un'API Stable Diffusion.
 
-    Non basta uno status HTTP 200: molti servizi locali (proxy, pannelli di
-    amministrazione, altri server di sviluppo) rispondono 200 OK a qualunque
-    percorso e genererebbero falsi positivi durante la scansione delle porte
-    comuni. Proviamo quindi due endpoint tipici dell'API sdapi — build diverse
-    di A1111/Forge possono avere l'uno senza l'altro (visto dal vivo: alcune
-    build di Forge rimuovono ``/sdapi/v1/options`` pur avendo ``--api``
-    attivo) — verificando che il corpo sia davvero JSON con la forma attesa,
-    non solo lo status HTTP.
+    Prova più endpoint ``/sdapi/v1/*`` (:data:`_PROBE_ENDPOINTS`) e accetta al
+    primo che risponde 200 con un corpo JSON (dict o list). Questo copre i
+    fork che non espongono tutti gli endpoint, restando robusto contro i falsi
+    positivi: un server generico su una porta comune (es. 8080) risponde con
+    404 o HTML su questi percorsi specifici, non con JSON valido.
     """
-    try:
-        response = requests.get(f"{base_url}/sdapi/v1/options", timeout=timeout)
-        if response.ok:
+    for endpoint in _PROBE_ENDPOINTS:
+        try:
+            response = requests.get(f"{base_url}/sdapi/v1/{endpoint}", timeout=timeout)
+        except requests.RequestException:
+            continue
+        if not response.ok:
+            continue
+        try:
             data = response.json()
-            if isinstance(data, dict) and "sd_model_checkpoint" in data:
-                return True
-    except (requests.RequestException, ValueError):
-        pass
-
-    try:
-        response = requests.get(f"{base_url}/sdapi/v1/sd-models", timeout=timeout)
-        if response.ok:
-            data = response.json()
-            return (
-                isinstance(data, list)
-                and len(data) > 0
-                and isinstance(data[0], dict)
-                and "title" in data[0]
-            )
-    except (requests.RequestException, ValueError):
-        pass
-
+        except ValueError:
+            continue
+        if isinstance(data, (dict, list)):
+            return True
     return False
+
+
+def probe_endpoints(base_url: str | None = None, timeout: float = 4.0) -> dict[str, Any]:
+    """Sonda gli endpoint sdapi principali per la diagnostica in-app.
+
+    Non solleva mai: cattura ogni errore e restituisce lo stato di ciascun
+    endpoint, così l'utente (e chi lo assiste) vede esattamente cosa espone la
+    propria build senza aprire un terminale o Swagger.
+
+    Returns:
+        ``{"base_url": str, "results": [{"endpoint", "status", "note"}, ...]}``.
+        ``txt2img`` viene sondato in GET: un 405 (metodo non consentito) è la
+        prova che l'endpoint di generazione **esiste**; un 404 che **manca**.
+    """
+    url = base_url or resolve_base_url() or DEFAULT_BASE_URL
+    checks: tuple[str, ...] = (
+        "sd-models", "samplers", "loras", "options", "progress", "txt2img",
+    )
+    results: list[dict[str, Any]] = []
+    for endpoint in checks:
+        full = f"{url}/sdapi/v1/{endpoint}"
+        entry: dict[str, Any] = {"endpoint": f"/sdapi/v1/{endpoint}", "status": None, "note": ""}
+        try:
+            response = requests.get(full, timeout=timeout)
+            entry["status"] = response.status_code
+            if endpoint == "txt2img":
+                if response.status_code == 405:
+                    entry["note"] = "✅ esiste (405 = serve POST, è normale)"
+                elif response.status_code == 404:
+                    entry["note"] = "❌ ASSENTE: questa build non può generare via API"
+                else:
+                    entry["note"] = f"risposta inattesa ({response.status_code})"
+            elif response.ok:
+                try:
+                    parsed = response.json()
+                    entry["note"] = f"✅ OK · JSON {type(parsed).__name__}"
+                except ValueError:
+                    entry["note"] = "⚠️ 200 ma non-JSON (probabile servizio non-SD)"
+            elif response.status_code == 404:
+                entry["note"] = "assente su questa build (ok se altri sono ✅)"
+            else:
+                entry["note"] = f"HTTP {response.status_code}"
+        except requests.RequestException as exc:
+            entry["note"] = f"irraggiungibile ({type(exc).__name__})"
+        results.append(entry)
+    return {"base_url": url, "results": results}
 
 
 def _candidate_urls() -> list[str]:
@@ -238,7 +282,18 @@ def txt2img(
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
-        raise SDApiError(f"L'API ha risposto con errore HTTP: {exc}") from exc
+        if response.status_code == 404:
+            raise SDApiError(
+                f"L'endpoint {url}/sdapi/v1/txt2img non esiste (404) su questa "
+                "build di Stable Diffusion: non può generare immagini via API. "
+                "Usa una build A1111/Forge standard avviata con --api, oppure "
+                "apri la diagnostica in Asset Forge per vedere quali endpoint "
+                "espone la tua installazione."
+            ) from exc
+        snippet = (response.text or "")[:300]
+        raise SDApiError(
+            f"L'API ha risposto con HTTP {response.status_code}. Dettaglio: {snippet}"
+        ) from exc
 
     # NB: in requests >= 2.27 JSONDecodeError eredita sia da ValueError sia da
     # RequestException: un except ValueError separato e mirato (non un ramo

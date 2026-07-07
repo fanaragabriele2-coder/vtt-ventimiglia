@@ -26,18 +26,62 @@ st.caption(
     "`asset_forge/tokens/`."
 )
 
-sd_url = sd_api.resolve_base_url()
+sd_url = sd_api.resolve_base_url(force=True)
 sd_online = sd_url is not None
 if sd_online:
     st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
 else:
     st.error(
         "🔴 **Stable Diffusion non raggiungibile** su nessuna porta comune "
-        f"({', '.join(str(p) for p in sd_api.COMMON_PORTS)}). Avvia la WebUI "
-        "da Stability Matrix con `--api` nelle Launch Options. Puoi comunque "
-        "preparare i parametri qui sotto.",
+        f"({', '.join(str(p) for p in sd_api.COMMON_PORTS)}). Avvia la tua "
+        "WebUI con `--api` attivo, oppure imposta la variabile d'ambiente "
+        "`SD_API_URL` se usa una porta non elencata. Puoi comunque preparare "
+        "i parametri qui sotto.",
         icon="🎨",
     )
+
+with st.expander("🔍 Diagnostica Stable Diffusion (apri se l'indicatore è rosso)"):
+    st.caption(
+        "Sonda gli endpoint dell'API sulla porta trovata (o su 7860 di default) "
+        "e mostra cosa espone davvero la tua installazione — utile con i fork "
+        "che non hanno tutti gli endpoint."
+    )
+    default_probe = (sd_url or sd_api.DEFAULT_BASE_URL).rsplit(":", 1)[-1]
+    probe_port = st.text_input(
+        "Porta da diagnosticare", value=default_probe,
+        help="Cambiala se la tua WebUI gira su una porta diversa da quella mostrata.",
+    )
+    if st.button("▶️ Esegui diagnostica"):
+        probe_url = f"http://127.0.0.1:{probe_port.strip()}"
+        with st.spinner(f"Sondaggio di {probe_url}…"):
+            report = sd_api.probe_endpoints(base_url=probe_url)
+        st.write(f"Indirizzo sondato: `{report['base_url']}`")
+        st.table(
+            [
+                {"Endpoint": r["endpoint"], "Status": r["status"] if r["status"] is not None else "—",
+                 "Esito": r["note"]}
+                for r in report["results"]
+            ]
+        )
+        txt2img_row = next((r for r in report["results"] if r["endpoint"].endswith("txt2img")), None)
+        any_ok = any("✅" in r["note"] for r in report["results"])
+        if txt2img_row and txt2img_row["status"] == 405:
+            st.success(
+                "L'endpoint di generazione esiste: se l'indicatore era rosso, "
+                "chiudi e riapri l'Hub (Ctrl+C + RUN_ME_FIRST.bat) per rileggerlo."
+            )
+        elif txt2img_row and txt2img_row["status"] == 404:
+            st.error(
+                "L'endpoint /sdapi/v1/txt2img NON esiste su questa build: non "
+                "può generare via API. Serve una WebUI A1111/Forge standard "
+                "avviata con --api."
+            )
+        elif not any_ok:
+            st.warning(
+                "Nessun endpoint sdapi ha risposto: la WebUI non è avviata su "
+                "questa porta, oppure `--api` non è attivo. Verifica il tuo "
+                "`Avvia_StableDiffusion.bat` e la porta reale."
+            )
 
 # ---------------------------------------------------------------------------
 # Step 1 — Generazione 2D
