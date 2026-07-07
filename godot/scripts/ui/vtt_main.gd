@@ -7,8 +7,10 @@ extends Control
 
 var _tactical_map: TacticalMap
 var _overworld_map: OverworldMap
+var _nexus_view: NexusView
 var _view_tactical_btn: Button
 var _view_overworld_btn: Button
+var _view_nexus_btn: Button
 var _ai_toggle_btn: Button
 var _background_dialog: FileDialog
 
@@ -90,6 +92,13 @@ func _build_layout() -> void:
 	# Un'imboscata casuale durante la camminata: si passa subito alla mappa tattica per combattere.
 	_overworld_map.encounter_triggered.connect(_show_tactical)
 	center.add_child(_overworld_map)
+
+	# Terza vista: il Nexus Map Engine (dungeon procedurali illuminati). Nascosto finche' non lo
+	# si sceglie dal toggle, cosi' il SubViewport non consuma risorse quando non serve.
+	_nexus_view = NexusView.new()
+	_nexus_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_nexus_view.visible = false
+	center.add_child(_nexus_view)
 
 	var combat_hud := CombatHUD.new()
 	center.add_child(combat_hud)
@@ -209,34 +218,45 @@ func _toolbar_button(text: String, handler: Callable) -> Button:
 	return b
 
 
-# --- Toggle tra mappa tattica e overworld di Ventimiglia (come la transizione del monolite) ---
+# --- Toggle a 3 vie: mappa tattica · overworld Ventimiglia · dungeon Nexus ---
 
 func _build_view_toggle() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	_view_tactical_btn = _toolbar_button("🗺 Mappa tattica", _show_tactical)
 	_view_overworld_btn = _toolbar_button("🌍 Ventimiglia", _show_overworld)
+	_view_nexus_btn = _toolbar_button("🏰 Dungeon Nexus", _show_nexus)
 	row.add_child(_view_tactical_btn)
 	row.add_child(_view_overworld_btn)
-	_update_toggle_state(true)
+	row.add_child(_view_nexus_btn)
+	_update_toggle_state("tactical")
 	return row
 
 
 func _show_tactical() -> void:
-	_tactical_map.visible = true
-	_overworld_map.visible = false
-	_update_toggle_state(true)
+	_apply_view("tactical")
 
 
 func _show_overworld() -> void:
-	_tactical_map.visible = false
-	_overworld_map.visible = true
-	_update_toggle_state(false)
+	_apply_view("overworld")
 
 
-func _update_toggle_state(tactical_active: bool) -> void:
-	_view_tactical_btn.disabled = tactical_active
-	_view_overworld_btn.disabled = not tactical_active
+func _show_nexus() -> void:
+	_apply_view("nexus")
+
+
+func _apply_view(quale: String) -> void:
+	_tactical_map.visible = quale == "tactical"
+	_overworld_map.visible = quale == "overworld"
+	_nexus_view.visible = quale == "nexus"
+	_update_toggle_state(quale)
+
+
+func _update_toggle_state(attiva: String) -> void:
+	# Il pulsante della vista attiva e' disabilitato (gia' selezionato).
+	_view_tactical_btn.disabled = attiva == "tactical"
+	_view_overworld_btn.disabled = attiva == "overworld"
+	_view_nexus_btn.disabled = attiva == "nexus"
 
 
 func _on_party_traveled(poi_name: String, _poi: Dictionary) -> void:

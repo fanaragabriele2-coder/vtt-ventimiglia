@@ -16,6 +16,7 @@ config/features=PackedStringArray("4.3", "Forward Plus")
 
 [autoload]
 
+EventBus="*res://scripts/autoload/event_bus.gd"
 GameState="*res://scripts/autoload/game_state.gd"
 CharacterManager="*res://scripts/autoload/character_manager.gd"
 InventoryManager="*res://scripts/autoload/inventory_manager.gd"

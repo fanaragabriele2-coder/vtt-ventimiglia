@@ -15,8 +15,9 @@ Godot 4.3+ (`Import` → seleziona `godot/project.godot`).
 
 ```
 godot/
-├── project.godot                     # 15 autoload (ordine di dipendenza) + scena principale
+├── project.godot                     # 17 autoload (ordine di dipendenza) + scena principale
 ├── main.tscn                         # scena principale (root Control + vtt_main.gd)
+├── scenes/nexus_demo.tscn            # scena standalone del Nexus Map Engine (prova i dungeon da soli)
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
 │   ├── monsters.json                 # bestiario (ex npcCatalog, Modulo 06)
 │   ├── items.json                    # armi/armature/consumabili base (ex itemCatalog, Modulo 05)
@@ -30,6 +31,7 @@ godot/
 └── scripts/
     ├── data/character_data.gd        # Resource: dati di un PG (ex defaultCharacterState, Mod. 03)
     ├── autoload/
+    │   ├── event_bus.gd             # EventBus — signal tipizzati del Nexus Map Engine (disaccoppiamento)
     │   ├── game_state.gd             # GameState — store globale + canale di annuncio (Modulo 36)
     │   ├── character_manager.gd      # CharacterManager — roster, HP, caratteristiche (Modulo 03)
     │   ├── inventory_manager.gd      # InventoryManager — economia azioni, slot, zaino, grimorio,
@@ -49,6 +51,9 @@ godot/
     │   ├── encounter_balancer.gd     # EncounterBalancer — scontri scalati sul party (Modulo 37)
     │   └── action_menu_manager.gd    # ActionMenuManager — Azione Bonus dinamica (Modulo 38)
     ├── network/ai_bridge.gd          # AIBridge — ponte streaming verso Ollama remoto (Mod. 10/11)
+    ├── map/                          # Nexus Map Engine (dungeon procedurali illuminati)
+    │   ├── dungeon_generator.gd      # generatore BSP (strutture) + Cellular Automata (caverne), a temi
+    │   └── map_manager.gd            # NexusMapManager — 4 TileMapLayer + Y-sort + PointLight2D + fog LOS
     └── ui/                           # Control auto-costruiti via codice (niente .tscn scritti a mano)
         ├── vtt_main.gd               # scena radice: layout 3 colonne + toolbar + overlay
         ├── character_creation_screen.gd # overlay d'avvio: razza/classe/caratteristiche/party (Mod. 14)
@@ -62,6 +67,7 @@ godot/
         ├── dice_roller.gd            # centro-basso: tiratore rapido D4-D20 → GameState.announce
         ├── status_bar.gd             # in fondo: turno/round, combattimento, party, IA nemica
         ├── loot_popup.gd             # overlay: popup di bottino ← ProgressionManager/ArmeriaManager
+        ├── nexus_view.gd             # centro: incapsula il Nexus Map Engine in un SubViewport + toolbar
         └── master_chat_panel.gd      # destra: Chat Master (Ollama LAN o Groq cloud), log di sistema
 ```
 
@@ -130,13 +136,37 @@ Tutto GDScript 4 a **tipizzazione statica severa** (`var hp: int`, `-> void`, `A
 Già dichiarati in `project.godot`, **in ordine di dipendenza** (non riordinare a caso — i manager
 più in basso usano quelli sopra al loro `_ready()`):
 
-1. `GameState` 2. `CharacterManager` 3. `InventoryManager` 4. `ArmeriaManager`
-5. `CharacterCreation` 6. `CombatManager` 7. `ProgressionManager` 8. `ConditionsManager`
-9. `FlankingSystem` 10. `ElevationManager` 11. `SurfacesManager` 12. `EnemyAI`
-13. `EncounterBalancer` 14. `ActionMenuManager` 15. `AIBridge` 16. `SaveManager`
+1. `EventBus` 2. `GameState` 3. `CharacterManager` 4. `InventoryManager` 5. `ArmeriaManager`
+6. `CharacterCreation` 7. `CombatManager` 8. `ProgressionManager` 9. `ConditionsManager`
+10. `FlankingSystem` 11. `ElevationManager` 12. `SurfacesManager` 13. `EnemyAI`
+14. `EncounterBalancer` 15. `ActionMenuManager` 16. `AIBridge` 17. `SaveManager`
 
 Se non compaiono (progetto importato senza leggere il `.godot`), aggiungili a mano: Project
 Settings → Autoload → *Path* = lo script, *Node Name* = il nome sopra → **Add**.
+
+## 🏰 Nexus Map Engine (dungeon procedurali illuminati)
+
+Terza vista della colonna centrale (toggle **🏰 Dungeon Nexus**), oltre a Mappa tattica e Overworld.
+Un motore mappa vero e proprio in stile "AAA 2.5D", pensato per dungeon complessi (cripte, roccaforti
+naniche, templi con fiumi di lava, caverne):
+
+- **4 `TileMapLayer`** (Ground · Walls · Props · Overhead) con **Y-sort**: pilastri e archi si
+  disegnano *sopra* i token che ci passano davanti/sotto → profondità 2.5D.
+- **Illuminazione dinamica**: `CanvasModulate` scurisce l'ambiente, ogni torcia e la lava sono
+  `PointLight2D`; i muri hanno `LightOccluder2D`, quindi la luce **non attraversa la pietra** →
+  **nebbia di guerra per linea di vista** (raycasting fatto dal renderer 2D, non a mano). La vista
+  del party segue il suo token.
+- **Generazione procedurale** (`dungeon_generator.gd`): **BSP tree** per le strutture costruite
+  (stanze collegate da corridoi, connettività garantita) e **Cellular Automata** per le caverne
+  naturali (con flood-fill che tiene solo la regione raggiungibile). I temi aggiungono fiumi di
+  lava/acqua con ponti e archi.
+- **Autosufficienza**: `TileSet`, texture delle luci e token sono **generati a runtime** da `Image`
+  (nessun asset da scaricare). Vedi `assets/tilesets/README.md` per sostituirli con arte vera.
+- **Integrazione, non duplicazione**: il dungeon dialoga con i sistemi esistenti via `EventBus` +
+  `CombatManager` — qualunque nemico evocato (pulsanti, Encounter Balancer, comandi del Master IA)
+  compare come token sul dungeon e sparisce quando muore. Nessuna regola D&D è ri-scritta qui.
+- Prova anche in **isolamento** aprendo `scenes/nexus_demo.tscn` e premendo Play: click = muovi,
+  rotellina = zoom, trascina col tasto destro = pan, **🎲 Rigenera** cambia dungeon/tema.
 
 ## Cosa NON è (ancora) portato
 
@@ -164,7 +194,7 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 28 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 32 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)
