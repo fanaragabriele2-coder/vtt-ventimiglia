@@ -42,17 +42,35 @@ def is_available(base_url: str = DEFAULT_BASE_URL, timeout: float = 3.0) -> bool
     Non basta uno status HTTP 200: molti servizi locali (proxy, pannelli di
     amministrazione, altri server di sviluppo) rispondono 200 OK a qualunque
     percorso e genererebbero falsi positivi durante la scansione delle porte
-    comuni. Verifichiamo quindi che il corpo sia JSON e contenga
-    ``sd_model_checkpoint``, una chiave specifica delle impostazioni A1111/Forge.
+    comuni. Proviamo quindi due endpoint tipici dell'API sdapi — build diverse
+    di A1111/Forge possono avere l'uno senza l'altro (visto dal vivo: alcune
+    build di Forge rimuovono ``/sdapi/v1/options`` pur avendo ``--api``
+    attivo) — verificando che il corpo sia davvero JSON con la forma attesa,
+    non solo lo status HTTP.
     """
     try:
         response = requests.get(f"{base_url}/sdapi/v1/options", timeout=timeout)
-        if not response.ok:
-            return False
-        data = response.json()
-        return isinstance(data, dict) and "sd_model_checkpoint" in data
+        if response.ok:
+            data = response.json()
+            if isinstance(data, dict) and "sd_model_checkpoint" in data:
+                return True
     except (requests.RequestException, ValueError):
-        return False
+        pass
+
+    try:
+        response = requests.get(f"{base_url}/sdapi/v1/sd-models", timeout=timeout)
+        if response.ok:
+            data = response.json()
+            return (
+                isinstance(data, list)
+                and len(data) > 0
+                and isinstance(data[0], dict)
+                and "title" in data[0]
+            )
+    except (requests.RequestException, ValueError):
+        pass
+
+    return False
 
 
 def _candidate_urls() -> list[str]:
