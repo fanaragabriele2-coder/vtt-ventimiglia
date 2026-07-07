@@ -211,3 +211,16 @@ func _on_combatant_defeated(combatant_id: String, source_id: String) -> void:
 	var loot: Dictionary = _loot_for_enemy(combatant)
 	if not loot["items"].is_empty() or int(loot["gold"]) > 0:
 		loot_ready.emit(loot)
+
+
+# --- Salvataggio partita (SaveManager) ---
+
+## Tutta la progressione (xp/livello/oro) di ogni PG mai esistito nel party, non solo l'attivo.
+func get_save_state() -> Dictionary:
+	return _progression.duplicate(true)
+
+
+## Non emette segnali: chi chiama (SaveManager) lo fa PRIMA di CharacterManager.hydrate_party, cosi'
+## quando party_changed scatena il refresh della UI (barra XP...) i dati sono gia' quelli giusti.
+func hydrate_save_state(state: Dictionary) -> void:
+	_progression = state.duplicate(true)

@@ -72,6 +72,13 @@ func _build_ui() -> void:
 	sub.add_theme_color_override("font_color", Color(0.72, 0.63, 0.42))
 	root.add_child(sub)
 
+	if SaveManager.has_save():
+		var load_btn := Button.new()
+		load_btn.text = "📂 Carica partita salvata"
+		load_btn.custom_minimum_size = Vector2(0, 40)
+		load_btn.pressed.connect(_on_load_saved_game)
+		root.add_child(load_btn)
+
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 8)
 	root.add_child(name_row)
@@ -288,6 +295,14 @@ func _on_add_to_party() -> void:
 func _on_remove_from_party(index: int) -> void:
 	_party_builds.remove_at(index)
 	_refresh_party_list()
+
+
+## Salta del tutto la creazione: ripristina il party/inventario/progressione salvati e riparte da li'.
+func _on_load_saved_game() -> void:
+	if SaveManager.load_game():
+		adventure_started.emit()
+	else:
+		_message_label.text = "Impossibile caricare il salvataggio."
 
 
 func _on_start_adventure() -> void:

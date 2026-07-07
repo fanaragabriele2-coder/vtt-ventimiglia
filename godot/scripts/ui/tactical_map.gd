@@ -18,6 +18,7 @@ const GRID_ROWS: int = 18
 const FOG_REVEAL_RADIUS: int = 4       # celle rivelate attorno a ogni PG (Chebyshev)
 const PARTY_ANCHOR: Vector2i = Vector2i(6, 9)
 const ENEMY_ANCHOR: Vector2i = Vector2i(19, 9)
+const METERS_PER_CELL: float = 1.5     # scala del gioco (coerente con PORTATA_MOVIMENTO in EnemyAI)
 
 # Colori (palette scura del monolite).
 const COL_GRID: Color = Color(0.78, 0.61, 0.24, 0.12)
@@ -42,6 +43,12 @@ var _current_combatant_id: String = ""
 # NULLA da internet qui dentro (niente scraping di Pinterest: e' vietato dai loro termini d'uso e
 # comunque fragile) — l'utente sceglie un file gia' salvato sul proprio computer.
 var _background_texture: Texture2D = null
+
+# Righello di misurazione (stile Foundry): tasto destro premuto + trascina, la distanza (celle e
+# metri, Chebyshev come il resto del combattimento) si vede live; il rilascio lo cancella.
+var _ruler_active: bool = false
+var _ruler_start: Vector2 = Vector2.ZERO
+var _ruler_end: Vector2 = Vector2.ZERO
 
 var _cell_size: float = 32.0
 var _origin: Vector2 = Vector2.ZERO
@@ -136,6 +143,30 @@ func _draw() -> void:
 				var rect := Rect2(_origin + Vector2(x * _cell_size, y * _cell_size), Vector2(_cell_size, _cell_size))
 				draw_rect(rect, COL_FOG, true)
 
+	# 6) Righello di misurazione: sempre sopra a tutto il resto, come un HUD.
+	if _ruler_active:
+		_draw_ruler()
+
+
+## Tasto destro tenuto premuto + trascina: mostra distanza in celle/metri (Chebyshev, come il resto
+## del combattimento — porting "in stile Foundry" del righello di misurazione, non presente nel
+## monolite ne' finora in Godot).
+func _draw_ruler() -> void:
+	draw_line(_ruler_start, _ruler_end, Color(0.94, 0.83, 0.53, 0.9), 2.0)
+	draw_circle(_ruler_start, 4.0, Color(0.94, 0.83, 0.53))
+	draw_circle(_ruler_end, 4.0, Color(0.94, 0.83, 0.53))
+	var start_cell: Vector2i = _pixel_to_cell(_ruler_start)
+	var end_cell: Vector2i = _pixel_to_cell(_ruler_end)
+	var cells: int = maxi(absi(end_cell.x - start_cell.x), absi(end_cell.y - start_cell.y))
+	var meters: float = cells * METERS_PER_CELL
+	var label: String = "%d celle · %.1f m" % [cells, meters]
+	var font: Font = ThemeDB.fallback_font
+	var fsize: int = 14
+	var text_w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+	var mid: Vector2 = (_ruler_start + _ruler_end) * 0.5
+	draw_rect(Rect2(mid + Vector2(-text_w * 0.5 - 6, -fsize - 6), Vector2(text_w + 12, fsize + 10)), Color(0, 0, 0, 0.65), true)
+	draw_string(font, mid + Vector2(-text_w * 0.5, -8), label, HORIZONTAL_ALIGNMENT_LEFT, text_w + 4, fsize, Color(0.94, 0.83, 0.53))
+
 
 func _draw_elevation() -> void:
 	var quote: Dictionary = ElevationManager.celle_dipinte()
@@ -206,11 +237,31 @@ func clear_background_image() -> void:
 	queue_redraw()
 
 
-# --- Input: seleziona / muovi (click-to-move BG3) ---
+# --- Input: seleziona / muovi (click-to-move BG3) + righello (tasto destro trascinato) ---
 
 func _gui_input(event: InputEvent) -> void:
+	var mm := event as InputEventMouseMotion
+	if mm != null:
+		if _ruler_active:
+			_ruler_end = mm.position
+			queue_redraw()
+		return
+
 	var mb := event as InputEventMouseButton
-	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+	if mb == null:
+		return
+
+	if mb.button_index == MOUSE_BUTTON_RIGHT:
+		if mb.pressed:
+			_ruler_active = true
+			_ruler_start = mb.position
+			_ruler_end = mb.position
+		else:
+			_ruler_active = false
+		queue_redraw()
+		return
+
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
 	_recompute_geometry()
 	var cell: Vector2i = _pixel_to_cell(mb.position)

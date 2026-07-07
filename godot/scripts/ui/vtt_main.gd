@@ -139,7 +139,17 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_ai_toggle_btn)
 	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
+	row.add_child(_toolbar_button("💾 Salva", _save_game))
+	row.add_child(_toolbar_button("📂 Carica", _load_game))
 	return panel
+
+
+func _save_game() -> void:
+	SaveManager.save_game()
+
+
+func _load_game() -> void:
+	SaveManager.load_game()
 
 
 ## Apre un selettore file per scegliere un'immagine locale (una mappa salvata da Pinterest, Google

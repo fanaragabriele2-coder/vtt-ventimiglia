@@ -75,6 +75,9 @@ func _ready() -> void:
 	resized.connect(queue_redraw)
 	_build_walk_controls()
 	set_process(false)
+	# Un caricamento partita (SaveManager) o un futuro comando "moveTo" del Master aggiornano
+	# GameState direttamente: qui ci si limita a riflettere la posizione, non a ripubblicarla.
+	GameState.party_location_changed.connect(_on_party_location_changed)
 
 
 func _load_pois() -> void:
@@ -311,6 +314,22 @@ func _travel_to(index: int) -> void:
 	var p: Dictionary = _pois[index]
 	GameState.announce("➜ Il party si dirige verso " + String(p["name"]) + ". " + String(p.get("desc", "")))
 	party_traveled.emit(String(p["name"]), p)
+	queue_redraw()
+
+
+## GameState.party_location_changed e' cambiato da FUORI (caricamento partita, comando esterno): si
+## riallinea la posizione visibile senza ripubblicare (eviterebbe un loop, anche se innocuo).
+func _on_party_location_changed(location: Dictionary) -> void:
+	var poi_name: String = String(location.get("name", ""))
+	if poi_name.is_empty():
+		return
+	var idx: int = _index_of(poi_name)
+	if idx == _current_index:
+		return
+	_current_index = idx
+	_last_zone_index = idx
+	if _walk_mode and not _pois.is_empty():
+		_party_pixel_pos = _latlng_to_pixel(float(_pois[idx]["lat"]), float(_pois[idx]["lng"]))
 	queue_redraw()
 
 

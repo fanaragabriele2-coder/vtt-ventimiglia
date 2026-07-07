@@ -407,7 +407,12 @@ func hydrate_full_state(state: Dictionary) -> void:
 	for e: Variant in state.get("inventory", []):
 		if e is Dictionary:
 			_inventory.append((e as Dictionary).duplicate(true))
-	_spell_slots = (state.get("spellSlots", _spell_slots) as Dictionary).duplicate(true)
+	# Le chiavi di livello DEVONO restare int: se questo stato e' passato da un file di salvataggio
+	# (JSON), le chiavi tornano come String ("1", "2"...) — normalizza sempre con int(), altrimenti
+	# _spell_slots.has(level) con level int fallisce silenziosamente dopo un caricamento.
+	_spell_slots.clear()
+	for level_key: Variant in (state.get("spellSlots", {}) as Dictionary).keys():
+		_spell_slots[int(level_key)] = ((state["spellSlots"] as Dictionary)[level_key] as Dictionary).duplicate(true)
 	_spellbook.clear()
 	for s: Variant in state.get("spellbook", []):
 		if s is Dictionary:
@@ -460,3 +465,22 @@ func reset_snapshots() -> void:
 	_snapshots.clear()
 	_pending_kits.clear()
 	_current_owner_id = ""
+
+
+# --- Salvataggio partita (SaveManager): serve TUTTO, non solo l'inventario "vivo" del PG attivo,
+# altrimenti al caricamento si perderebbe lo zaino di chi non era attivo nell'istante del salvataggio. ---
+
+func get_save_state() -> Dictionary:
+	return {
+		"currentOwnerId": _current_owner_id,
+		"liveState": get_full_state(),
+		"snapshots": _snapshots.duplicate(true),
+		"pendingKits": _pending_kits.duplicate(true),
+	}
+
+
+func hydrate_save_state(state: Dictionary) -> void:
+	_snapshots = (state.get("snapshots", {}) as Dictionary).duplicate(true)
+	_pending_kits = (state.get("pendingKits", {}) as Dictionary).duplicate(true)
+	_current_owner_id = String(state.get("currentOwnerId", ""))
+	hydrate_full_state(state.get("liveState", {}))
