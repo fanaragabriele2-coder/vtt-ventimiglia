@@ -36,7 +36,9 @@ godot/
     │   │                             #   inventario PER-PG salvato/ripristinato in hotseat (Mod. 05/17)
     │   ├── armeria_manager.gd        # ArmeriaManager — rarità, drop scalati sulla forza (Mod. 41)
     │   ├── character_creation.gd     # CharacterCreation — calcolo PG, installa il party (Mod. 14)
-    │   └── progression_manager.gd    # ProgressionManager — XP, level-up, bottino (Modulo 15)
+    │   ├── progression_manager.gd    # ProgressionManager — XP, level-up, bottino (Modulo 15)
+    │   └── save_manager.gd           # SaveManager — salva/carica partita su user://saves/ (nuovo,
+    │                                 #   non presente nel monolite ne' nella prima migrazione)
     ├── combat/
     │   ├── combat_manager.gd         # CombatManager — turni, iniziativa, danni, spinta, posizioni (Mod. 05/24/26)
     │   ├── conditions_manager.gd     # ConditionsManager — prono/stordito/avvelenato (Modulo 30)
@@ -53,7 +55,7 @@ godot/
         ├── character_sheet_panel.gd  # sinistra: Scheda PG (HP, caratteristiche) ← CharacterManager
         ├── xp_bar.gd                 # sinistra: barra XP/livello/oro ← ProgressionManager
         ├── tactical_map.gd           # centro: griglia, nebbia, token, elevazione, superfici, click-to-move,
-        │                             #   sfondo mappa da immagine locale
+        │                             #   sfondo mappa da immagine locale, righello di misurazione
         ├── overworld_map.gd          # centro: overworld (POI reali, viaggio del party, modalità a
         │                             #   piedi con WASD + rilevamento zone)
         ├── combat_hud.gd             # centro-basso: HUD BG3 (Attacca/Spingi/Bonus/Termina turno)
@@ -93,7 +95,14 @@ godot/
      del solo click; avvicinarsi a un POI fa scattare da solo l'arrivo (narrazione automatica in
      chat), come lo zone-detection del monolite;
    - **🖼 Sfondo mappa** in toolbar: carica un'immagine locale (una mappa salvata da Pinterest, un
-     proprio disegno...) al posto della scacchiera generica sulla mappa tattica.
+     proprio disegno...) al posto della scacchiera generica sulla mappa tattica;
+   - sulla mappa tattica, tasto **destro tenuto premuto e trascina** = righello di misurazione
+     (celle + metri, live, stile Foundry); camminando sull'overworld puo' scattare un'**imboscata
+     casuale** (più probabile nelle zone selvatiche/militari), che passa subito alla mappa tattica;
+   - **💾 Salva** / **📂 Carica** in toolbar: la partita (party, inventario per-PG, XP/livello,
+     posizione) si salva su disco (`user://saves/`) e si ricarica in qualunque momento fuori
+     combattimento; alla schermata iniziale compare anche **📂 Carica partita salvata**, se esiste
+     un salvataggio, per saltare del tutto la creazione del personaggio.
 4. Per il Master IA, nella colonna destra scegli il provider:
    - **🖧 Ollama (LAN)**: scrivi l'**IP della 5080** (es. `192.168.1.50`) → *Imposta*;
    - **☁ Groq (cloud)**: incolla la tua **API key Groq** (gratuita su console.groq.com) → *Imposta* —
@@ -124,7 +133,7 @@ più in basso usano quelli sopra al loro `_ready()`):
 1. `GameState` 2. `CharacterManager` 3. `InventoryManager` 4. `ArmeriaManager`
 5. `CharacterCreation` 6. `CombatManager` 7. `ProgressionManager` 8. `ConditionsManager`
 9. `FlankingSystem` 10. `ElevationManager` 11. `SurfacesManager` 12. `EnemyAI`
-13. `EncounterBalancer` 14. `ActionMenuManager` 15. `AIBridge`
+13. `EncounterBalancer` 14. `ActionMenuManager` 15. `AIBridge` 16. `SaveManager`
 
 Se non compaiono (progetto importato senza leggere il `.godot`), aggiungili a mano: Project
 Settings → Autoload → *Path* = lo script, *Node Name* = il nome sopra → **Add**.
@@ -141,8 +150,8 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   (Task 4 del monolite), **TTS/STT**, **overworld con tile reali** (qui è stilizzata — la modalità a
   piedi cammina sulla proiezione stilizzata, non su Leaflet/OSM), **multiplayer** (relay/Supabase):
   non ancora portati.
-- **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio, salvataggi) e il
-  **Sistema dropdown** del monolite (autodiagnosi moduli, "modalità console"): non portati — in
+- **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio) e il **Sistema
+  dropdown** del monolite (autodiagnosi moduli, "modalità console"): non portati — in
   Godot un eventuale problema di script lo segnala l'editor stesso, non serve un pannello dedicato.
 - **Incontri casuali durante la camminata**: la modalità a piedi rileva le zone e narra gli arrivi,
   ma non fa comparire nemici da sola mentre cammini (`VTTCampagna.spawnEnemyNearPg` del monolite
@@ -155,7 +164,7 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 27 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 28 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)
