@@ -35,6 +35,7 @@ CampaignMemory="*res://scripts/autoload/campaign_memory.gd"
 LocalGameManager="*res://scripts/autoload/local_game_manager.gd"
 LocalInputManager="*res://scripts/autoload/local_input_manager.gd"
 AIBridge="*res://scripts/network/ai_bridge.gd"
+ChatCombatBridge="*res://scripts/combat/chat_combat_bridge.gd"
 DiceServer="*res://scripts/network/dice_server.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 
