@@ -15,7 +15,7 @@ Godot 4.3+ (`Import` → seleziona `godot/project.godot`).
 
 ```
 godot/
-├── project.godot                     # 17 autoload (ordine di dipendenza) + scena principale
+├── project.godot                     # 21 autoload (ordine di dipendenza) + scena principale
 ├── main.tscn                         # scena principale (root Control + vtt_main.gd)
 ├── scenes/nexus_demo.tscn            # scena standalone del Nexus Map Engine (prova i dungeon da soli)
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
@@ -139,7 +139,8 @@ più in basso usano quelli sopra al loro `_ready()`):
 1. `EventBus` 2. `GameState` 3. `CharacterManager` 4. `InventoryManager` 5. `ArmeriaManager`
 6. `CharacterCreation` 7. `CombatManager` 8. `ProgressionManager` 9. `ConditionsManager`
 10. `FlankingSystem` 11. `ElevationManager` 12. `SurfacesManager` 13. `EnemyAI`
-14. `EncounterBalancer` 15. `ActionMenuManager` 16. `AIBridge` 17. `SaveManager`
+14. `EncounterBalancer` 15. `ActionMenuManager` 16. `CampaignMemory` 17. `LocalGameManager`
+18. `LocalInputManager` 19. `AIBridge` 20. `DiceServer` 21. `SaveManager`
 
 Se non compaiono (progetto importato senza leggere il `.godot`), aggiungili a mano: Project
 Settings → Autoload → *Path* = lo script, *Node Name* = il nome sopra → **Add**.
@@ -186,9 +187,10 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 - **Incontri casuali durante la camminata**: la modalità a piedi rileva le zone e narra gli arrivi,
   ma non fa comparire nemici da sola mentre cammini (`VTTCampagna.spawnEnemyNearPg` del monolite
   era comunque pilotato dal Master IA, non casuale in autonomia).
-- **Memoria di campagna per il Master IA** (Moduli 29/32) e **ponte chat→combattimento/mappa**
-  (Modulo 34/39 lato parsing automatico della narrazione): `AIBridge` esegue già i comandi
-  strutturati (`<<DATI>>`) ma non estrae ancora spawn/spostamenti dalla sola prosa libera.
+- **Ponte chat→combattimento/mappa** (Modulo 34/39 lato parsing automatico della narrazione):
+  `AIBridge` esegue già i comandi strutturati (`<<DATI>>`) ma non estrae ancora spawn/spostamenti
+  dalla sola prosa libera. (La **memoria di campagna** dei Moduli 29/32 invece ORA C'È:
+  `CampaignMemory` registra gli eventi chiave e li inietta nel prompt del Master.)
 
 ## Nota sulla verifica
 

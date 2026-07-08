@@ -61,6 +61,7 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 		"progression": ProgressionManager.get_save_state(),
 		"partyLocation": GameState.get_party_location(),
 		"nexus": nexus_stato if nexus_stato is Dictionary else {},
+		"campaignMemory": CampaignMemory.get_save_state(),
 	}
 	var f: FileAccess = FileAccess.open(_slot_path(slot_name), FileAccess.WRITE)
 	if f == null:
@@ -91,6 +92,7 @@ func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	# corretti quando si ridisegnano, non i valori di default di una sessione nuova.
 	ProgressionManager.hydrate_save_state(state.get("progression", {}))
 	InventoryManager.hydrate_save_state(state.get("inventory", {}))
+	CampaignMemory.hydrate_save_state(state.get("campaignMemory", []))
 	CharacterManager.hydrate_party(state.get("character", {}))
 	var location: Variant = state.get("partyLocation")
 	if location is Dictionary and location.has("name"):

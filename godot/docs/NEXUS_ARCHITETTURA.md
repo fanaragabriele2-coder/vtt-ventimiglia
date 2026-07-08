@@ -111,7 +111,8 @@ MapData (Resource)                          ← evoluzione del Dictionary gia' i
 | **3-resto** | Muri alti 32x64 veri (per ora: muro bicolore faccia/cima — servono tile artistici) + `MapData` come Resource formale (per ora resta il Dictionary del generatore, che gia' funziona) | 🔧 |
 | **4 (rete)** | ~~Seed-sync host-authoritative su WebSocket/Supabase~~ — **ANNULLATA**: cambio di direzione, il VTT e' LOCALE (un solo PC su uno schermo al centro del tavolo) | ✖ |
 | **4-locale** | Local UX: input centralizzato (`LocalInputManager` — il Master muove qualsiasi token, i giocatori solo il party), hotseat "passa il mouse" (`LocalGameManager`), un token per membro del party, **visione di GRUPPO** (fog = unione dei campi visivi di tutti i token del party) | ✅ |
-| **4-locale-resto** | UI asimmetrica: tiri di dado dai telefoni dei giocatori verso il PC via server HTTP locale (`TCPServer`/`HTTPServer` in ascolto sulla LAN + pagina web minimale). Progettata, NON ancora costruita | 🔧 |
+| **4-locale-resto** | UI asimmetrica: tiri di dado dai telefoni via server HTTP locale (`DiceServer` su TCPServer, porta 8383, pagina web inline; tiro autorevole lato PC, risultato in chat) | ✅ |
+| **5 (memoria)** | Diario di campagna per il Master IA (`CampaignMemory`, Moduli 29/32-lite): eventi chiave nel system prompt + posizioni reali dei combattenti nel payload | ✅ |
 
 ## Direzione locale (couch play) — nota d'architettura
 

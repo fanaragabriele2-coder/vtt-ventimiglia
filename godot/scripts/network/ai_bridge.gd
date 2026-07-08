@@ -126,12 +126,36 @@ func _build_system_prompt() -> String:
 		"SCHEDE DEI PERSONAGGI DEL PARTY (gia note, tienine conto — HP, CA e caratteristiche REALI, NON chiedere presentazioni):",
 		CharacterManager.party_context_text(),
 		"",
+		"DIARIO DI CAMPAGNA (eventi chiave accaduti finora — la tua memoria a lungo termine):",
+		CampaignMemory.contesto_testo(),
+		"",
+		"POSIZIONI ATTUALI (aggiornate dal gioco, non inventarne altre):",
+		_posizioni_context_text(),
+		"",
 		"Se e SOLO se serve segnalare un dato di gioco (tiro, comparsa nemici, danno...), aggiungi",
 		"SUBITO DOPO la narrazione, su una riga a parte, ESATTAMENTE questo separatore: " + SEPARATORE_DATI_MASTER,
 		"e dopo di esso un array JSON di comandi, es:",
 		SEPARATORE_DATI_MASTER,
 		'[{"command":"addNpc","id":"goblin","count":2},{"command":"startCombat"}]',
 	])
+
+
+## Snapshot delle posizioni per il Master: luogo del party sull'overworld + celle e HP dei
+## combattenti sulla griglia (il payload "game_state aggiornato" della direttiva AI Bridge).
+func _posizioni_context_text() -> String:
+	var righe: PackedStringArray = []
+	var luogo: Variant = GameState.get_party_location()
+	if luogo is Dictionary and (luogo as Dictionary).has("name"):
+		righe.append("- Party (Ventimiglia): " + String((luogo as Dictionary)["name"]))
+	var stato: Dictionary = CombatManager.get_state()
+	for c: Dictionary in stato["combatants"]:
+		var cella: Variant = CombatManager.get_combatant_cell(String(c["id"]))
+		if cella is Vector2i:
+			righe.append("- %s: cella (%d, %d), HP %d/%d" % [
+				String(c["name"]), (cella as Vector2i).x, (cella as Vector2i).y,
+				int(c["hitPoints"]), int(c["maxHitPoints"]),
+			])
+	return "\n".join(righe) if not righe.is_empty() else "- nessuna posizione tracciata al momento"
 
 
 func _build_messages(user_text: String) -> Array:

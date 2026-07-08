@@ -12,6 +12,7 @@ var _view_tactical_btn: Button
 var _view_overworld_btn: Button
 var _view_nexus_btn: Button
 var _ai_toggle_btn: Button
+var _dadi_telefono_btn: Button
 var _background_dialog: FileDialog
 
 
@@ -147,10 +148,22 @@ func _build_toolbar() -> PanelContainer:
 	_ai_toggle_btn = _toolbar_button("🐺 IA Nemica: ON", _toggle_enemy_ai)
 	row.add_child(_ai_toggle_btn)
 	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
+	_dadi_telefono_btn = _toolbar_button("📱 Dadi: OFF", _toggle_dice_server)
+	row.add_child(_dadi_telefono_btn)
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
 	row.add_child(_toolbar_button("💾 Salva", _save_game))
 	row.add_child(_toolbar_button("📂 Carica", _load_game))
 	return panel
+
+
+## UI asimmetrica: accende/spegne il mini server HTTP dei dadi (i giocatori tirano dal telefono,
+## il risultato compare in chat; l'indirizzo da digitare viene annunciato in chat all'accensione).
+func _toggle_dice_server() -> void:
+	if DiceServer.e_attivo():
+		DiceServer.ferma()
+	else:
+		DiceServer.avvia()
+	_dadi_telefono_btn.text = "📱 Dadi: ON" if DiceServer.e_attivo() else "📱 Dadi: OFF"
 
 
 func _save_game() -> void:
