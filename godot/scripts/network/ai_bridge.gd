@@ -37,10 +37,9 @@ const SEPARATORE_DATI_MASTER: String = "<<DATI>>"
 # La API key NON e' MAI scritta nel codice sorgente (sarebbe un segreto in chiaro nel repository):
 # l'utente la incolla una volta nella Chat Master, e da li' in poi vive SOLO in user://ai_bridge.cfg
 # (un file locale sulla macchina di chi gioca, fuori dal progetto Godot e dal controllo versione).
-const GROQ_HOST: String = "api.groq.com"
-const GROQ_PORT: int = 443
-const GROQ_PATH: String = "/openai/v1/chat/completions"
+const GROQ_URL: String = "https://api.groq.com/openai/v1/chat/completions"
 const GROQ_MODEL: String = "llama-3.3-70b-versatile"
+const GROQ_MODEL_FALLBACK: String = "llama-3.1-8b-instant"  # riserva se il primario e' ritirato (404)
 
 var _host: String = DEFAULT_HOST
 var _port: int = DEFAULT_PORT
@@ -195,6 +194,10 @@ func _send_ollama_prompt(user_text: String) -> void:
 		_fail("Il Master non ha risposto (nessuna risposta dal server).")
 		return
 	var code: int = http.get_response_code()
+	if code == 404:
+		# Ollama risponde 404 su /api/chat quasi sempre perche' il MODELLO non e' installato.
+		_fail("HTTP 404 da Ollama: il modello '%s' non risulta installato sul server. Sul PC del Master esegui:  ollama pull %s  — oppure passa al Master Groq (cloud)." % [_model, _model])
+		return
 	if code < 200 or code >= 300:
 		_fail("Il Master ha risposto con errore HTTP %d." % code)
 		return
@@ -228,71 +231,75 @@ func _send_ollama_prompt(user_text: String) -> void:
 
 
 ## Invia il prompt al Master via Groq cloud (porting di fetchGroqMasterReply, js/12): niente
-## streaming (l'API Groq qui e' chiamata con "stream": false, come nel monolite), un'unica
-## risposta JSON con .choices[0].message.content.
-func _send_groq_prompt(user_text: String) -> void:
+## streaming ("stream": false, come nel monolite), un'unica risposta con .choices[0].message.content.
+##
+## FIX 404: trasporto con il nodo HTTPRequest (TLS/redirect/corpo gestiti dall'engine) al posto
+## dell'HTTPClient scritto a mano; in caso di errore HTTP si MOSTRA il messaggio vero restituito
+## da Groq (il corpo spiega sempre il motivo: key, modello, quota); se il 404 viene da un modello
+## ritirato, si ritenta UNA volta col modello di riserva.
+func _send_groq_prompt(user_text: String, modello_forzato: String = "") -> void:
 	if not has_groq_key():
 		_fail("Inserisci la tua Groq API key (gratuita su console.groq.com) per usare il Master Groq.")
 		return
+	var modello: String = modello_forzato if not modello_forzato.is_empty() else GROQ_MODEL
 
-	var http := HTTPClient.new()
-	var err: int = http.connect_to_host(GROQ_HOST, GROQ_PORT, TLSOptions.client())
-	if err != OK:
-		_fail("Connessione a Groq fallita.")
-		return
-
-	while http.get_status() == HTTPClient.STATUS_CONNECTING or http.get_status() == HTTPClient.STATUS_RESOLVING:
-		http.poll()
-		await get_tree().process_frame
-	if http.get_status() != HTTPClient.STATUS_CONNECTED:
-		_fail("Impossibile raggiungere Groq (controlla la connessione internet).")
-		return
-
+	var req := HTTPRequest.new()
+	add_child(req)
 	var body: String = JSON.stringify({
-		"model": GROQ_MODEL, "stream": false, "temperature": 0.85, "max_tokens": 700,
+		"model": modello, "stream": false, "temperature": 0.85, "max_tokens": 700,
 		"messages": _build_messages(user_text),
 	})
-	var headers: PackedStringArray = [
+	var headers := PackedStringArray([
 		"Content-Type: application/json", "Authorization: Bearer " + _groq_api_key,
-	]
-	err = http.request(HTTPClient.METHOD_POST, GROQ_PATH, headers, body)
+	])
+	var err: int = req.request(GROQ_URL, headers, HTTPClient.METHOD_POST, body)
 	if err != OK:
-		_fail("Invio della richiesta a Groq fallito.")
+		req.queue_free()
+		_fail("Invio della richiesta a Groq fallito (errore %d)." % err)
 		return
 
-	while http.get_status() == HTTPClient.STATUS_REQUESTING:
-		http.poll()
-		await get_tree().process_frame
-
-	if not http.has_response():
-		_fail("Groq non ha risposto.")
+	var esito: Array = await req.request_completed
+	req.queue_free()
+	var risultato: int = esito[0]
+	if risultato != HTTPRequest.RESULT_SUCCESS:
+		_fail("Groq non raggiungibile (errore di rete %d): controlla la connessione internet." % risultato)
 		return
-	var code: int = http.get_response_code()
-	if code == 401:
+	_gestisci_risposta_groq(user_text, modello_forzato, int(esito[1]), (esito[3] as PackedByteArray))
+
+
+## Seconda meta' della chiamata Groq: interpreta codice HTTP + corpo. Separata per leggibilita'
+## (le guardie d'errore sono tante: key, modello ritirato, quota, corpo vuoto).
+func _gestisci_risposta_groq(user_text: String, modello_forzato: String, codice: int, grezzo: PackedByteArray) -> void:
+	var testo: String = grezzo.get_string_from_utf8()
+	if codice == 404 and modello_forzato.is_empty():
+		# 404 da Groq = quasi sempre modello ritirato/rinominato: riprova col modello di riserva.
+		master_chunk.emit("(modello non disponibile, passo a %s…) " % GROQ_MODEL_FALLBACK)
+		_send_groq_prompt(user_text, GROQ_MODEL_FALLBACK)
+		return
+	if codice == 401:
 		_fail("API key Groq non valida (401). Reinseriscila nel pannello Master.")
 		return
-	if code < 200 or code >= 300:
-		_fail("Groq ha risposto con errore HTTP %d." % code)
+	if codice < 200 or codice >= 300:
+		_fail("Groq HTTP %d: %s" % [codice, _errore_api_leggibile(testo)])
 		return
-
-	var raw: PackedByteArray = PackedByteArray()
-	while http.get_status() == HTTPClient.STATUS_BODY:
-		http.poll()
-		var chunk: PackedByteArray = http.read_response_body_chunk()
-		if chunk.is_empty():
-			await get_tree().process_frame
-			continue
-		raw.append_array(chunk)
-	http.close()
-
-	var parsed: Variant = JSON.parse_string(raw.get_string_from_utf8())
-	var content: String = _extract_groq_content(parsed)
+	var content: String = _extract_groq_content(JSON.parse_string(testo))
 	if content.is_empty():
-		_fail("Groq ha risposto senza contenuto.")
+		_fail("Groq ha risposto senza contenuto: " + _errore_api_leggibile(testo))
 		return
 	var split: Dictionary = _separate_narration_and_data(content)
 	master_chunk.emit(String(split["narration"]))
 	_finish(user_text, content)
+
+
+## Estrae il messaggio leggibile dal corpo JSON di un errore API ({"error":{"message":...}}).
+func _errore_api_leggibile(testo: String) -> String:
+	var parsed: Variant = JSON.parse_string(testo)
+	if parsed is Dictionary and (parsed as Dictionary).has("error"):
+		var e: Variant = (parsed as Dictionary)["error"]
+		if e is Dictionary and (e as Dictionary).has("message"):
+			return String((e as Dictionary)["message"])
+		return str(e)
+	return testo.substr(0, 200)
 
 
 func _extract_groq_content(parsed: Variant) -> String:

@@ -31,6 +31,8 @@ SurfacesManager="*res://scripts/combat/surfaces_manager.gd"
 EnemyAI="*res://scripts/combat/enemy_ai.gd"
 EncounterBalancer="*res://scripts/combat/encounter_balancer.gd"
 ActionMenuManager="*res://scripts/combat/action_menu_manager.gd"
+LocalGameManager="*res://scripts/autoload/local_game_manager.gd"
+LocalInputManager="*res://scripts/autoload/local_input_manager.gd"
 AIBridge="*res://scripts/network/ai_bridge.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 

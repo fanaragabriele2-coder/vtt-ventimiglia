@@ -109,4 +109,14 @@ MapData (Resource)                          ← evoluzione del Dictionary gia' i
 | **2** | Occluder nel TileSet + fog a doppio canale con shader + AStarGrid2D + `valida_movimento` unico | ✅ |
 | **3** | Tetti a scomparsa per stanza + multi-livello con scale + save seme+delta | ✅ |
 | **3-resto** | Muri alti 32x64 veri (per ora: muro bicolore faccia/cima — servono tile artistici) + `MapData` come Resource formale (per ora resta il Dictionary del generatore, che gia' funziona) | 🔧 |
-| **4** | Rete seed-sync host-authoritative su WebSocket/Supabase | 🔧 |
+| **4 (rete)** | ~~Seed-sync host-authoritative su WebSocket/Supabase~~ — **ANNULLATA**: cambio di direzione, il VTT e' LOCALE (un solo PC su uno schermo al centro del tavolo) | ✖ |
+| **4-locale** | Local UX: input centralizzato (`LocalInputManager` — il Master muove qualsiasi token, i giocatori solo il party), hotseat "passa il mouse" (`LocalGameManager`), un token per membro del party, **visione di GRUPPO** (fog = unione dei campi visivi di tutti i token del party) | ✅ |
+| **4-locale-resto** | UI asimmetrica: tiri di dado dai telefoni dei giocatori verso il PC via server HTTP locale (`TCPServer`/`HTTPServer` in ascolto sulla LAN + pagina web minimale). Progettata, NON ancora costruita | 🔧 |
+
+## Direzione locale (couch play) — nota d'architettura
+
+Il salvataggio "seme+delta" e il cancello unico `valida_movimento` progettati per la rete NON sono
+sprecati: sono esattamente cio' che serve anche in locale (persistenza su disco, coerenza dei
+movimenti fra giocatore/IA/Master). La visione per-client e' diventata visione di GRUPPO: una sola
+fog condivisa sullo schermo comune, unione dei campi visivi del party — meno lavoro, esperienza
+giusta per il tavolo.

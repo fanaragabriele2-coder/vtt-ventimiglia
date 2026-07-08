@@ -78,7 +78,7 @@ var _fog_per_livello: Array[PackedByteArray] = []
 var _livello_corrente: int = 0
 var _tema_corrente: String = "cripta"
 var _seme_base: int = 0
-var _ultima_cella_party: Vector2i = Vector2i.ZERO
+var _ultime_celle_party: Array[Vector2i] = []
 var _tetti: Array[TileMapLayer] = []
 var _tetti_stanze: Array[Rect2i] = []
 var _tetti_alpha: Array[float] = []
@@ -88,7 +88,6 @@ var _luce_tex: Texture2D
 var _token_tex: Texture2D
 var _dati: Dictionary = {}
 var _tokens: Dictionary = {}      # combatant_id -> Node2D
-var _pc_light: PointLight2D
 var _camera: VTTCamera
 
 
@@ -245,7 +244,6 @@ func _applica_livello() -> void:
 	_dipingi_layers()
 	_costruisci_tetti()
 	_piazza_luci_torce()
-	_piazza_luce_party()
 	_ricostruisci_astar()
 	_inizializza_fog()
 	if _camera:
@@ -267,7 +265,6 @@ func _pulisci() -> void:
 		for figlio: Node in gruppo.get_children():
 			figlio.queue_free()
 	_tokens.clear()
-	_pc_light = null
 
 
 func _dipingi_layers() -> void:
@@ -309,9 +306,14 @@ func _costruisci_tetti() -> void:
 		_tetti_alpha.append(1.0)
 
 
-func _aggiorna_tetti(cella_party: Vector2i) -> void:
+## Il tetto di una stanza svanisce se QUALSIASI membro del party e' dentro (visione di gruppo).
+func _aggiorna_tetti(celle_party: Array[Vector2i]) -> void:
 	for i: int in range(_tetti.size()):
-		var dentro: bool = _tetti_stanze[i].has_point(cella_party)
+		var dentro: bool = false
+		for cella: Vector2i in celle_party:
+			if _tetti_stanze[i].has_point(cella):
+				dentro = true
+				break
 		var alpha_target: float = 0.0 if dentro else 1.0
 		if not is_equal_approx(_tetti_alpha[i], alpha_target):
 			_tetti_alpha[i] = alpha_target
@@ -350,7 +352,7 @@ func cambia_livello_via_scala(direzione: int) -> Vector2i:
 	_livello_corrente = destinazione
 	_applica_livello()
 	var arrivo: Vector2i = _dati.get("scala_su" if direzione > 0 else "scala_giu", _dati.get("spawn", Vector2i(2, 2)))
-	aggiorna_visione(arrivo)
+	# La visione la ricalcola la vista DOPO aver ripiazzato i token del party (visione di gruppo).
 	if _camera:
 		_camera.centra_su(_centro_cella(arrivo))
 	return arrivo
@@ -359,7 +361,7 @@ func cambia_livello_via_scala(direzione: int) -> Vector2i:
 # --- Salvataggio "seme+delta" (Fase 3): il mondo si rigenera dal seme, si persiste solo il resto ---
 
 ## Pubblica in GameState lo stato minimo per ricostruire il dungeon: tema+seme (rigenerano le mappe
-## identiche al bit), fog esplorata per livello (il "delta"), livello e cella del party. SaveManager
+## identiche al bit), fog esplorata per livello (il "delta"), livello e celle del party. SaveManager
 ## lo raccoglie da li' senza conoscere questo nodo (disaccoppiamento).
 func _pubblica_stato_salvataggio() -> void:
 	if _livelli.is_empty():
@@ -368,16 +370,19 @@ func _pubblica_stato_salvataggio() -> void:
 	var fogs: Array[String] = []
 	for f: PackedByteArray in _fog_per_livello:
 		fogs.append(Marshalls.raw_to_base64(f) if not f.is_empty() else "")
+	var celle_party: Array = []
+	for c: Vector2i in _ultime_celle_party:
+		celle_party.append([c.x, c.y])
 	GameState.set_value("nexus.save", {
 		"tema": _tema_corrente, "seme": _seme_base, "livelli": _livelli.size(),
 		"livelloCorrente": _livello_corrente, "fog": fogs,
-		"partyCell": [_ultima_cella_party.x, _ultima_cella_party.y],
+		"partyCells": celle_party,
 	})
 
 
 ## Ricostruisce il complesso da uno stato salvato: rigenera dal seme, poi riapplica i delta
-## (fog esplorata, livello corrente). Ritorna la cella dove rimettere il token del party.
-func ripristina_da_salvataggio(stato: Dictionary) -> Vector2i:
+## (fog esplorata, livello corrente). Ritorna le celle dove rimettere i token del party.
+func ripristina_da_salvataggio(stato: Dictionary) -> Array[Vector2i]:
 	genera_dungeon(String(stato.get("tema", "cripta")), int(stato.get("seme", 0)), int(stato.get("livelli", 2)))
 	var fogs: Array = stato.get("fog", [])
 	for i: int in range(mini(fogs.size(), _fog_per_livello.size())):
@@ -390,12 +395,18 @@ func ripristina_da_salvataggio(stato: Dictionary) -> Vector2i:
 		_applica_livello()
 	else:
 		_inizializza_fog()  # ricarica la fog del livello 0 appena ripristinata
-	var pc_raw: Array = stato.get("partyCell", [])
-	var pc: Vector2i = Vector2i(int(pc_raw[0]), int(pc_raw[1])) if pc_raw.size() == 2 else _dati.get("spawn", Vector2i(2, 2))
-	aggiorna_visione(pc)
+	var celle: Array[Vector2i] = []
+	for e: Variant in stato.get("partyCells", []):
+		if e is Array and (e as Array).size() == 2:
+			celle.append(Vector2i(int(e[0]), int(e[1])))
+	# Retrocompatibilita' coi salvataggi a cella singola ("partyCell").
+	if celle.is_empty():
+		var pc_raw: Array = stato.get("partyCell", [])
+		celle.append(Vector2i(int(pc_raw[0]), int(pc_raw[1])) if pc_raw.size() == 2 else _dati.get("spawn", Vector2i(2, 2)))
+	aggiorna_visione_multipla(celle)
 	if _camera:
-		_camera.centra_su(_centro_cella(pc))
-	return pc
+		_camera.centra_su(_centro_cella(celle[0]))
+	return celle
 
 
 func _piazza_luci_torce() -> void:
@@ -427,18 +438,11 @@ func _nuova_luce(colore: Color, energia: float, scala: float) -> PointLight2D:
 	return luce
 
 
-## Luce di vista del party (bianca, ampia): segue il token del PG e con le ombre dei muri crea la
-## nebbia di guerra per linea di vista. Piazzata sulla cella di spawn del dungeon.
-func _piazza_luce_party() -> void:
-	_pc_light = _nuova_luce(Color(0.9, 0.92, 1.0), 1.2, 5.0)
-	_pc_light.position = _centro_cella(_dati.get("spawn", Vector2i(2, 2)))
-	_lights.add_child(_pc_light)
-
-
 # --- Token (Y-sortati) ---
 
-## Crea un token visivo sulla mappa e (per i PG) ci aggancia la luce di vista. Non tocca le regole:
-## la registrazione del combattente resta a CombatManager, qui c'e' solo la rappresentazione.
+## Crea un token visivo sulla mappa. Ogni PG porta la PROPRIA luce di vista (visione di gruppo:
+## con piu' membri sparsi, l'illuminazione a schermo E' gia' l'unione delle loro viste — le ombre
+## le tagliano i muri). Non tocca le regole: il combattente resta a CombatManager.
 func spawn_token(combatant_id: String, cell: Vector2i, is_pc: bool, colore: Color) -> void:
 	var token := Sprite2D.new()
 	token.texture = _token_tex
@@ -446,13 +450,30 @@ func spawn_token(combatant_id: String, cell: Vector2i, is_pc: bool, colore: Colo
 	token.position = _centro_cella(cell)
 	_tokens_root.add_child(token)
 	_tokens[combatant_id] = token
-	if is_pc and _pc_light:
-		# La vista segue il PG: riattacca la luce del party a questo token.
-		if _pc_light.get_parent():
-			_pc_light.get_parent().remove_child(_pc_light)
-		token.add_child(_pc_light)
-		_pc_light.position = Vector2.ZERO
+	if is_pc:
+		token.add_child(_nuova_luce(Color(0.9, 0.92, 1.0), 1.1, 4.2))
 	EventBus.nexus_token_spawned.emit(combatant_id, cell)
+
+
+## Id del token che occupa la cella ("" se libera). Le posizioni si derivano dagli sprite: nessuna
+## seconda mappa di stato da tenere sincronizzata.
+func token_in_cella(cell: Vector2i) -> String:
+	for id: String in _tokens.keys():
+		if mondo_a_cella((_tokens[id] as Node2D).position) == cell:
+			return id
+	return ""
+
+
+func cella_di_token(token_id: String) -> Vector2i:
+	if not _tokens.has(token_id):
+		return Vector2i(-1, -1)
+	return mondo_a_cella((_tokens[token_id] as Node2D).position)
+
+
+## Evidenzia il token selezionato dal tavolo (leggermente ingrandito); "" per azzerare tutti.
+func evidenzia_token(token_id: String) -> void:
+	for id: String in _tokens.keys():
+		(_tokens[id] as Node2D).scale = Vector2(1.25, 1.25) if id == token_id else Vector2.ONE
 
 
 func muovi_token(combatant_id: String, cell: Vector2i) -> void:
@@ -590,26 +611,37 @@ func _inizializza_fog() -> void:
 	_fog_sprite.texture = ImageTexture.create_from_image(_fog_image)
 
 
-## Ricalcola la linea di vista dalla cella data (event-driven: SOLO quando il party si muove, mai
-## per frame). Raggi di Bresenham verso ogni cella nel raggio di visione: i muri bloccano; le celle
-## viste entrano per sempre nella memoria dell'esplorato.
+## Visione singola: scorciatoia per la visione di gruppo con un'unica origine.
 func aggiorna_visione(origine: Vector2i) -> void:
-	if _dati.is_empty() or not in_mappa(origine):
+	var origini: Array[Vector2i] = [origine]
+	aggiorna_visione_multipla(origini)
+
+
+## VISIONE DI GRUPPO (tavolo condiviso, direttiva locale): la nebbia mostrata sullo schermo
+## centrale e' l'UNIONE dei campi visivi di TUTTI i token del party — non una vista per client.
+## Event-driven: si ricalcola SOLO quando un token del party si muove, mai per frame. Per ogni
+## origine, raggi di Bresenham verso le celle nel raggio di visione; i muri bloccano; le celle
+## viste da CHIUNQUE entrano per sempre nella memoria comune dell'esplorato.
+func aggiorna_visione_multipla(origini: Array[Vector2i]) -> void:
+	if _dati.is_empty() or origini.is_empty():
 		return
 	var w: int = int(_dati["larghezza"])
 	var visibili: Dictionary = {}
-	for dy: int in range(-RAGGIO_VISIONE, RAGGIO_VISIONE + 1):
-		for dx: int in range(-RAGGIO_VISIONE, RAGGIO_VISIONE + 1):
-			if dx * dx + dy * dy > RAGGIO_VISIONE * RAGGIO_VISIONE:
-				continue  # cerchio, non quadrato
-			var c := Vector2i(origine.x + dx, origine.y + dy)
-			if in_mappa(c) and _linea_vista_libera(origine, c):
-				var idx: int = c.y * w + c.x
-				visibili[idx] = true
-				_fog_esplorata[idx] = 1
+	for origine: Vector2i in origini:
+		if not in_mappa(origine):
+			continue
+		for dy: int in range(-RAGGIO_VISIONE, RAGGIO_VISIONE + 1):
+			for dx: int in range(-RAGGIO_VISIONE, RAGGIO_VISIONE + 1):
+				if dx * dx + dy * dy > RAGGIO_VISIONE * RAGGIO_VISIONE:
+					continue  # cerchio, non quadrato
+				var c := Vector2i(origine.x + dx, origine.y + dy)
+				if in_mappa(c) and _linea_vista_libera(origine, c):
+					var idx: int = c.y * w + c.x
+					visibili[idx] = true
+					_fog_esplorata[idx] = 1
 	_ridisegna_fog(visibili)
-	_ultima_cella_party = origine
-	_aggiorna_tetti(origine)         # entrando in una stanza, il suo tetto svanisce
+	_ultime_celle_party = origini.duplicate()
+	_aggiorna_tetti(origini)         # una stanza col party dentro perde il tetto
 	_pubblica_stato_salvataggio()    # stato sempre pronto per SaveManager (seme+delta)
 
 
