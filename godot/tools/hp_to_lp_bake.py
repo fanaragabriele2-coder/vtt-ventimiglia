@@ -29,6 +29,7 @@ import bpy
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     p = argparse.ArgumentParser(description="Bake HP->LP per la pipeline Blender->Godot")
+    p.add_argument("--blend", default="", help="Apri questo .blend prima del bake (necessario col modulo pip bpy; superfluo con blender -b file.blend)")
     p.add_argument("--hp", required=True, help="Nome oggetto (o piu' nomi separati da virgola) High Poly")
     p.add_argument("--lp", required=True, help="Nome oggetto Low Poly (bersaglio del bake)")
     p.add_argument("--out", required=True, help="Cartella di output delle texture")
@@ -38,7 +39,9 @@ def parse_args():
     p.add_argument("--maps", default="basecolor,normal,ao,roughness",
                    help="Mappe da bakare, separate da virgola (basecolor,normal,ao,roughness,metallic)")
     p.add_argument("--cage", default="", help="Nome oggetto gabbia (opzionale)")
-    p.add_argument("--extrusion", type=float, default=0.05, help="Cage extrusion (default 0.05)")
+    p.add_argument("--extrusion", type=float, default=0.1, help="Cage extrusion (default 0.1)")
+    p.add_argument("--ray-dist", type=float, default=0.5, dest="ray_dist",
+                   help="Distanza massima dei raggi di bake (default 0.5; 0 = illimitata)")
     p.add_argument("--samples", type=int, default=32, help="Sample Cycles per il bake (default 32)")
     p.add_argument("--gpu", action="store_true", help="Usa la GPU se disponibile")
     p.add_argument("--smoothness", action="store_true", help="Genera anche <asset>_smoothness.png (roughness invertita)")
@@ -94,6 +97,7 @@ def setup_cycles(args):
     b.use_selected_to_active = True
     b.margin = args.margin
     b.cage_extrusion = args.extrusion
+    b.max_ray_distance = args.ray_dist
     if args.cage:
         cage = bpy.data.objects.get(args.cage)
         if cage is None:
@@ -229,7 +233,7 @@ def bake_mappa(mappa, args, hp_list, lp, mats, outdir):
         bpy.context.scene.render.bake.use_pass_direct = False
         bpy.context.scene.render.bake.use_pass_indirect = False
         bpy.context.scene.render.bake.use_pass_color = True
-        bpy.ops.object.bake(type="DIFFUSE")
+        bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"})
     elif mappa == "normal":
         bpy.ops.object.bake(type="NORMAL")
     elif mappa == "ao":
@@ -285,6 +289,8 @@ def genera_orm(immagini, args, outdir):
 
 def main():
     args = parse_args()
+    if args.blend:
+        bpy.ops.wm.open_mainfile(filepath=os.path.abspath(args.blend))
     outdir = os.path.abspath(bpy.path.abspath(args.out))
     os.makedirs(outdir, exist_ok=True)
 

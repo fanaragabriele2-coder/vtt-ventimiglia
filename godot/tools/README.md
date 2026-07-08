@@ -52,7 +52,25 @@ blender -b art/blender/statua.blend --python godot/tools/hp_to_lp_bake.py -- \
   ripristinato); `--smoothness` = roughness invertita; `--pack-orm` = R:AO / G:Roughness /
   B:Metallic (convenzione glTF, la stessa che Godot legge nativamente).
 - Naming output: `<asset>_<mappa>.png` in `art/textures/`.
-- Lo script è verificato a livello di sintassi; il primo bake reale fallo su un asset piccolo.
+- **Collaudato end-to-end** sul pilastro della cripta (HP 47.616 tris → LP 212, riduzione 224×):
+  tutte le mappe verificate pixel-per-pixel (basecolor pietra, normal, AO, roughness=0.9→229, ORM).
+- **ATTENZIONE — build di Blender:** il pacchetto `blender` di **apt/Ubuntu ha Cycles rotto**
+  (ogni bake esce nero, perfino un EMIT a colore fisso — verificato). Usa la build ufficiale da
+  blender.org **oppure** `pip install bpy` (modulo ufficiale della Blender Foundation): con la pip
+  gli script si lanciano con `python3 tools/hp_to_lp_bake.py -- --blend file.blend ...`
+  (argomento `--blend` per aprire il file, dato che non c'è la CLI di Blender).
+- Due fix emersi dal collaudo reale: `pass_filter={"COLOR"}` esplicito sul bake DIFFUSE (da script
+  il default può essere vuoto → basecolor nera) e `--ray-dist` (default 0.5) perché il subsurf
+  restringe l'HP oltre la sola cage extrusion → i raggi mancavano la mesh.
+
+## Export: export_glb.py
+
+```
+python3 tools/export_glb.py -- --blend art/blender/pilastro_cripta.blend \
+  --lp Pilastro_LP --textures art/textures --asset pilastro_cripta --out art/exports
+```
+Costruisce sul LP il materiale glTF (basecolor sRGB + normal + roughness Non-Color) ed esporta
+SOLO il LP in GLB con texture incorporate. Demo in Godot: `scenes/asset_demo_3d.tscn` (F6).
 
 ## Export per Godot (checklist)
 

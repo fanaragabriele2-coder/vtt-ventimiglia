@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+; Demo del primo asset della pipeline Blender -> Godot (pilastro della cripta, HP->LP 224x).
+; Apri e premi Play sulla scena (F6). Il nodo radice costruisce tutto da script.
+
+[ext_resource type="Script" path="res://scripts/ui/asset_demo_3d.gd" id="1_demo3d"]
+
+[node name="AssetDemo3D" type="Node3D"]
+script = ExtResource("1_demo3d")
