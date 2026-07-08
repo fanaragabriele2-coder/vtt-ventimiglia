@@ -451,7 +451,7 @@ func _rebuild_combat_tab() -> void:
 	cond_title.add_theme_color_override("font_color", Color(0.72, 0.63, 0.42))
 	_combat_box.add_child(cond_title)
 
-	var conditions: Array[Dictionary] = ConditionsManager.condizioni_di(CombatManager.PC_LOCAL_ID)
+	var conditions: Array[Dictionary] = ConditionsManager.condizioni_di(CombatManager.pc_attivo_id())
 	if conditions.is_empty():
 		var none_lbl := Label.new()
 		none_lbl.text = "— nessuna —"
@@ -578,12 +578,12 @@ func _on_party_selected(index: int) -> void:
 
 
 func _on_damage_pressed() -> void:
-	# Instrada dal CombatManager cosi' anche la logica vittoria/TPK resta coerente col pc-local.
-	CombatManager.apply_damage_to_combatant(CombatManager.PC_LOCAL_ID, 5)
+	# Instrada dal CombatManager cosi' anche la logica vittoria/TPK resta coerente.
+	CombatManager.apply_damage_to_combatant(CombatManager.pc_attivo_id(), 5)
 
 
 func _on_heal_pressed() -> void:
-	CombatManager.heal_combatant(CombatManager.PC_LOCAL_ID, 5)
+	CombatManager.heal_combatant(CombatManager.pc_attivo_id(), 5)
 
 
 func _on_add_player_pressed() -> void:

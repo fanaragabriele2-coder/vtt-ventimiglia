@@ -1,3 +1,5 @@
+# gdlint: disable=max-public-methods
+# (Facciata del roster/schede: lettura+mutazioni con signal — API ampia per design.)
 extends Node
 ## CharacterManager (Autoload singleton) — porting del Modulo 03 JS "State Manager PG".
 ##
@@ -212,6 +214,40 @@ func heal(amount: int) -> Dictionary:
 	c.hp_current = mini(c.hp_max, c.hp_current + healing)
 	character_changed.emit(c, "heal")
 	hp_changed.emit(c.hp_current, c.hp_max, c.hp_temporary)
+	return { "requestedHealing": healing, "currentHp": c.hp_current, "maxHp": c.hp_max }
+
+
+# --- Varianti PER-ID (hotseat in combattimento: ogni membro del party e' un combattente e prende
+# danno/cure ANCHE quando non e' il PG attivo sulla scheda). Stessa logica delle versioni "active";
+# i signal hp_changed/character_changed partono solo se il colpito E' il PG attivo (sono i signal
+# della scheda a video), party_changed parte sempre (chi mostra il roster si aggiorna). ---
+
+func apply_damage_by_id(character_id: String, amount: int) -> Dictionary:
+	var c: CharacterData = get_character_by_id(character_id)
+	if c == null:
+		return {}
+	var damage: int = clampi(amount, 0, 999)
+	var absorbed: int = mini(c.hp_temporary, damage)
+	c.hp_temporary -= absorbed
+	var to_current: int = damage - absorbed
+	c.hp_current = maxi(0, c.hp_current - to_current)
+	if c == get_active():
+		character_changed.emit(c, "damage")
+		hp_changed.emit(c.hp_current, c.hp_max, c.hp_temporary)
+	party_changed.emit(_party)
+	return { "requestedDamage": damage, "currentHp": c.hp_current, "temporaryHp": c.hp_temporary }
+
+
+func heal_by_id(character_id: String, amount: int) -> Dictionary:
+	var c: CharacterData = get_character_by_id(character_id)
+	if c == null:
+		return {}
+	var healing: int = clampi(amount, 0, 999)
+	c.hp_current = mini(c.hp_max, c.hp_current + healing)
+	if c == get_active():
+		character_changed.emit(c, "heal")
+		hp_changed.emit(c.hp_current, c.hp_max, c.hp_temporary)
+	party_changed.emit(_party)
 	return { "requestedHealing": healing, "currentHp": c.hp_current, "maxHp": c.hp_max }
 
 

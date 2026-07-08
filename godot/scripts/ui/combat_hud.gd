@@ -266,7 +266,7 @@ func _actor_id() -> String:
 	var c: Dictionary = CombatManager.get_combatant(_current_id)
 	if not c.is_empty() and c["kind"] == "pc":
 		return _current_id
-	return CombatManager.PC_LOCAL_ID
+	return CombatManager.pc_attivo_id()
 
 
 # --- Menu Azione Bonus dinamico (porting del Modulo 38): opzioni generate da classe/razza/

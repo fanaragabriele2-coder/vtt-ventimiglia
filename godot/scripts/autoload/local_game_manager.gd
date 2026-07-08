@@ -49,9 +49,21 @@ func passa_posto() -> void:
 		GameState.announce("🎮 Il mouse passa a %s." % attivo.character_name)
 
 
+## HOTSEAT AUTOMATICO: quando il turno passa a un combattente-PG, la scheda attiva diventa la SUA
+## (con inventario, economia azioni e barra XP che seguono da soli via snapshot per-PG), e il
+## tavolo viene avvisato ad alta voce — lo schermo e' condiviso, il "tocca a te" non e' sottinteso.
 func _on_turn_changed(combatant_id: String, _round_number: int) -> void:
-	# Sullo schermo condiviso il "tocca a te" va detto ad alta voce (in chat), non sottinteso.
-	if combatant_id == CombatManager.PC_LOCAL_ID:
-		var attivo: CharacterData = CharacterManager.get_active()
-		if attivo:
-			GameState.announce("⚔ Tocca a %s: a lui il mouse!" % attivo.character_name)
+	var char_id: String = CombatManager.character_id_di(combatant_id)
+	if char_id.is_empty():
+		return  # turno di un PNG
+	var party: Array[CharacterData] = CharacterManager.get_party()
+	for i: int in range(party.size()):
+		if party[i].id != char_id:
+			continue
+		if CharacterManager.get_active_index() != i:
+			CharacterManager.set_active_index(i)
+		# La risorsa azione/bonus/reazione del membro si rinnova a inizio del SUO turno.
+		InventoryManager.reset_turn()
+		posto_cambiato.emit(i, party[i].character_name)
+		GameState.announce("⚔ Tocca a %s: a lui il mouse!" % party[i].character_name)
+		return

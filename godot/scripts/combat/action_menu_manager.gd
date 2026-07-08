@@ -155,7 +155,7 @@ func _effetto_attacco_secondario(opzione: Dictionary, target_id: String) -> bool
 	if target_id.is_empty():
 		GameState.announce("⚔️ Nessun bersaglio per l'attacco secondario.")
 		return true
-	CombatManager.resolve_attack(CombatManager.PC_LOCAL_ID, target_id, "normal")
+	CombatManager.resolve_attack(CombatManager.pc_attivo_id(), target_id, "normal")
 	GameState.announce("⚔️ %s (attacco bonus)." % String(opzione["etichetta"]))
 	return true
 

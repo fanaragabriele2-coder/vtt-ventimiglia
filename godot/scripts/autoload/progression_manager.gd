@@ -201,12 +201,11 @@ func _on_combatant_defeated(combatant_id: String, source_id: String) -> void:
 		return
 	# Se il colpo di grazia non ha un attaccante noto (es. superficie ambientale) l'XP va al PG
 	# attivo: e' comunque il party ad averlo ottenuto, meglio di perderlo.
-	var killer_id: String = source_id if not source_id.is_empty() else CombatManager.PC_LOCAL_ID
-	# NOTA: CombatManager rappresenta oggi in combattimento SOLO il PG attivo ("pc-local"), non
-	# l'intero party hotseat come combattenti separati — quindi "pc-local" e l'id di progressione
-	# del PG attivo coincidono sempre. Se in futuro ogni membro del party avra' un proprio
-	# combattente (come gia' avviene per i token sulla mappa), questa riga andra' generalizzata.
-	var progression_id: String = CharacterManager.get_active().id if killer_id == CombatManager.PC_LOCAL_ID and CharacterManager.get_active() else killer_id
+	var killer_id: String = source_id if not source_id.is_empty() else CombatManager.pc_attivo_id()
+	# Ogni membro del party e' un combattente ("pc-<id>"): l'XP va al PERSONAGGIO che ha sferrato
+	# il colpo, chiunque fosse sulla scheda in quel momento. Colpi "ambientali" -> PG attivo.
+	var char_id: String = CombatManager.character_id_di(killer_id)
+	var progression_id: String = char_id if not char_id.is_empty() else (CharacterManager.get_active().id if CharacterManager.get_active() else killer_id)
 	gain_xp(_xp_for_enemy(combatant), "sconfitto " + _base_name(String(combatant.get("name", ""))), progression_id)
 	var loot: Dictionary = _loot_for_enemy(combatant)
 	if not loot["items"].is_empty() or int(loot["gold"]) > 0:

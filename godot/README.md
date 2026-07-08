@@ -173,10 +173,11 @@ naniche, templi con fiumi di lava, caverne):
 
 Trasparenza sui gap noti, per chi continua il lavoro:
 
-- **Un combattente per membro del party hotseat.** `CombatManager` oggi rappresenta in
-  combattimento solo il PG **attivo** (`pc-local`); il monolite JS (dopo un fix successivo) dava un
-  combattente/token separato a OGNI membro del party hotseat contemporaneamente. Gli altri membri
-  esistono comunque nel roster (`CharacterManager`) e ricevono XP/kit correttamente al loro turno.
+- ~~Un combattente per membro del party~~ ORA C'È: ogni membro e' un combattente separato
+  (`pc-<id>`) con la sua iniziativa, i suoi HP (autorevoli in `CharacterManager`, per-personaggio)
+  e il suo token sulla griglia; al turno di un membro la scheda attiva passa a LUI da sola
+  (hotseat automatico: inventario, economia azioni e barra XP seguono via snapshot per-PG), e
+  l'XP del colpo di grazia va al personaggio che l'ha sferrato davvero.
 - **Dadi 3D fisici** (qui c'è solo un tiratore rapido D4-D20 non fisico), **audio procedurale + voce**
   (Task 4 del monolite), **TTS/STT**, **overworld con tile reali** (qui è stilizzata — la modalità a
   piedi cammina sulla proiezione stilizzata, non su Leaflet/OSM), **multiplayer** (relay/Supabase):

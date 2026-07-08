@@ -413,11 +413,11 @@ func _dispatch_command(command: Dictionary) -> void:
 		"rollInitiative":
 			CombatManager.roll_all_initiative()
 		"attack":
-			CombatManager.resolve_attack(String(command.get("attacker", "pc-local")), String(command.get("target", "")), String(command.get("mode", "normal")))
+			CombatManager.resolve_attack(String(command.get("attacker", CombatManager.pc_attivo_id())), String(command.get("target", "")), String(command.get("mode", "normal")))
 		"damage":
-			CombatManager.apply_damage_to_combatant(String(command.get("targetId", "pc-local")), int(command.get("amount", 0)))
+			CombatManager.apply_damage_to_combatant(String(command.get("targetId", CombatManager.pc_attivo_id())), int(command.get("amount", 0)))
 		"heal":
-			CombatManager.heal_combatant(String(command.get("targetId", "pc-local")), int(command.get("amount", 0)))
+			CombatManager.heal_combatant(String(command.get("targetId", CombatManager.pc_attivo_id())), int(command.get("amount", 0)))
 		"setHp":
 			CharacterManager.set_current_hp(int(command.get("value", 0)))
 		"setAc":

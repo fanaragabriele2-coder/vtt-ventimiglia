@@ -1,3 +1,5 @@
+# gdlint: disable=max-public-methods
+# (Facciata del sistema di combattimento: turni, dadi, danni, posizioni — API ampia per design.)
 extends Node
 ## CombatManager (Autoload singleton) — porting dei Moduli 05 (Combat Tracker), 24 (Reazioni) e
 ## 26 (Spingi) del monolite JS.
@@ -6,8 +8,8 @@ extends Node
 ## Regole D&D 5e fedeli al legacy: tiro d20 con vantaggio/svantaggio, formule di danno con
 ## raddoppio dei SOLI dadi sui critici, prova contrapposta per la Spinta, attacco di opportunita'.
 ##
-## Il danno al PG attivo ("pc-local") viene instradato su CharacterManager (unica verita' sugli HP
-## della scheda); i PNG hanno HP locali qui. Alla morte dell'ultimo nemico lo scontro finisce da
+## OGNI membro del party e' un combattente ("pc-<id>", hotseat vero): il danno ai PG viene
+## instradato su CharacterManager per-personaggio (unica verita' sugli HP); i PNG hanno HP locali qui. Alla morte dell'ultimo nemico lo scontro finisce da
 ## solo (VITTORIA), a party interamente a terra si interrompe (TPK) — come nel monolite.
 ##
 ## Registrazione: Project Settings > Autoload -> "CombatManager" (dopo CharacterManager).
@@ -24,9 +26,11 @@ signal attack_resolved(result: Dictionary)
 signal shove_resolved(result: Dictionary)
 signal victory()
 signal party_wiped()
+## La cella di un combattente e' cambiata (la UI mappa si allinea da sola).
+signal combatant_position_changed(combatant_id: String, cell: Vector2i)
 
 const MONSTERS_PATH: String = "res://data/monsters.json"
-const PC_LOCAL_ID: String = "pc-local"
+const PC_PREFIX: String = "pc-"
 
 var _monster_catalog: Array[Dictionary] = []
 var _combatants: Array[Dictionary] = []
@@ -40,30 +44,81 @@ var _last_event: String = ""
 # (TacticalMap), cosi' la logica di gioco (fiancheggiamento, elevazione, IA nemici) puo' leggerla
 # senza dipendere da un nodo di scena. TacticalMap la scrive quando un token si muove (click o IA)
 # e vi si aggancia per riflettere gli spostamenti che ha causato il gioco (es. l'IA nemica).
-signal combatant_position_changed(combatant_id: String, cell: Vector2i)
 var _positions: Dictionary = {}
 
 
 func _ready() -> void:
 	_monster_catalog = _load_catalog(MONSTERS_PATH, "monsters")
-	# Il tracker parte SOLO con il PG locale (nessun PNG di default): i nemici li evoca il Master.
-	_combatants.append(_make_pc_local())
+	# UN combattente per OGNI membro del party (hotseat vero): niente piu' singolo "pc-local".
+	_rebuild_pc_combatants()
+	CharacterManager.party_changed.connect(_on_party_changed)
 
 
-func _make_pc_local() -> Dictionary:
-	# Specchia la scheda attiva; gli HP restano autorevoli in CharacterManager, qui e' un riflesso.
+## Id del combattente di un personaggio del party ("pc-<id personaggio>").
+func pc_id_di(character_id: String) -> String:
+	return PC_PREFIX + character_id
+
+
+## Il combattente del PG ATTIVO sulla scheda (l'attaccante di default dell'HUD).
+func pc_attivo_id() -> String:
 	var c: CharacterData = CharacterManager.get_active()
+	return pc_id_di(c.id) if c else ""
+
+
+## L'id personaggio dietro un combattente-PG ("" se e' un PNG o non esiste).
+func character_id_di(combatant_id: String) -> String:
+	var c: Dictionary = get_combatant(combatant_id)
+	return String(c.get("characterId", "")) if not c.is_empty() else ""
+
+
+func _make_pc_combatant(c: CharacterData) -> Dictionary:
+	# Specchia la scheda del membro; gli HP restano autorevoli in CharacterManager, qui e' un riflesso.
 	return {
-		"id": PC_LOCAL_ID, "kind": "pc",
-		"name": c.character_name if c else "Eroe Locale",
-		"armorClass": c.armor_class if c else 10,
-		"hitPoints": c.hp_current if c else 10,
-		"maxHitPoints": c.hp_max if c else 10,
-		"temporaryHitPoints": c.hp_temporary if c else 0,
+		"id": pc_id_di(c.id), "kind": "pc", "characterId": c.id,
+		"name": c.character_name,
+		"armorClass": c.armor_class,
+		"hitPoints": c.hp_current,
+		"maxHitPoints": c.hp_max,
+		"temporaryHitPoints": c.hp_temporary,
 		"initiative": 0,
-		"initiativeBonus": c.modifier_of("dex") if c else 0,
-		"attackBonus": 4, "damageFormula": "1d8+2", "defeated": false,
+		"initiativeBonus": c.modifier_of("dex"),
+		"attackBonus": 4, "damageFormula": "1d8+2", "defeated": c.hp_current <= 0,
 	}
+
+
+## Ricostruisce i combattenti-PG dal roster (nuova partita, membri aggiunti/rimossi). Mai durante
+## uno scontro attivo: in quel caso rimanda alla fine del combattimento.
+func _rebuild_pc_combatants() -> void:
+	for c: Dictionary in _combatants:
+		if c["kind"] == "pc":
+			clear_combatant_cell(String(c["id"]))
+	_combatants = _combatants.filter(func(c: Dictionary) -> bool: return c["kind"] != "pc")
+	var party: Array[CharacterData] = CharacterManager.get_party()
+	for i: int in range(party.size()):
+		_combatants.insert(i, _make_pc_combatant(party[i]))
+
+
+func _on_party_changed(_party: Array) -> void:
+	if _active:
+		return  # a scontro finito end_combat() riallinea il roster
+	_allinea_pc_roster()
+
+
+## Ricostruisce SOLO se la composizione del party e' cambiata (membri aggiunti/rimossi/nuova
+## partita); per un semplice cambio di HP (party_changed scatta anche li') basta sincronizzare —
+## ricostruire ogni volta azzererebbe le posizioni sulla griglia.
+func _allinea_pc_roster() -> void:
+	var attesi: Array[String] = []
+	for c: CharacterData in CharacterManager.get_party():
+		attesi.append(pc_id_di(c.id))
+	var attuali: Array[String] = []
+	for c: Dictionary in _combatants:
+		if c["kind"] == "pc":
+			attuali.append(String(c["id"]))
+	if attesi != attuali:
+		_rebuild_pc_combatants()
+	else:
+		_sync_pcs_from_characters()
 
 
 func _load_catalog(path: String, key: String) -> Array[Dictionary]:
@@ -171,7 +226,7 @@ func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 # --- Ciclo del combattimento (porting di startCombat/endCombat/nextTurn) ---
 
 func start_combat() -> void:
-	_sync_pc_local_from_character()
+	_sync_pcs_from_characters()
 	# Non si combatte con tutto il party a terra.
 	var any_conscious: bool = false
 	for c: Dictionary in _combatants:
@@ -199,6 +254,7 @@ func end_combat() -> void:
 	_last_event = "Combattimento terminato."
 	GameState.set_combat_active(false)
 	combat_ended.emit()
+	_allinea_pc_roster()
 
 
 func next_turn() -> void:
@@ -243,20 +299,20 @@ func _compare_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 	return int(a["initiative"]) > int(b["initiative"])
 
 
-func _sync_pc_local_from_character() -> void:
-	var c: CharacterData = CharacterManager.get_active()
-	if c == null:
-		return
-	var pc: Dictionary = get_combatant(PC_LOCAL_ID)
-	if pc.is_empty():
-		return
-	pc["name"] = c.character_name
-	pc["armorClass"] = c.armor_class
-	pc["hitPoints"] = c.hp_current
-	pc["maxHitPoints"] = c.hp_max
-	pc["temporaryHitPoints"] = c.hp_temporary
-	pc["initiativeBonus"] = c.modifier_of("dex")
-	pc["defeated"] = c.hp_current <= 0
+func _sync_pcs_from_characters() -> void:
+	for pc: Dictionary in _combatants:
+		if pc["kind"] != "pc":
+			continue
+		var c: CharacterData = CharacterManager.get_character_by_id(String(pc["characterId"]))
+		if c == null:
+			continue
+		pc["name"] = c.character_name
+		pc["armorClass"] = c.armor_class
+		pc["hitPoints"] = c.hp_current
+		pc["maxHitPoints"] = c.hp_max
+		pc["temporaryHitPoints"] = c.hp_temporary
+		pc["initiativeBonus"] = c.modifier_of("dex")
+		pc["defeated"] = c.hp_current <= 0
 
 
 # --- Dadi e formule di danno (porting fedele di rollD20WithMode / rollDamageFormula) ---
@@ -324,10 +380,10 @@ func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: Str
 	var damage: int = clampi(amount, 0, 9999)
 	var was_defeated: bool = bool(combatant["defeated"])
 
-	if combatant_id == PC_LOCAL_ID:
-		# Il PG attivo: gli HP autorevoli stanno in CharacterManager.
-		CharacterManager.apply_damage(damage)
-		_sync_pc_local_from_character()
+	if combatant["kind"] == "pc":
+		# Un membro del party: gli HP autorevoli stanno in CharacterManager (per-personaggio).
+		CharacterManager.apply_damage_by_id(String(combatant["characterId"]), damage)
+		_sync_pcs_from_characters()
 	else:
 		combatant["hitPoints"] = maxi(0, int(combatant["hitPoints"]) - damage)
 		combatant["defeated"] = int(combatant["hitPoints"]) <= 0
@@ -345,9 +401,9 @@ func heal_combatant(combatant_id: String, amount: int) -> bool:
 	if combatant.is_empty():
 		return false
 	var healing: int = clampi(amount, 0, 9999)
-	if combatant_id == PC_LOCAL_ID:
-		CharacterManager.heal(healing)
-		_sync_pc_local_from_character()
+	if combatant["kind"] == "pc":
+		CharacterManager.heal_by_id(String(combatant["characterId"]), healing)
+		_sync_pcs_from_characters()
 	else:
 		combatant["hitPoints"] = mini(int(combatant["maxHitPoints"]), int(combatant["hitPoints"]) + healing)
 		combatant["defeated"] = int(combatant["hitPoints"]) <= 0
@@ -453,16 +509,22 @@ func shove(attacker_id: String, target_id: String) -> Dictionary:
 
 
 func _athletics_bonus(combatant_id: String) -> int:
-	if combatant_id == PC_LOCAL_ID:
-		return CharacterManager.skill_modifier("athletics")
+	var char_id: String = character_id_di(combatant_id)
+	if not char_id.is_empty():
+		var pg: CharacterData = CharacterManager.get_character_by_id(char_id)
+		if pg:
+			return pg.skill_modifier("athletics")
 	# PNG: approssimazione dal bonus d'attacco (proxy della forza fisica), come nel legacy.
 	var c: Dictionary = get_combatant(combatant_id)
 	return int(c.get("attackBonus", 2)) - 2 if not c.is_empty() else 0
 
 
 func _acrobatics_bonus(combatant_id: String) -> int:
-	if combatant_id == PC_LOCAL_ID:
-		return CharacterManager.skill_modifier("acrobatics")
+	var char_id: String = character_id_di(combatant_id)
+	if not char_id.is_empty():
+		var pg: CharacterData = CharacterManager.get_character_by_id(char_id)
+		if pg:
+			return pg.skill_modifier("acrobatics")
 	var c: Dictionary = get_combatant(combatant_id)
 	return int(c.get("initiativeBonus", 0)) if not c.is_empty() else 0
 
@@ -472,7 +534,9 @@ func _acrobatics_bonus(combatant_id: String) -> int:
 ## Un combattente sferra un attacco di opportunita' su un bersaglio che si allontana. Consuma la
 ## reazione (la spesa la valida InventoryManager per il PG). Ritorna il risultato dell'attacco.
 func opportunity_attack(reactor_id: String, target_id: String) -> Dictionary:
-	if reactor_id == PC_LOCAL_ID and not InventoryManager.spend_action_resource("reaction"):
+	# L'economia azioni "viva" e' del PG ATTIVO (gli altri membri hanno la loro in snapshot):
+	# la spesa della reazione si valida solo per lui; i compagni reagiscono senza contabilita'.
+	if reactor_id == pc_attivo_id() and not InventoryManager.spend_action_resource("reaction"):
 		return { "ok": false, "reason": "Reazione gia' spesa." }
 	return resolve_attack(reactor_id, target_id, "normal")
 
