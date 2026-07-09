@@ -137,6 +137,8 @@ func _build_system_prompt() -> String:
 		"e dopo di esso un array JSON di comandi, es:",
 		SEPARATORE_DATI_MASTER,
 		'[{"command":"addNpc","id":"goblin","count":2},{"command":"startCombat"}]',
+		'Per spostare il party in un luogo di Ventimiglia: {"command":"moveTo","to":"Porto Turistico"}.',
+		"(Se descrivi lo spostamento a parole, il gioco lo riconosce e muove il party da solo.)",
 	])
 
 
@@ -424,6 +426,9 @@ func _dispatch_command(command: Dictionary) -> void:
 			CharacterManager.set_armor_class(int(command.get("value", 10)))
 		"setAbility":
 			CharacterManager.set_ability_score(String(command.get("ability", "str")), int(command.get("value", 10)))
+		"moveTo", "travelTo", "moveParty":
+			# Spostamento del party sull'overworld: stessa risoluzione POI della prosa (fonte unica).
+			ChatTravelBridge.viaggia_a_nome(String(command.get("to", command.get("name", ""))))
 		_:
 			# moveToken, addToken, revealFog, createSurface, setElevation, applyCondition, ...
 			# li gestira' il layer mappa/condizioni quando lo costruiremo.

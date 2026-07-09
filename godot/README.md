@@ -15,7 +15,7 @@ Godot 4.3+ (`Import` → seleziona `godot/project.godot`).
 
 ```
 godot/
-├── project.godot                     # 22 autoload (ordine di dipendenza) + scena principale
+├── project.godot                     # 23 autoload (ordine di dipendenza) + scena principale
 ├── main.tscn                         # scena principale (root Control + vtt_main.gd)
 ├── scenes/nexus_demo.tscn            # scena standalone del Nexus Map Engine (prova i dungeon da soli)
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
@@ -197,15 +197,22 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 - ~~Ponte chat→combattimento~~ ORA C'È (`ChatCombatBridge`, Modulo 34): se la narrazione del
   Master annuncia uno scontro senza emettere comandi `<<DATI>>`, i nemici compaiono da soli
   (bestiario riconosciuto nella prosa, conteggi inclusi: "tre goblin", "goblin 1...goblin 4").
-  Resta NON portato solo il lato mappa del Modulo 39 (spostamento POI dalla prosa; il comando
-  strutturato `moveTo` invece funziona). La **memoria di campagna** (Moduli 29/32) c'è:
-  `CampaignMemory` registra gli eventi chiave e li inietta nel prompt del Master.
+- ~~Ponte chat→mappa (Modulo 39)~~ ORA C'È (`ChatTravelBridge`): se il Master NARRA uno
+  spostamento ("vi incamminate verso il porto", "raggiungete i Giardini Hanbury"), il party si
+  muove DAVVERO sull'overworld di Ventimiglia. Un verbo di viaggio + un POI riconosciuto (nomi
+  reali + alias in prosa, match a confine di parola e a frase più lunga: "ponte sul Roya" batte
+  "ponte") aggiornano `GameState.party.location`, l'unica fonte di verità che OverworldMap, HUD,
+  memoria e prossimo prompt leggono. Anche il comando strutturato `{"command":"moveTo","to":...}`
+  passa per la stessa risoluzione POI (nessuna tabella doppia). Nessun falso positivo su semplici
+  menzioni ("il porto è in fiamme" non teletrasporta nessuno) né durante un combattimento.
+- La **memoria di campagna** (Moduli 29/32) c'è: `CampaignMemory` registra gli eventi chiave e li
+  inietta nel prompt del Master.
 
 ## Nota sulla verifica
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 32 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 43 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)
