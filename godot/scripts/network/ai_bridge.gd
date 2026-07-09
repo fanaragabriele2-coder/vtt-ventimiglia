@@ -26,6 +26,10 @@ signal master_error(message: String)
 signal command_received(command: Dictionary)
 ## Comando "speak": testo da leggere ad alta voce (lo raccogliera' il futuro modulo TTS).
 signal speak_requested(text: String)
+## Modalita' Storia (NLP): risposta JSON strutturata { narrazione, opzioni, richiede_dado, dado,
+## scopo_dado } gia' validata. Canale SEPARATO da master_complete: la voce e i bridge prosa->gioco
+## non devono reagire a un blob JSON.
+signal json_complete(risposta: Dictionary)
 
 const CONFIG_PATH: String = "user://ai_bridge.cfg"
 const DEFAULT_HOST: String = "127.0.0.1"
@@ -49,6 +53,10 @@ var _groq_api_key: String = ""
 var _busy: bool = false
 # Storico conversazione (ruoli user/assistant) per dare continuita' al Master.
 var _history: Array[Dictionary] = []
+# Modalita' Storia (NLP): quando attiva, il prompt usa lo schema JSON e la risposta va SOLO su
+# json_complete. Ha uno storico proprio: la Storia e la Chat Master sono conversazioni distinte.
+var _json_mode: bool = false
+var _history_json: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -160,9 +168,33 @@ func _posizioni_context_text() -> String:
 	return "\n".join(righe) if not righe.is_empty() else "- nessuna posizione tracciata al momento"
 
 
+## System prompt della Modalita' Storia (Chat-Driven UI): il modello risponde SOLO con l'oggetto
+## JSON dello schema — Godot lo parsa e genera la UI (testo, pulsanti-opzione, pulsante dado).
+## Lo STATO DEL GIOCO nel prompt e' lo snapshot compatto di VttCoreManager (party, luogo,
+## combattenti, cronaca recente): il modello non deve inventare nulla che il motore gia' sa.
+func _build_system_prompt_json() -> String:
+	return "\n".join([
+		"Sei il Dungeon Master di un GDR ambientato a Ventimiglia (D&D 5e semplificato).",
+		"Il giocatore scrive in linguaggio naturale. Rispondi SOLO con un oggetto JSON valido,",
+		"senza alcun testo prima o dopo e senza blocchi di codice, ESATTAMENTE in questo schema:",
+		'{"narrazione":"...","opzioni":["...","..."],"richiede_dado":false,"dado":"","scopo_dado":""}',
+		"REGOLE:",
+		"- narrazione: 2-6 frasi in italiano, seconda persona plurale, evocative ma concise.",
+		"- opzioni: da 2 a 4 azioni brevi e concrete che il party puo' fare ORA.",
+		'- richiede_dado true SOLO se serve un tiro: allora dado e\' nel formato "1d6" o "1d20",',
+		'  e scopo_dado vale "movimento" (il tiro dice di quante celle si muove il party)',
+		'  oppure "prova" (abilita\', attacco, fortuna).',
+		"- Non inventare posizioni, HP o membri del party: usa lo STATO DEL GIOCO qui sotto.",
+		"",
+		"STATO DEL GIOCO (JSON aggiornato dal motore, fonte di verita'):",
+		JSON.stringify(VttCoreManager.stato_per_llm()),
+	])
+
+
 func _build_messages(user_text: String) -> Array:
-	var messages: Array = [{ "role": "system", "content": _build_system_prompt() }]
-	messages.append_array(_history)
+	var sistema: String = _build_system_prompt_json() if _json_mode else _build_system_prompt()
+	var messages: Array = [{ "role": "system", "content": sistema }]
+	messages.append_array(_history_json if _json_mode else _history)
 	messages.append({ "role": "user", "content": user_text })
 	return messages
 
@@ -179,6 +211,23 @@ func send_master_prompt(user_text: String) -> void:
 	if user_text.strip_edges().is_empty():
 		return
 	_busy = true
+	_json_mode = false
+	if _provider == "groq":
+		_send_groq_prompt(user_text)
+	else:
+		_send_ollama_prompt(user_text)
+
+
+## Modalita' Storia: stesso trasporto (Ollama LAN o Groq), ma prompt a schema JSON, storico
+## separato e risposta consegnata SOLO via json_complete (gia' parsata e validata).
+func send_json_prompt(user_text: String) -> void:
+	if _busy:
+		master_error.emit("Il Master sta gia' rispondendo, attendi.")
+		return
+	if user_text.strip_edges().is_empty():
+		return
+	_busy = true
+	_json_mode = true
 	if _provider == "groq":
 		_send_groq_prompt(user_text)
 	else:
@@ -249,7 +298,9 @@ func _send_ollama_prompt(user_text: String) -> void:
 			if not piece.is_empty():
 				full_reply += piece
 				# Trasmette live SOLO la parte narrativa (prima del separatore <<DATI>>).
-				master_chunk.emit(_visible_during_streaming(full_reply, piece))
+				# In modalita' Storia non si streama nulla: il JSON si mostra solo completo.
+				if not _json_mode:
+					master_chunk.emit(_visible_during_streaming(full_reply, piece))
 		await get_tree().process_frame
 
 	http.close()
@@ -299,7 +350,8 @@ func _gestisci_risposta_groq(user_text: String, modello_forzato: String, codice:
 	var testo: String = grezzo.get_string_from_utf8()
 	if codice == 404 and modello_forzato.is_empty():
 		# 404 da Groq = quasi sempre modello ritirato/rinominato: riprova col modello di riserva.
-		master_chunk.emit("(modello non disponibile, passo a %s…) " % GROQ_MODEL_FALLBACK)
+		if not _json_mode:
+			master_chunk.emit("(modello non disponibile, passo a %s…) " % GROQ_MODEL_FALLBACK)
 		_send_groq_prompt(user_text, GROQ_MODEL_FALLBACK)
 		return
 	if codice == 401:
@@ -312,8 +364,9 @@ func _gestisci_risposta_groq(user_text: String, modello_forzato: String, codice:
 	if content.is_empty():
 		_fail("Groq ha risposto senza contenuto: " + _errore_api_leggibile(testo))
 		return
-	var split: Dictionary = _separate_narration_and_data(content)
-	master_chunk.emit(String(split["narration"]))
+	if not _json_mode:
+		var split: Dictionary = _separate_narration_and_data(content)
+		master_chunk.emit(String(split["narration"]))
 	_finish(user_text, content)
 
 
@@ -360,6 +413,16 @@ func _visible_during_streaming(full_reply: String, latest_piece: String) -> Stri
 
 func _finish(user_text: String, full_reply: String) -> void:
 	_busy = false
+	if _json_mode:
+		_json_mode = false
+		# Nello storico va la risposta GREZZA: rivedere il proprio JSON aiuta il modello a
+		# restare nello schema ai turni successivi.
+		_history_json.append({ "role": "user", "content": user_text })
+		_history_json.append({ "role": "assistant", "content": full_reply.strip_edges() })
+		while _history_json.size() > 20:
+			_history_json.pop_front()
+		json_complete.emit(_parse_risposta_json(full_reply))
+		return
 	var split: Dictionary = _separate_narration_and_data(full_reply)
 	# Aggiorna lo storico (solo la narrazione, non i comandi grezzi).
 	_history.append({ "role": "user", "content": user_text })
@@ -372,7 +435,40 @@ func _finish(user_text: String, full_reply: String) -> void:
 
 func _fail(message: String) -> void:
 	_busy = false
+	_json_mode = false
 	master_error.emit(message)
+
+
+## Estrae e valida l'oggetto JSON della Modalita' Storia. Tollerante coi vizi tipici dei modelli
+## (blocco ```json, testo attorno): si isola dalla prima "{" all'ultima "}". Se il parsing fallisce
+## del tutto, la risposta INTERA diventa narrazione: mai perdere il testo del Master.
+func _parse_risposta_json(content: String) -> Dictionary:
+	var pulito: String = content.strip_edges()
+	var inizio: int = pulito.find("{")
+	var fine: int = pulito.rfind("}")
+	if inizio >= 0 and fine > inizio:
+		pulito = pulito.substr(inizio, fine - inizio + 1)
+	var parsed: Variant = JSON.parse_string(pulito)
+	if not (parsed is Dictionary):
+		return {
+			"narrazione": content.strip_edges(), "opzioni": [],
+			"richiede_dado": false, "dado": "", "scopo_dado": "",
+		}
+	var d: Dictionary = parsed
+	var opzioni: Array = []
+	var grezze: Variant = d.get("opzioni", [])
+	if grezze is Array:
+		for o: Variant in (grezze as Array):
+			var testo: String = String(o).strip_edges()
+			if not testo.is_empty() and opzioni.size() < 4:
+				opzioni.append(testo)
+	return {
+		"narrazione": String(d.get("narrazione", "")).strip_edges(),
+		"opzioni": opzioni,
+		"richiede_dado": bool(d.get("richiede_dado", false)),
+		"dado": String(d.get("dado", "")).strip_edges().to_lower(),
+		"scopo_dado": String(d.get("scopo_dado", "")).strip_edges().to_lower(),
+	}
 
 
 ## Divide "narrazione <<DATI>> [json]" -> { narration, commands }. Porting di separaNarrazioneEDati.
@@ -442,3 +538,4 @@ func is_busy() -> bool:
 ## Azzera lo storico della conversazione (nuova scena/sessione).
 func clear_history() -> void:
 	_history.clear()
+	_history_json.clear()

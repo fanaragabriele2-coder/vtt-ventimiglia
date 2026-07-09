@@ -15,7 +15,7 @@ Godot 4.3+ (`Import` → seleziona `godot/project.godot`).
 
 ```
 godot/
-├── project.godot                     # 23 autoload (ordine di dipendenza) + scena principale
+├── project.godot                     # 25 autoload (ordine di dipendenza) + scena principale
 ├── main.tscn                         # scena principale (root Control + vtt_main.gd)
 ├── scenes/nexus_demo.tscn            # scena standalone del Nexus Map Engine (prova i dungeon da soli)
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
@@ -213,12 +213,29 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   menzioni ("il porto è in fiamme" non teletrasporta nessuno) né durante un combattimento.
 - La **memoria di campagna** (Moduli 29/32) c'è: `CampaignMemory` registra gli eventi chiave e li
   inietta nel prompt del Master.
+- **State machine rigida + Modalità Storia (direttiva "Elite Godot Architect")**: `VttCoreManager`
+  (autoload) tiene i due stati del tavolo — EXPLORATION (il party si muove IN BLOCCO: chi guida
+  clicca, gli altri lo raggiungono via A*) e COMBAT (movimento individuale a turni) — riflettendo
+  `CombatManager` (che resta l'unica autorità sul combattimento), più la cronaca corta degli
+  eventi e lo snapshot compatto `stato_per_llm()`. Il pulsante **📖 Storia** apre la Chat-Driven
+  UI (`NlpUiController`): scrivi in linguaggio naturale, l'LLM risponde SOLO con lo schema JSON
+  `{narrazione, opzioni, richiede_dado, dado, scopo_dado}` e Godot genera i pulsanti: le opzioni
+  si cliccano, "🎲 Lancia 1d6" apre il vassoio 3D VERO e, se lo scopo è "movimento", il risultato
+  diventa il budget di celle che la griglia Nexus consuma passo per passo. Il risultato del tiro
+  torna da solo all'LLM ("Ho tirato 1d6: 4") e la storia prosegue dal numero vero.
+- **Culling / VRAM (RTX 4050 + LLM locale)**: `MapEngineOptimized` spegne le PointLight2D di
+  decoro e nasconde i token PNG fuori inquadratura (a intervalli di 0.15s, non a ogni frame);
+  le luci-VISTA dei PG non si toccano mai (sono stato di gioco, non decoro). Include il
+  **Map Stitcher**: più immagini locali cucite in una mappa gigante a chunk, con le texture dei
+  chunk lontani SCARICATE dalla VRAM (si ricaricano dal disco quando la camera torna vicina) e
+  `CanvasModulate` per uniformare l'illuminazione dei lotti. I TileMapLayer non vengono toccati:
+  Godot li culla già da solo per quadranti.
 
 ## Nota sulla verifica
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 43 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 47 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)

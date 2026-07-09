@@ -219,10 +219,18 @@ func _on_cella_cliccata(cell: Vector2i) -> void:
 	var percorso: Array[Vector2i] = _map.trova_percorso(da, cell)
 	if percorso.is_empty():
 		return  # irraggiungibile: i muri della cripta non si attraversano
+	# Dado di movimento (Modalita' Storia): se un budget e' attivo, ogni passo del capofila costa
+	# celle vere — il controllo avviene PRIMA di muovere (il rifiuto viene annunciato in chat).
+	if sel.begins_with(PREFISSO_PC) and not VttCoreManager.consuma_movimento(percorso.size()):
+		return
 	var tw: Tween = _map.muovi_token_lungo_percorso(sel, percorso)
 
 	if sel.begins_with(PREFISSO_PC):
 		_party_cells[sel] = cell
+		# State machine (VttCoreManager): in EXPLORATION il party viaggia IN BLOCCO — chi guida
+		# muove, gli altri lo raggiungono da soli. In COMBAT ognuno si muove nel proprio turno.
+		if VttCoreManager.is_movimento_in_blocco():
+			_muovi_party_in_blocco(sel, cell)
 		_map.aggiorna_visione_multipla(_celle_party())  # visione di GRUPPO: unione dei campi visivi
 		EventBus.nexus_party_moved.emit(cell)
 		# Se la destinazione e' una scala, all'ARRIVO del token tutto il party cambia piano.
@@ -234,6 +242,26 @@ func _on_cella_cliccata(cell: Vector2i) -> void:
 	else:
 		# Token nemico mosso dal Master: la posizione autorevole va anche al sistema di combattimento.
 		CombatManager.set_combatant_cell(sel, cell)
+
+
+## Movimento in blocco (EXPLORATION): ogni altro membro del party raggiunge una cella libera
+## attorno alla destinazione del capofila, lungo il SUO percorso A* (niente teletrasporti: se un
+## membro e' murato fuori, semplicemente resta dov'e' — se ne riparla dalla scala o a piedi).
+func _muovi_party_in_blocco(capofila: String, destinazione: Vector2i) -> void:
+	for id: String in _party_cells.keys():
+		if id == capofila:
+			continue
+		var da: Vector2i = _map.cella_di_token(id)
+		if da.x < 0:
+			continue
+		var arrivo: Vector2i = _cella_libera_vicino(destinazione)
+		if arrivo == da:
+			continue
+		var percorso: Array[Vector2i] = _map.trova_percorso(da, arrivo)
+		if percorso.is_empty():
+			continue
+		_map.muovi_token_lungo_percorso(id, percorso)
+		_party_cells[id] = arrivo
 
 
 func _usa_scala(direzione: int) -> void:

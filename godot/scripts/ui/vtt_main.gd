@@ -14,6 +14,9 @@ var _view_nexus_btn: Button
 var _ai_toggle_btn: Button
 var _voce_btn: Button
 var _dadi_telefono_btn: Button
+var _storia_btn: Button
+var _chat_panel: MasterChatPanel
+var _nlp_panel: NlpUiController
 var _background_dialog: FileDialog
 
 
@@ -107,10 +110,15 @@ func _build_layout() -> void:
 
 	center.add_child(DiceRoller.new())
 
-	# Destra: Chat Master.
-	var chat := MasterChatPanel.new()
-	chat.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	columns.add_child(chat)
+	# Destra: Chat Master + Modalita' Storia (NLP). Convivono nello stesso spazio come le viste
+	# del centro: una sola e' visibile, il pulsante in toolbar le scambia.
+	_chat_panel = MasterChatPanel.new()
+	_chat_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.add_child(_chat_panel)
+	_nlp_panel = NlpUiController.new()
+	_nlp_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_nlp_panel.visible = false
+	columns.add_child(_nlp_panel)
 
 	# Barra di stato in fondo a tutta la finestra (fuori dalle 3 colonne, come il session panel
 	# del monolite): turno/combattimento/party/IA nemica a colpo d'occhio.
@@ -155,6 +163,8 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_ai_toggle_btn)
 	_voce_btn = _toolbar_button("🔊 Voce Master: ON", _toggle_voce_master)
 	row.add_child(_voce_btn)
+	_storia_btn = _toolbar_button("📖 Storia", _toggle_storia)
+	row.add_child(_storia_btn)
 	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	_dadi_telefono_btn = _toolbar_button("📱 Dadi: OFF", _toggle_dice_server)
 	row.add_child(_dadi_telefono_btn)
@@ -208,6 +218,15 @@ func _on_map_background_selected(path: String) -> void:
 func _toggle_enemy_ai() -> void:
 	EnemyAI.set_enabled(not EnemyAI.is_enabled())
 	_ai_toggle_btn.text = "🐺 IA Nemica: ON" if EnemyAI.is_enabled() else "🐺 IA Nemica: OFF"
+
+
+## Scambia il pannello destro: Chat Master classica <-> Modalita' Storia (UI guidata dal JSON
+## dell'LLM: opzioni cliccabili e dadi di movimento).
+func _toggle_storia() -> void:
+	var storia_attiva: bool = not _nlp_panel.visible
+	_nlp_panel.visible = storia_attiva
+	_chat_panel.visible = not storia_attiva
+	_storia_btn.text = "💬 Chat" if storia_attiva else "📖 Storia"
 
 
 ## Accende/spegne la lettura ad alta voce della narrazione del Master (TTS del sistema operativo).

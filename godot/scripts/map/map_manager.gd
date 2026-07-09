@@ -89,6 +89,7 @@ var _token_tex: Texture2D
 var _dati: Dictionary = {}
 var _tokens: Dictionary = {}      # combatant_id -> Node2D
 var _camera: VTTCamera
+var _ottimizzatore: MapEngineOptimized
 
 
 func _ready() -> void:
@@ -101,6 +102,11 @@ func _ready() -> void:
 	# non qui — il MapManager si occupa SOLO di griglia/token/luci (disaccoppiamento).
 	_camera = VTTCamera.new()
 	add_child(_camera)
+	# Culling (MapEngineOptimized): fuori inquadratura le luci-decoro si spengono e i token PNG
+	# si nascondono — VRAM libera per l'LLM locale. Le luci-vista dei PG non si toccano mai.
+	_ottimizzatore = MapEngineOptimized.new()
+	add_child(_ottimizzatore)
+	_ottimizzatore.configura(_camera, [_lights, _tokens_root])
 
 
 # --- Costruzione dei 4 TileMapLayer + contenitori Y-sortati ---
@@ -451,7 +457,13 @@ func spawn_token(combatant_id: String, cell: Vector2i, is_pc: bool, colore: Colo
 	_tokens_root.add_child(token)
 	_tokens[combatant_id] = token
 	if is_pc:
-		token.add_child(_nuova_luce(Color(0.9, 0.92, 1.0), 1.1, 4.2))
+		# La luce-vista di un PG e' STATO DI GIOCO (visione condivisa), non decoro: il meta
+		# "visione" dice al culling di non spegnerla mai, anche se il token esce dall'inquadratura.
+		var vista: PointLight2D = _nuova_luce(Color(0.9, 0.92, 1.0), 1.1, 4.2)
+		vista.set_meta("visione", true)
+		token.add_child(vista)
+	else:
+		token.set_meta("cullabile", true)  # i PNG fuori schermo possono sparire senza conseguenze
 	EventBus.nexus_token_spawned.emit(combatant_id, cell)
 
 
