@@ -39,6 +39,7 @@ AIBridge="*res://scripts/network/ai_bridge.gd"
 ChatCombatBridge="*res://scripts/combat/chat_combat_bridge.gd"
 ChatTravelBridge="*res://scripts/network/chat_travel_bridge.gd"
 MasterVoice="*res://scripts/network/master_voice.gd"
+AmbienceManager="*res://scripts/autoload/ambience_manager.gd"
 DiceServer="*res://scripts/network/dice_server.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 

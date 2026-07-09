@@ -15,7 +15,7 @@ Godot 4.3+ (`Import` → seleziona `godot/project.godot`).
 
 ```
 godot/
-├── project.godot                     # 25 autoload (ordine di dipendenza) + scena principale
+├── project.godot                     # 26 autoload (ordine di dipendenza) + scena principale
 ├── main.tscn                         # scena principale (root Control + vtt_main.gd)
 ├── scenes/nexus_demo.tscn            # scena standalone del Nexus Map Engine (prova i dungeon da soli)
 ├── data/                             # cataloghi statici (regola: JSON in res://data/)
@@ -190,10 +190,17 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   bloccante e in coda; il testo viene ripulito da emoji/markup e troncato a fine frase. Toggle
   **🔊 Voce Master** nella toolbar; se il sistema non ha un sintetizzatore, si spegne da solo e lo
   dice una volta. Il comando `speak` del Master interrompe e parla subito (voce di un PNG).
-- **Audio procedurale/ambience + STT** (riconoscimento vocale in ingresso), **overworld con tile
-  reali** (qui è stilizzata — la modalità a piedi cammina sulla proiezione stilizzata, non su
-  Leaflet/OSM), **multiplayer** (relay/Supabase — scelta di design: il tavolo è locale):
-  non ancora portati.
+- ~~Ambience procedurale + ducking~~ ORA C'È (`AmbienceManager`, chiude il Task 4): quattro
+  atmosfere SINTETIZZATE all'avvio (niente file audio: vento dei vicoli, onde del lungomare,
+  drone della cripta, tamburi di battaglia), in loop senza cuciture (frequenze in fase, rumore
+  ricucito con crossfade — DSP verificato a tavolino: zero clipping, cucitura sotto soglia).
+  La scena la scelgono gli EVENTI: COMBAT → tamburi, dungeon generato → drone, POI costiero →
+  onde, altrimenti città; i passaggi sono crossfade. **Ducking**: quando la voce del Master
+  parla (bordi veri dal motore TTS), l'atmosfera si abbassa da sola sul bus "Ambience" e poi
+  risale. Toggle **🎵 Musica** in toolbar.
+- **STT** (riconoscimento vocale in ingresso), **overworld con tile reali** (qui è stilizzata —
+  la modalità a piedi cammina sulla proiezione stilizzata, non su Leaflet/OSM), **multiplayer**
+  (relay/Supabase — scelta di design: il tavolo è locale): non ancora portati.
 - **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio) e il **Sistema
   dropdown** del monolite (autodiagnosi moduli, "modalità console"): non portati — in
   Godot un eventuale problema di script lo segnala l'editor stesso, non serve un pannello dedicato.
@@ -235,7 +242,7 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 48 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 49 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)

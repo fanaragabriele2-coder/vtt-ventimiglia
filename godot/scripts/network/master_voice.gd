@@ -15,6 +15,10 @@ extends Node
 ## setting "audio/general/text_to_speech=true" (gia' impostato in project.godot).
 
 signal stato_cambiato(attiva: bool)
+## La voce ha iniziato/finito di parlare (bordi VERI dal motore TTS del sistema): li usa
+## AmbienceManager per abbassare l'atmosfera mentre il Master parla (ducking) e poi rialzarla.
+signal voce_iniziata
+signal voce_terminata
 
 ## Oltre questa lunghezza la battuta viene troncata a fine frase: una risposta fiume del Master non
 ## deve inchiodare la voce per minuti (e il testo resta comunque leggibile in chat).
@@ -24,12 +28,21 @@ var _attiva: bool = true
 var _disponibile: bool = false
 var _voce_id: String = ""
 var _avvisato_indisponibile: bool = false
+var _prossimo_utterance_id: int = 0
+var _battute_in_corso: int = 0
 
 
 func _ready() -> void:
 	_disponibile = DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH)
 	if _disponibile:
 		_scegli_voce()
+		# Bordi delle battute dal motore TTS vero: servono al ducking dell'atmosfera.
+		DisplayServer.tts_set_utterance_callback(
+			DisplayServer.TTS_UTTERANCE_STARTED, _on_utterance_iniziata)
+		DisplayServer.tts_set_utterance_callback(
+			DisplayServer.TTS_UTTERANCE_ENDED, _on_utterance_finita)
+		DisplayServer.tts_set_utterance_callback(
+			DisplayServer.TTS_UTTERANCE_CANCELED, _on_utterance_finita)
 	AIBridge.master_complete.connect(_on_master_complete)
 	AIBridge.speak_requested.connect(_on_speak_requested)
 
@@ -71,6 +84,11 @@ func imposta_attiva(attiva: bool) -> void:
 func ferma() -> void:
 	if _disponibile:
 		DisplayServer.tts_stop()
+	# tts_stop dovrebbe far scattare i CANCELED, ma non tutti i backend lo fanno: si chiude il
+	# conteggio a mano, cosi' il ducking dell'atmosfera non resta mai incastrato a meta'.
+	if _battute_in_corso > 0:
+		_battute_in_corso = 0
+		voce_terminata.emit()
 
 
 ## Accoda una battuta da leggere (interrupt=false: si mette in fila, non taglia quella in corso).
@@ -81,7 +99,7 @@ func parla(testo: String) -> void:
 	var pulito: String = _ripulisci(testo)
 	if pulito.is_empty():
 		return
-	DisplayServer.tts_speak(pulito, _voce_id, 60, 1.0, 1.0, 0, false)
+	DisplayServer.tts_speak(pulito, _voce_id, 60, 1.0, 1.0, _nuovo_utterance_id(), false)
 
 
 func _on_master_complete(narration: String, _commands: Array) -> void:
@@ -97,7 +115,24 @@ func _on_speak_requested(text: String) -> void:
 	var pulito: String = _ripulisci(text)
 	if pulito.is_empty():
 		return
-	DisplayServer.tts_speak(pulito, _voce_id, 65, 1.05, 1.0, 0, true)
+	DisplayServer.tts_speak(pulito, _voce_id, 65, 1.05, 1.0, _nuovo_utterance_id(), true)
+
+
+func _nuovo_utterance_id() -> int:
+	_prossimo_utterance_id += 1
+	return _prossimo_utterance_id
+
+
+func _on_utterance_iniziata(_id: int) -> void:
+	_battute_in_corso += 1
+	if _battute_in_corso == 1:
+		voce_iniziata.emit()
+
+
+func _on_utterance_finita(_id: int) -> void:
+	_battute_in_corso = maxi(0, _battute_in_corso - 1)
+	if _battute_in_corso == 0:
+		voce_terminata.emit()
 
 
 func _avvisa_indisponibile() -> void:

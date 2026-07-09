@@ -15,6 +15,7 @@ var _ai_toggle_btn: Button
 var _voce_btn: Button
 var _dadi_telefono_btn: Button
 var _storia_btn: Button
+var _musica_btn: Button
 var _chat_panel: MasterChatPanel
 var _nlp_panel: NlpUiController
 var _background_dialog: FileDialog
@@ -168,6 +169,8 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_voce_btn)
 	_storia_btn = _toolbar_button("📖 Storia", _toggle_storia)
 	row.add_child(_storia_btn)
+	_musica_btn = _toolbar_button("🎵 Musica: ON", _toggle_musica)
+	row.add_child(_musica_btn)
 	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	_dadi_telefono_btn = _toolbar_button("📱 Dadi: OFF", _toggle_dice_server)
 	row.add_child(_dadi_telefono_btn)
@@ -232,10 +235,17 @@ func _toggle_storia() -> void:
 	_storia_btn.text = "💬 Chat" if storia_attiva else "📖 Storia"
 
 
+## Accende/spegne l'atmosfera procedurale (vento/onde/drone/tamburi, scelta dagli eventi).
+func _toggle_musica() -> void:
+	AmbienceManager.imposta_attiva(not AmbienceManager.is_attiva())
+	_musica_btn.text = "🎵 Musica: ON" if AmbienceManager.is_attiva() else "🔇 Musica: OFF"
+
+
 ## Accende/spegne la lettura ad alta voce della narrazione del Master (TTS del sistema operativo).
 func _toggle_voce_master() -> void:
 	if not MasterVoice.e_disponibile():
-		GameState.announce("🔇 Voce Master non disponibile su questo sistema (manca il sintetizzatore vocale).")
+		GameState.announce(
+			"🔇 Voce Master non disponibile su questo sistema (manca il sintetizzatore vocale).")
 		return
 	MasterVoice.imposta_attiva(not MasterVoice.is_attiva())
 	_voce_btn.text = "🔊 Voce Master: ON" if MasterVoice.is_attiva() else "🔇 Voce Master: OFF"
