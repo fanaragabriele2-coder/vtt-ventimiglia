@@ -157,37 +157,53 @@ func _build_toolbar() -> PanelContainer:
 	sb.content_margin_bottom = 6
 	panel.add_theme_stylebox_override("panel", sb)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	panel.add_child(row)
+	# Titolo su una riga, pulsanti sotto in un contenitore che VA A CAPO da solo (HFlowContainer):
+	# con 14 comandi una riga unica sfonderebbe una TV — su schermi larghi resta comunque una riga.
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	panel.add_child(col)
 
 	var title := Label.new()
 	title.text = "⚜ Tavolo Oscuro di Ventimiglia"
 	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", Color(0.94, 0.83, 0.53))
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(title)
+	col.add_child(title)
+
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 8)
+	row.add_theme_constant_override("v_separation", 6)
+	col.add_child(row)
 
 	# Handler con nome (i lambda multi-linea come argomento sono fragili in GDScript: meglio metodi).
+	# Separatori verticali raggruppano i comandi per funzione (combattimento · IA/audio · sistema).
 	row.add_child(_toolbar_button("⚔ Evoca 2 Goblin", _spawn_goblins))
 	row.add_child(_toolbar_button("💀 Evoca Orco", _spawn_orc))
 	row.add_child(_toolbar_button("🏳 Fine scontro", _end_combat))
+	row.add_child(_separatore_toolbar())
 	_ai_toggle_btn = _toolbar_button("🐺 IA Nemica: ON", _toggle_enemy_ai)
 	row.add_child(_ai_toggle_btn)
 	_voce_btn = _toolbar_button("🔊 Voce Master: ON", _toggle_voce_master)
 	row.add_child(_voce_btn)
-	_storia_btn = _toolbar_button("📖 Storia", _toggle_storia)
-	row.add_child(_storia_btn)
 	_musica_btn = _toolbar_button("🎵 Musica: ON", _toggle_musica)
 	row.add_child(_musica_btn)
-	row.add_child(_toolbar_button("🛠 Strumenti", _toggle_strumenti_master))
-	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
+	_storia_btn = _toolbar_button("📖 Storia", _toggle_storia)
+	row.add_child(_storia_btn)
 	_dadi_telefono_btn = _toolbar_button("📱 Dadi: OFF", _toggle_dice_server)
 	row.add_child(_dadi_telefono_btn)
+	row.add_child(_toolbar_button("🛠 Strumenti", _toggle_strumenti_master))
+	row.add_child(_separatore_toolbar())
+	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
 	row.add_child(_toolbar_button("💾 Salva", _save_game))
 	row.add_child(_toolbar_button("📂 Carica", _load_game))
 	return panel
+
+
+## Sottile separatore verticale tra gruppi di pulsanti della toolbar.
+func _separatore_toolbar() -> VSeparator:
+	var sep := VSeparator.new()
+	sep.add_theme_constant_override("separation", 10)
+	return sep
 
 
 ## UI asimmetrica: accende/spegne il mini server HTTP dei dadi (i giocatori tirano dal telefono,
