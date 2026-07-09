@@ -16,6 +16,7 @@ var _voce_btn: Button
 var _dadi_telefono_btn: Button
 var _storia_btn: Button
 var _musica_btn: Button
+var _master_tools: MasterToolsPanel
 var _chat_panel: MasterChatPanel
 var _nlp_panel: NlpUiController
 var _background_dialog: FileDialog
@@ -136,6 +137,14 @@ func _build_layout() -> void:
 	# Overlay di debug (F3): FPS, VRAM, stato macchina e statistiche del culling in tempo reale.
 	add_child(DebugOverlay.new())
 
+	# Cassetto Strumenti del Master: overlay a comparsa in alto a destra (toggle dal pulsante 🛠).
+	_master_tools = MasterToolsPanel.new()
+	_master_tools.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_master_tools.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_master_tools.offset_top = 62
+	_master_tools.offset_right = -12
+	add_child(_master_tools)
+
 
 func _build_toolbar() -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -171,6 +180,7 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_storia_btn)
 	_musica_btn = _toolbar_button("🎵 Musica: ON", _toggle_musica)
 	row.add_child(_musica_btn)
+	row.add_child(_toolbar_button("🛠 Strumenti", _toggle_strumenti_master))
 	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	_dadi_telefono_btn = _toolbar_button("📱 Dadi: OFF", _toggle_dice_server)
 	row.add_child(_dadi_telefono_btn)
@@ -233,6 +243,11 @@ func _toggle_storia() -> void:
 	_nlp_panel.visible = storia_attiva
 	_chat_panel.visible = not storia_attiva
 	_storia_btn.text = "💬 Chat" if storia_attiva else "📖 Storia"
+
+
+## Apre/chiude il cassetto Strumenti del Master (nebbia manuale, HP dei combattenti, atmosfera).
+func _toggle_strumenti_master() -> void:
+	_master_tools.alterna()
 
 
 ## Accende/spegne l'atmosfera procedurale (vento/onde/drone/tamburi, scelta dagli eventi).

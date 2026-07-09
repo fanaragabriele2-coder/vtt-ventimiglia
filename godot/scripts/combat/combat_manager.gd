@@ -28,6 +28,9 @@ signal victory()
 signal party_wiped()
 ## La cella di un combattente e' cambiata (la UI mappa si allinea da sola).
 signal combatant_position_changed(combatant_id: String, cell: Vector2i)
+## Un combattente e' stato TOLTO dalla scena dal Master (non ucciso: niente XP/bottino). La UI
+## mappa rimuove il token ascoltando questo signal.
+signal combatant_removed(combatant_id: String)
 
 const MONSTERS_PATH: String = "res://data/monsters.json"
 const PC_PREFIX: String = "pc-"
@@ -560,6 +563,35 @@ func has_combatant_cell(combatant_id: String) -> bool:
 
 func clear_combatant_cell(combatant_id: String) -> void:
 	_positions.erase(combatant_id)
+
+
+## Toglie un PNG dalla scena su ordine del Master (strumento del cassetto): NON e' una morte —
+## niente XP ne' bottino, il nemico semplicemente se ne va (fugge, viene rimosso per errore, ecc.).
+## Non tocca i PG del party (quelli si gestiscono dalla scheda/creazione). Se era il suo turno, si
+## passa al successivo per non lasciare il combattimento appeso su un combattente inesistente.
+func remove_combatant(combatant_id: String) -> bool:
+	var indice: int = -1
+	for i: int in range(_combatants.size()):
+		if _combatants[i]["id"] == combatant_id:
+			indice = i
+			break
+	if indice == -1 or _combatants[indice]["kind"] == "pc":
+		return false
+	var era_suo_turno: bool = _active and indice == _current_turn_index
+	_combatants.remove_at(indice)
+	_positions.erase(combatant_id)
+	if _active and indice < _current_turn_index:
+		_current_turn_index -= 1  # l'ordine si e' accorciato prima del turno corrente
+	combatant_removed.emit(combatant_id)
+	var npc_rimasti: Array = _combatants.filter(func(c: Dictionary) -> bool: return c["kind"] == "npc")
+	if _active and npc_rimasti.is_empty():
+		# tolto l'ultimo nemico: e' comunque una fine dello scontro (senza vittoria "da uccisione")
+		end_combat()
+	elif era_suo_turno:
+		_current_turn_index = _current_turn_index % maxi(1, _combatants.size())
+		var corrente: Dictionary = _combatants[_current_turn_index]
+		turn_changed.emit(String(corrente["id"]), _round)
+	return true
 
 
 ## Distanza Chebyshev in celle tra due combattenti, o -1 se una posizione non e' nota.

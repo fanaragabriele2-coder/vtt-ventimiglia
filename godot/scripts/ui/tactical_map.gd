@@ -57,10 +57,12 @@ var _origin: Vector2 = Vector2.ZERO
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_to_group("tactical_map")  # il cassetto Strumenti del Master trova la mappa da qui
 	_apply_dark_style_border()
 	CombatManager.combat_started.connect(_on_combat_started)
 	CombatManager.combatant_added.connect(_on_combatant_added)
 	CombatManager.combatant_defeated.connect(_on_combatant_defeated)
+	CombatManager.combatant_removed.connect(_on_combatant_defeated)  # stessa pulizia del token
 	CombatManager.turn_changed.connect(_on_turn_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
 	# L'IA nemica (o qualunque altro sistema) puo' spostare un combattente SENZA passare dal click
@@ -291,6 +293,25 @@ func _token_id_at(cell: Vector2i) -> String:
 
 
 # --- Nebbia di guerra ---
+
+## Strumento del Master: svela TUTTA la mappa (rivela ogni cella). Utile per mostrare l'ambiente
+## quando la scena e' finita o per un colpo d'occhio da dietro lo schermo.
+func svela_tutta_la_nebbia() -> void:
+	for y: int in range(GRID_ROWS):
+		for x: int in range(GRID_COLS):
+			_revealed["%d,%d" % [x, y]] = true
+	queue_redraw()
+
+
+## Strumento del Master: rimette la nebbia ovunque, poi riscopre solo attorno ai PG (com'era a
+## inizio scena). Non toglie la vista al party, la "resetta".
+func rinnebbia_tutto() -> void:
+	_revealed.clear()
+	for id: String in _tokens.keys():
+		if _tokens[id]["kind"] == "pc":
+			_reveal_around(_tokens[id]["cell"], FOG_REVEAL_RADIUS)
+	queue_redraw()
+
 
 func _reveal_around(cell: Vector2i, radius: int) -> void:
 	for dy: int in range(-radius, radius + 1):

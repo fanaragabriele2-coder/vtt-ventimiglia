@@ -43,6 +43,7 @@ func _ready() -> void:
 	# senza che AIBridge conosca il Nexus. Alla morte, il token sparisce.
 	CombatManager.combatant_added.connect(_on_combatant_added)
 	CombatManager.combatant_defeated.connect(_on_combatant_defeated)
+	CombatManager.combatant_removed.connect(_on_combatant_removed)
 	# Hook esplicito per il Master IA: "spawna sulla cella X" (il token nasce comunque da combatant_added).
 	EventBus.nexus_spawn_requested.connect(_on_spawn_requested)
 	# Politica d'input del tavolo (selezione centralizzata) + modalita' Master.
@@ -289,6 +290,11 @@ func _on_combatant_defeated(combatant_id: String, _source_id: String) -> void:
 	if LocalInputManager.selezionato() == combatant_id:
 		LocalInputManager.deseleziona()
 	_map.rimuovi_token(combatant_id)
+
+
+## Un PNG tolto dal Master (cassetto Strumenti): stessa pulizia del token di quando cade.
+func _on_combatant_removed(combatant_id: String) -> void:
+	_on_combatant_defeated(combatant_id, "")
 
 
 ## Hook per il Master IA: chiede lo spawn su una cella precisa. Il token nasce da _on_combatant_added

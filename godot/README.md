@@ -201,9 +201,15 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 - **STT** (riconoscimento vocale in ingresso), **overworld con tile reali** (qui è stilizzata —
   la modalità a piedi cammina sulla proiezione stilizzata, non su Leaflet/OSM), **multiplayer**
   (relay/Supabase — scelta di design: il tavolo è locale): non ancora portati.
-- **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio) e il **Sistema
-  dropdown** del monolite (autodiagnosi moduli, "modalità console"): non portati — in
-  Godot un eventuale problema di script lo segnala l'editor stesso, non serve un pannello dedicato.
+- ~~Cassetto "🛠 Strumenti" del Master~~ ORA C'È (`MasterToolsPanel`, toggle **🛠 Strumenti** in
+  toolbar): overlay a comparsa coi comandi da dietro lo schermo — **nebbia** manuale (svela tutta
+  la mappa tattica / rimetti la nebbia riscoprendo solo attorno ai PG), la **lista viva** dei
+  combattenti con HP a colpo d'occhio e pulsanti rapidi −5/+5 e 🗑 (togli il PNG dalla scena:
+  NON è una morte, niente XP/bottino, gestisce l'indice del turno per non lasciare lo scontro
+  appeso — logica verificata a tavolino), e la **manopola dell'atmosfera** (forza città/mare/
+  dungeon/battaglia o rimetti l'automatico). Resta non portato solo il **Sistema dropdown** del
+  monolite (autodiagnosi moduli, "modalità console"): in Godot un problema di script lo segnala
+  l'editor stesso, non serve un pannello dedicato.
 - **Incontri casuali durante la camminata**: la modalità a piedi rileva le zone e narra gli arrivi,
   ma non fa comparire nemici da sola mentre cammini (`VTTCampagna.spawnEnemyNearPg` del monolite
   era comunque pilotato dal Master IA, non casuale in autonomia).
@@ -242,7 +248,7 @@ Trasparenza sui gap noti, per chi continua il lavoro:
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 49 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 50 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)
