@@ -178,9 +178,15 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   e il suo token sulla griglia; al turno di un membro la scheda attiva passa a LUI da sola
   (hotseat automatico: inventario, economia azioni e barra XP seguono via snapshot per-PG), e
   l'XP del colpo di grazia va al personaggio che l'ha sferrato davvero.
-- **Dadi 3D fisici** (qui c'è solo un tiratore rapido D4-D20 non fisico), **audio procedurale + voce**
-  (Task 4 del monolite), **TTS/STT**, **overworld con tile reali** (qui è stilizzata — la modalità a
-  piedi cammina sulla proiezione stilizzata, non su Leaflet/OSM), **multiplayer** (relay/Supabase):
+- ~~Dadi 3D fisici~~ ORA CI SONO (Modulo 8 completo): d4/d6/d8/d10/d12/d20 poliedri VERI
+  (`DiceGeometry` — geometria verificata a tavolino: facce opposte che sommano a N+1, aquiloni
+  del d10 piani) lanciati come `RigidBody3D` in un vassoio 3D overlay (`DiceTray3D`); il
+  risultato si legge dalla faccia rivolta in alto (il d4 dalla faccia a terra, come quelli veri)
+  e finisce in chat a nome del PG attivo. I pulsanti del tiratore rapido aprono il vassoio di
+  default (toggle "3D" per il tiro istantaneo); dal vassoio si tirano anche N dadi insieme (×1-×8).
+- **Audio procedurale + voce** (Task 4 del monolite), **TTS/STT**, **overworld con tile reali**
+  (qui è stilizzata — la modalità a piedi cammina sulla proiezione stilizzata, non su
+  Leaflet/OSM), **multiplayer** (relay/Supabase — scelta di design: il tavolo è locale):
   non ancora portati.
 - **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio) e il **Sistema
   dropdown** del monolite (autodiagnosi moduli, "modalità console"): non portati — in

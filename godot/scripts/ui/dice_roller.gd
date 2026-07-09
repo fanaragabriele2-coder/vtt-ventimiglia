@@ -1,13 +1,17 @@
 class_name DiceRoller
 extends PanelContainer
-## Tiratore di dadi rapido — porting FUNZIONALE (non grafico) del Modulo 8 "3D Dice Engine": niente
-## fisica 3D qui (gap noto, vedi README), ma la stessa funzione base — tira 1dN e annuncia il
-## risultato nel canale unico di sistema (GameState.announce), cosi' compare nel log della Chat
-## Master esattamente come un tiro del monolite.
+## Tiratore di dadi rapido (Modulo 8 "3D Dice Engine"). Di default i tiri vanno al vassoio 3D
+## FISICO (DiceTray3D, trovato via gruppo "vassoio_dadi_3d"): dadi veri che rotolano sul feltro,
+## risultato letto dalla faccia in alto. Il toggle "3D" permette di tornare al tiro istantaneo
+## (utile quando serve solo il numero, senza la scenetta). In entrambi i casi il risultato passa
+## per il canale unico di sistema (GameState.announce) e compare nel log della Chat Master.
 
 const _FACES: Array[int] = [4, 6, 8, 10, 12, 20]
 
 var _result_label: Label
+var _btn_3d: Button
+var _usa_3d: bool = true
+var _vassoio_connesso: bool = false
 
 
 func _ready() -> void:
@@ -45,6 +49,13 @@ func _build_ui() -> void:
 		b.pressed.connect(_on_die_pressed.bind(faces))
 		row.add_child(b)
 
+	_btn_3d = Button.new()
+	_btn_3d.text = "3D: ON"
+	_btn_3d.tooltip_text = "Dadi fisici che rotolano sul tavolo (spegni per il tiro istantaneo)"
+	_btn_3d.custom_minimum_size = Vector2(0, 40)
+	_btn_3d.pressed.connect(_toggle_3d)
+	row.add_child(_btn_3d)
+
 	_result_label = Label.new()
 	_result_label.text = "–"
 	_result_label.custom_minimum_size = Vector2(50, 0)
@@ -54,7 +65,27 @@ func _build_ui() -> void:
 	row.add_child(_result_label)
 
 
+func _toggle_3d() -> void:
+	_usa_3d = not _usa_3d
+	_btn_3d.text = "3D: ON" if _usa_3d else "3D: OFF"
+
+
+func _vassoio() -> DiceTray3D:
+	return get_tree().get_first_node_in_group("vassoio_dadi_3d") as DiceTray3D
+
+
 func _on_die_pressed(faces: int) -> void:
+	var vassoio: DiceTray3D = _vassoio()
+	if _usa_3d and vassoio:
+		if not _vassoio_connesso:
+			vassoio.tiro_completato.connect(_on_tiro_3d)
+			_vassoio_connesso = true
+		vassoio.tira(faces)
+		return
 	var result: int = randi_range(1, faces)
 	_result_label.text = str(result)
 	GameState.announce("🎲 Tiro D%d: %d" % [faces, result])
+
+
+func _on_tiro_3d(_facce: int, totale: int, _singoli: PackedInt32Array) -> void:
+	_result_label.text = str(totale)

@@ -118,6 +118,11 @@ func _build_layout() -> void:
 	# Overlay globale (sopra tutto): popup di bottino (Modulo 15/41).
 	add_child(LootPopup.new())
 
+	# Vassoio dei dadi 3D fisici (Modulo 8): sopra tutto, nascosto finche' non si tira.
+	var vassoio := DiceTray3D.new()
+	vassoio.visible = false
+	add_child(vassoio)
+
 
 func _build_toolbar() -> PanelContainer:
 	var panel := PanelContainer.new()
