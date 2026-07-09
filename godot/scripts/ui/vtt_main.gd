@@ -132,6 +132,9 @@ func _build_layout() -> void:
 	vassoio.visible = false
 	add_child(vassoio)
 
+	# Overlay di debug (F3): FPS, VRAM, stato macchina e statistiche del culling in tempo reale.
+	add_child(DebugOverlay.new())
+
 
 func _build_toolbar() -> PanelContainer:
 	var panel := PanelContainer.new()

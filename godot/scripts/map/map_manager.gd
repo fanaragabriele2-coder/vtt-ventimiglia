@@ -107,6 +107,7 @@ func _ready() -> void:
 	_ottimizzatore = MapEngineOptimized.new()
 	add_child(_ottimizzatore)
 	_ottimizzatore.configura(_camera, [_lights, _tokens_root])
+	add_to_group("nexus_map")  # l'overlay di debug (F3) trova la mappa da qui
 
 
 # --- Costruzione dei 4 TileMapLayer + contenitori Y-sortati ---
@@ -465,6 +466,11 @@ func spawn_token(combatant_id: String, cell: Vector2i, is_pc: bool, colore: Colo
 	else:
 		token.set_meta("cullabile", true)  # i PNG fuori schermo possono sparire senza conseguenze
 	EventBus.nexus_token_spawned.emit(combatant_id, cell)
+
+
+## Numeri onesti del culling per l'overlay di debug (F3): luci davvero accese, chunk in VRAM.
+func statistiche_culling() -> Dictionary:
+	return _ottimizzatore.statistiche() if _ottimizzatore != null else {}
 
 
 ## Id del token che occupa la cella ("" se libera). Le posizioni si derivano dagli sprite: nessuna
