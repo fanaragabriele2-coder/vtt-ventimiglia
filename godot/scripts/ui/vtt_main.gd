@@ -12,6 +12,7 @@ var _view_tactical_btn: Button
 var _view_overworld_btn: Button
 var _view_nexus_btn: Button
 var _ai_toggle_btn: Button
+var _voce_btn: Button
 var _dadi_telefono_btn: Button
 var _background_dialog: FileDialog
 
@@ -152,6 +153,8 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_toolbar_button("🏳 Fine scontro", _end_combat))
 	_ai_toggle_btn = _toolbar_button("🐺 IA Nemica: ON", _toggle_enemy_ai)
 	row.add_child(_ai_toggle_btn)
+	_voce_btn = _toolbar_button("🔊 Voce Master: ON", _toggle_voce_master)
+	row.add_child(_voce_btn)
 	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	_dadi_telefono_btn = _toolbar_button("📱 Dadi: OFF", _toggle_dice_server)
 	row.add_child(_dadi_telefono_btn)
@@ -205,6 +208,15 @@ func _on_map_background_selected(path: String) -> void:
 func _toggle_enemy_ai() -> void:
 	EnemyAI.set_enabled(not EnemyAI.is_enabled())
 	_ai_toggle_btn.text = "🐺 IA Nemica: ON" if EnemyAI.is_enabled() else "🐺 IA Nemica: OFF"
+
+
+## Accende/spegne la lettura ad alta voce della narrazione del Master (TTS del sistema operativo).
+func _toggle_voce_master() -> void:
+	if not MasterVoice.e_disponibile():
+		GameState.announce("🔇 Voce Master non disponibile su questo sistema (manca il sintetizzatore vocale).")
+		return
+	MasterVoice.imposta_attiva(not MasterVoice.is_attiva())
+	_voce_btn.text = "🔊 Voce Master: ON" if MasterVoice.is_attiva() else "🔇 Voce Master: OFF"
 
 
 func _toggle_fullscreen() -> void:

@@ -216,7 +216,8 @@ func _on_game_event(event_name: String, payload: Variant) -> void:
 
 
 func _on_speak_requested(text: String) -> void:
-	# Il modulo TTS non c'e' ancora: per ora si annota solo che il Master voleva parlare.
+	# La battuta viene letta ad alta voce da MasterVoice (TTS di sistema); qui la si mostra anche
+	# scritta, per chi tiene la voce spenta o preferisce leggere.
 	_append_system("🔊 (voce Master) " + text)
 
 

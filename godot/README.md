@@ -184,8 +184,14 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   risultato si legge dalla faccia rivolta in alto (il d4 dalla faccia a terra, come quelli veri)
   e finisce in chat a nome del PG attivo. I pulsanti del tiratore rapido aprono il vassoio di
   default (toggle "3D" per il tiro istantaneo); dal vassoio si tirano anche N dadi insieme (×1-×8).
-- **Audio procedurale + voce** (Task 4 del monolite), **TTS/STT**, **overworld con tile reali**
-  (qui è stilizzata — la modalità a piedi cammina sulla proiezione stilizzata, non su
+- ~~Voce del Master (TTS)~~ ORA C'È (`MasterVoice`, parte del Task 4): la narrazione del Master
+  viene letta ad alta voce dal sintetizzatore vocale del sistema operativo (SAPI su Windows,
+  speech-dispatcher su Linux, AVSpeech su macOS), preferendo una voce italiana se presente. Non
+  bloccante e in coda; il testo viene ripulito da emoji/markup e troncato a fine frase. Toggle
+  **🔊 Voce Master** nella toolbar; se il sistema non ha un sintetizzatore, si spegne da solo e lo
+  dice una volta. Il comando `speak` del Master interrompe e parla subito (voce di un PNG).
+- **Audio procedurale/ambience + STT** (riconoscimento vocale in ingresso), **overworld con tile
+  reali** (qui è stilizzata — la modalità a piedi cammina sulla proiezione stilizzata, non su
   Leaflet/OSM), **multiplayer** (relay/Supabase — scelta di design: il tavolo è locale):
   non ancora portati.
 - **Cassetto "🛠 Strumenti" del Master** (fog manuale, controlli token/audio) e il **Sistema
