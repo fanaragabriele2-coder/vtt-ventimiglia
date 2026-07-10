@@ -6,7 +6,7 @@ extends PanelContainer
 ## tirata, la card di turno si evidenzia a ogni turn_changed, gli HP calano in tempo reale, e i
 ## pulsanti (Attacca / Spingi / Termina turno) invocano il manager. Vittoria/TPK spengono l'HUD.
 
-var _initiative_strip: HBoxContainer
+var _initiative_strip: HFlowContainer
 var _target_option: OptionButton
 var _round_label: Label
 var _last_event: Label
@@ -30,6 +30,9 @@ func _ready() -> void:
 	CombatManager.combatant_added.connect(_on_combatant_added)
 	CombatManager.attack_resolved.connect(_on_attack_resolved)
 	CombatManager.shove_resolved.connect(_on_shove_resolved)
+	# Economia delle azioni: i pulsanti si accendono/spengono in base a cio' che resta nel turno
+	# (una azione base, una bonus, poi Termina turno) — niente piu' attacchi all'infinito.
+	InventoryManager.action_economy_changed.connect(_on_action_economy_changed)
 	CombatManager.victory.connect(func() -> void: _announce("🏆 VITTORIA! Tutti i nemici sconfitti."))
 	CombatManager.party_wiped.connect(func() -> void: _announce("💀 Il party e' caduto."))
 	visible = false  # nascosto finche' non inizia un combattimento
@@ -54,8 +57,11 @@ func _build_ui() -> void:
 	add_child(root)
 
 	# --- Barra dell'iniziativa (una card per combattente) ---
-	_initiative_strip = HBoxContainer.new()
-	_initiative_strip.add_theme_constant_override("separation", 6)
+	# HFlowContainer: con molti combattenti le card vanno a capo invece di allargare la colonna
+	# centrale (che spingerebbe la chat a destra fuori schermo).
+	_initiative_strip = HFlowContainer.new()
+	_initiative_strip.add_theme_constant_override("h_separation", 6)
+	_initiative_strip.add_theme_constant_override("v_separation", 6)
 	root.add_child(_initiative_strip)
 
 	# --- Riga info: round + ultimo evento ---
@@ -172,6 +178,7 @@ func _on_combat_started() -> void:
 	visible = true
 	_rebuild_strip()
 	_round_label.text = "Round 1"
+	_refresh_action_buttons()
 
 
 func _on_combat_ended() -> void:
@@ -193,6 +200,7 @@ func _on_turn_changed(combatant_id: String, round_number: int) -> void:
 	var c: Dictionary = CombatManager.get_combatant(combatant_id)
 	if not c.is_empty():
 		_last_event.text = "Turno di %s" % c["name"]
+	_refresh_action_buttons()
 
 
 func _on_combatant_damaged(combatant_id: String, amount: int, current_hp: int) -> void:
@@ -243,18 +251,56 @@ func _announce(text: String) -> void:
 # --- Handler dei pulsanti azione ---
 
 func _on_attack_pressed() -> void:
+	if not _puo_agire():
+		return
 	var target: String = _selected_target_id()
 	if target.is_empty():
 		_last_event.text = "Nessun bersaglio selezionato."
 		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: fai un'azione bonus o termina il turno."
+		return
 	CombatManager.resolve_attack(_actor_id(), target, "normal")
+	InventoryManager.spend_action_resource("action")  # una sola azione base per turno
 
 
 func _on_shove_pressed() -> void:
+	if not _puo_agire():
+		return
 	var target: String = _selected_target_id()
 	if target.is_empty():
 		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: la spinta e' la tua azione del turno."
+		return
 	CombatManager.shove(_actor_id(), target)
+	InventoryManager.spend_action_resource("action")
+
+
+func _on_action_economy_changed(_economy: Dictionary) -> void:
+	_refresh_action_buttons()
+
+
+## Solo nel turno di un PG si puo' agire dai pulsanti (nei turni dei PNG comanda l'IA nemica).
+func _puo_agire() -> bool:
+	var c: Dictionary = CombatManager.get_combatant(_current_id)
+	if CombatManager.is_active() and not c.is_empty() and c["kind"] == "pc":
+		return true
+	_last_event.text = "Non e' il tuo turno."
+	return false
+
+
+## Accende/spegne i pulsanti azione in base a cosa resta nel turno del PG corrente: una azione
+## base (Attacca/Spingi), una bonus, poi solo Termina turno. Nei turni dei PNG restano tutti spenti.
+func _refresh_action_buttons() -> void:
+	var c: Dictionary = CombatManager.get_combatant(_current_id)
+	var turno_pc: bool = CombatManager.is_active() and not c.is_empty() and c["kind"] == "pc"
+	var eco: Dictionary = InventoryManager.get_action_economy()
+	var ha_azione: bool = turno_pc and bool(eco.get("action", false))
+	var ha_bonus: bool = turno_pc and bool(eco.get("bonusAction", false))
+	_attack_button.disabled = not ha_azione
+	_shove_button.disabled = not ha_azione
+	_bonus_button.disabled = not ha_bonus
 
 
 func _on_end_turn_pressed() -> void:

@@ -68,9 +68,10 @@ func _build_layout() -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(columns)
 
-	# Sinistra: Scheda PG + barra XP.
+	# Sinistra: Scheda PG + barra XP. Larghezza minima fissa: la scheda non deve schiacciarsi.
 	var left := VBoxContainer.new()
 	left.add_theme_constant_override("separation", 8)
+	left.custom_minimum_size = Vector2(260, 0)
 	columns.add_child(left)
 	left.add_child(XpBar.new())
 	var sheet := CharacterSheetPanel.new()
@@ -113,12 +114,16 @@ func _build_layout() -> void:
 	center.add_child(DiceRoller.new())
 
 	# Destra: Chat Master + Modalita' Storia (NLP). Convivono nello stesso spazio come le viste
-	# del centro: una sola e' visibile, il pulsante in toolbar le scambia.
+	# del centro: una sola e' visibile, il pulsante in toolbar le scambia. Larghezza minima fissa:
+	# quando il combattimento riempie il centro, la chat NON deve venire schiacciata via (era il bug
+	# "la chat non si vede piu' appena inizia lo scontro").
 	_chat_panel = MasterChatPanel.new()
 	_chat_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_chat_panel.custom_minimum_size = Vector2(320, 0)
 	columns.add_child(_chat_panel)
 	_nlp_panel = NlpUiController.new()
 	_nlp_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_nlp_panel.custom_minimum_size = Vector2(320, 0)
 	_nlp_panel.visible = false
 	columns.add_child(_nlp_panel)
 

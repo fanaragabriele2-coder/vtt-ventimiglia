@@ -34,8 +34,11 @@ const NUMERI: Dictionary = {
 	"cinque": 5, "sei": 6, "sette": 7, "otto": 8,
 }
 
-# Comandi <<DATI>> che dimostrano che il Master ha GIA' gestito lo scontro via canale strutturato.
-const COMANDI_SPAWN: Array[String] = ["addNpc", "spawnAt", "startCombat"]
+# Comandi <<DATI>> che dimostrano che il Master ha DAVVERO piazzato dei nemici via canale
+# strutturato: solo questi disattivano il rilevamento dalla prosa. NON "startCombat" — un
+# startCombat "nudo" (senza addNpc/spawnAt) e' proprio il caso in cui i nemici NON sono stati
+# piazzati e questa rete di sicurezza DEVE intervenire (era il bug "combattimento senza nemici").
+const COMANDI_SPAWN: Array[String] = ["addNpc", "spawnAt"]
 
 var _re_combattimento: RegEx
 

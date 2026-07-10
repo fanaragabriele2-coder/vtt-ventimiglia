@@ -239,6 +239,17 @@ func start_combat() -> void:
 	if not any_conscious:
 		_last_event = "Tutti i PG sono incoscienti. Rianimali prima."
 		return
+	# Non si avvia un combattimento SENZA nemici: un "startCombat" nudo (dal Master IA o altrove)
+	# lascerebbe la scena con solo i PG e i pulsanti che girano a vuoto. Chi vuole davvero uno
+	# scontro deve prima piazzare almeno un PNG (Encounter Balancer, addNpc, il ponte narrazione).
+	var nemico_vivo: bool = false
+	for c: Dictionary in _combatants:
+		if c["kind"] == "npc" and not c["defeated"] and int(c["hitPoints"]) > 0:
+			nemico_vivo = true
+			break
+	if not nemico_vivo:
+		_last_event = "Nessun nemico in scena: evoca dei PNG prima di iniziare il combattimento."
+		return
 	_active = true
 	_round = 1
 	roll_all_initiative()
