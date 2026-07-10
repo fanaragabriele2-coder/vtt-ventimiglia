@@ -4,6 +4,10 @@ extends Control
 ## in un SubViewport con la camera VTT (pan col destro, zoom sulla rotellina), come NexusView.
 ## In alto una mini-toolbar per il ciclo del giorno (CanvasModulate globale del mondo), per aprire
 ## la cartella delle mappe nel file manager, e per ricaricare dopo aver aggiunto/tolto immagini.
+##
+## DRAG & DROP: trascina i file immagine (png/jpg/webp) direttamente sulla finestra del gioco
+## mentre questa vista e' aperta — vengono copiati in user://maps e il mondo si ricostruisce da
+## solo. Zero file manager, zero percorsi: il modo piu' semplice di aggiungere battlemap.
 
 const ORE_BOTTONI: Array[Array] = [
 	["☀ Giorno", "giorno"], ["🌇 Tramonto", "tramonto"],
@@ -19,6 +23,16 @@ func _ready() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_build_viewport()
 	_build_toolbar()
+	# files_dropped vive sulla Window (la vista puo' essere ricreata, la finestra no): connesso
+	# qui e scollegato in _exit_tree, con guardia di visibilita' dentro il gestore — i drop
+	# valgono solo quando il Mondo cucito e' la vista attiva.
+	get_window().files_dropped.connect(_su_file_trascinati)
+
+
+func _exit_tree() -> void:
+	var finestra: Window = get_window()
+	if finestra != null and finestra.files_dropped.is_connected(_su_file_trascinati):
+		finestra.files_dropped.disconnect(_su_file_trascinati)
 
 
 func _build_viewport() -> void:
@@ -82,6 +96,13 @@ func _build_toolbar() -> void:
 	rigenera.pressed.connect(_su_ricarica)
 	row.add_child(rigenera)
 
+	var inquadra := Button.new()
+	inquadra.text = "🗺 Inquadra tutto"
+	inquadra.tooltip_text = "Riporta la camera a inquadrare l'intero mondo cucito."
+	inquadra.custom_minimum_size = Vector2(0, 34)
+	inquadra.pressed.connect(_su_inquadra)
+	row.add_child(inquadra)
+
 
 func _on_ora_pressed(nome: String) -> void:
 	_builder.imposta_ora(nome)
@@ -89,6 +110,25 @@ func _on_ora_pressed(nome: String) -> void:
 
 func _su_apri_cartella() -> void:
 	_builder.apri_cartella_mappe()
+
+
+func _su_inquadra() -> void:
+	_builder.inquadra_mondo()
+
+
+## File trascinati sulla finestra del gioco: se questa vista e' quella attiva, le immagini valide
+## vengono copiate in user://maps e il mondo si ricuce da solo. La guardia di visibilita' evita
+## che un drop fatto in un'altra vista (Nexus, scheda PG...) importi mappe di nascosto.
+func _su_file_trascinati(percorsi: PackedStringArray) -> void:
+	if not is_visible_in_tree():
+		return
+	var copiati: int = _builder.importa_mappe(percorsi)
+	if copiati == 0:
+		GameState.announce("🌍 Mondo: nessun file immagine valido tra quelli trascinati "
+			+ "(formati supportati: png, jpg, webp).")
+		return
+	GameState.announce("🌍 Mondo: %d mappa/e importata/e — ricucio il mondo..." % copiati)
+	_su_ricarica()
 
 
 ## Dopo aver aggiunto/tolto file dalla cartella mappe, ricostruisce il mondo da zero (nuovo nodo

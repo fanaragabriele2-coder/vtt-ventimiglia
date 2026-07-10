@@ -16,6 +16,10 @@ var _target_pos: Vector2 = Vector2.ZERO
 var _target_zoom: float = 1.2
 var _dragging: bool = false
 var _limiti: Rect2 = Rect2()      # bounds del mondo (in pixel); Rect2() = nessun limite
+# Limite minimo di zoom EFFETTIVO: parte da ZOOM_MIN ma adatta_a() lo abbassa quando inquadra un
+# mondo piu' grande dello schermo — altrimenti il primo colpo di rotellina dopo l'inquadratura
+# scatterebbe di colpo da ~0.05 a 0.4 (13x in un frame) invece di zoomare dolcemente.
+var _zoom_min: float = ZOOM_MIN
 
 
 func _ready() -> void:
@@ -52,7 +56,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Zoom mantenendo fermo il punto del mondo sotto il cursore: il bersaglio della camera si sposta
 ## lungo la retta cursore->centro in proporzione al rapporto vecchio/nuovo zoom.
 func _zoom_verso_cursore(fattore: float) -> void:
-	var nuovo_zoom: float = clampf(_target_zoom * fattore, ZOOM_MIN, ZOOM_MAX)
+	var nuovo_zoom: float = clampf(_target_zoom * fattore, _zoom_min, ZOOM_MAX)
 	if is_equal_approx(nuovo_zoom, _target_zoom):
 		return
 	var mouse_world: Vector2 = get_global_mouse_position()
@@ -85,6 +89,9 @@ func adatta_a(rect: Rect2) -> void:
 		vp = Vector2(1152, 648)  # fallback se il viewport non ha ancora una dimensione
 	var fit: float = minf(vp.x / rect.size.x, vp.y / rect.size.y) * 0.95
 	_target_zoom = clampf(fit, 0.03, ZOOM_MAX)  # floor bassissimo: la mega-mappa ci sta tutta
+	# Il fit diventa il nuovo pavimento di zoom: dalla vista "mondo intero" la rotellina riparte
+	# esattamente da li' (niente scatto verso ZOOM_MIN) e non si puo' arretrare oltre il mondo.
+	_zoom_min = minf(ZOOM_MIN, _target_zoom)
 	zoom = Vector2(_target_zoom, _target_zoom)
 	centra_su(rect.get_center())
 

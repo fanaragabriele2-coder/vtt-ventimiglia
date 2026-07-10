@@ -5,16 +5,23 @@ progetto viene aggiornato (un nuovo zip, un `git pull`...), questa cartella fa p
 repository e può essere sovrascritta — le immagini che avevi messo qui **rischiano di
 sparire** al prossimo aggiornamento.
 
-## Metti le tue mappe in `user://maps` invece
+## Il modo più semplice: TRASCINA le immagini sulla finestra del gioco
 
-In gioco, apri la vista **🧩 Mondo cucito** e premi **📁 Apri cartella mappe**: si apre
-direttamente la cartella giusta nel file manager del sistema (Esplora File su Windows), senza
-bisogno di cercare o digitare percorsi. Quella cartella (`user://maps`, fuori dal progetto,
-nella cartella dati dell'utente del sistema operativo) **non viene mai toccata** dagli
-aggiornamenti del gioco: le mappe che ci metti restano per sempre.
+Apri la vista **🧩 Mondo cucito** e **trascina i file immagine (PNG/JPG/WebP) direttamente
+sulla finestra del gioco** (da Esplora File, dal Desktop, da dove vuoi): vengono copiati
+automaticamente in `user://maps` e il mondo si ricostruisce da solo. Niente cartelle da
+cercare, niente percorsi da digitare, niente riavvii.
 
-Dopo aver aggiunto o tolto immagini, premi **🔄 Ricarica mappe** nella stessa vista (non serve
-riavviare il gioco).
+## In alternativa: la cartella `user://maps`
+
+Nella stessa vista, **📁 Apri cartella mappe** apre direttamente la cartella giusta nel file
+manager del sistema (Esplora File su Windows). Quella cartella (`user://maps`, fuori dal
+progetto, nella cartella dati dell'utente del sistema operativo) **non viene mai toccata**
+dagli aggiornamenti del gioco: le mappe che ci metti restano per sempre.
+
+Dopo aver aggiunto o tolto immagini a mano, premi **🔄 Ricarica mappe** nella stessa vista
+(non serve riavviare il gioco). **🗺 Inquadra tutto** riporta la camera a vedere l'intero
+mondo dopo che hai zoomato ed esplorato.
 
 Il `WorldBuilder` cerca PRIMA in `user://maps`; se è vuota, ripiega su questa cartella
 (`res://assets/maps`) — quindi questa cartella del repository resta utile solo per chi

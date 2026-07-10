@@ -32,7 +32,7 @@ extends Node2D
 ##    progetto. Usata SOLO se user://maps non contiene immagini valide.
 const CARTELLA_MAPPE_UTENTE: String = "user://maps"
 const CARTELLA_MAPPE_PROGETTO: String = "res://assets/maps"
-const ESTENSIONI: Array[String] = ["png", "jpg", "jpeg"]
+const ESTENSIONI: Array[String] = ["png", "jpg", "jpeg", "webp"]
 const CAMPIONE_PX: int = 32     # le statistiche cromatiche si misurano su una miniatura
 const GRADING_MIN: float = 0.85  # micro-correzioni: mai stravolgere l'artwork originale
 const GRADING_MAX: float = 1.18
@@ -77,10 +77,10 @@ func _ready() -> void:
 		# Se dei file erano presenti ma sono tutti falliti, _cuci_mappe() ha gia' spiegato il
 		# motivo (formato/CMYK) file per file: qui si avvisa solo se ENTRAMBE le cartelle erano vuote.
 		if not _file_trovati:
-			GameState.announce(("🌍 Mondo: nessuna mappa trovata. Metti le tue battlemap PNG/JPG " +
-				"in %s (pulsante \"📁 Apri cartella mappe\" per aprirla subito) — questa cartella " +
-				"e' FUORI dal progetto: i prossimi aggiornamenti del gioco non la cancellano mai.")
-				% percorso_cartella_utente())
+			GameState.announce(("🌍 Mondo: nessuna mappa trovata. TRASCINA le tue battlemap " +
+				"(PNG/JPG/WebP) direttamente su questa finestra, oppure mettile in %s (pulsante " +
+				"\"📁 Apri cartella mappe\") — cartella FUORI dal progetto: gli aggiornamenti " +
+				"del gioco non la cancellano mai.") % percorso_cartella_utente())
 		return
 	_uniforma_colori(chunks)
 	# Inquadra tutta la mega-mappa: differito, perche' durante _ready il SubViewport puo' non avere
@@ -146,6 +146,33 @@ func apri_cartella_mappe() -> void:
 
 func cartella_attiva() -> String:
 	return _cartella_attiva
+
+
+## Re-inquadra l'INTERO mondo cucito (pulsante "🗺 Inquadra tutto"): dopo aver zoomato ed
+## esplorato, un click riporta la vista d'insieme senza dover arretrare a colpi di rotellina.
+func inquadra_mondo() -> void:
+	if _rect_mappa.size == Vector2.ZERO:
+		return  # nessuna mappa caricata: niente da inquadrare
+	_camera.imposta_limiti(_rect_mappa)
+	_camera.adatta_a(_rect_mappa)
+
+
+## Importa in user://maps i file passati (percorsi ASSOLUTI del sistema operativo, tipicamente
+## trascinati sulla finestra del gioco): copia solo le immagini con estensione supportata.
+## Ritorna quanti file ha copiato davvero — chi chiama decide se ricostruire il mondo.
+func importa_mappe(percorsi: PackedStringArray) -> int:
+	_assicura_cartella_utente()
+	var copiati: int = 0
+	for percorso: String in percorsi:
+		if not ESTENSIONI.has(percorso.get_extension().to_lower()):
+			continue
+		var destinazione: String = percorso_cartella_utente().path_join(percorso.get_file())
+		if DirAccess.copy_absolute(percorso, destinazione) == OK:
+			copiati += 1
+		else:
+			GameState.announce("🌍 Mondo: impossibile copiare \"%s\" nella cartella mappe."
+				% percorso.get_file())
+	return copiati
 
 
 # --- Macro-funzione 1: auto-stitching ---

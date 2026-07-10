@@ -243,17 +243,20 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   chunk lontani SCARICATE dalla VRAM (si ricaricano dal disco quando la camera torna vicina) e
   `CanvasModulate` per uniformare l'illuminazione dei lotti. I TileMapLayer non vengono toccati:
   Godot li culla già da solo per quadranti.
-- **🧩 Mondo cucito (direttiva OMEGA)**: quarta vista del centro. In gioco, premi **📁 Apri
-  cartella mappe** per aprire `user://maps` nel file manager del sistema (fuori dal progetto:
-  sopravvive per sempre agli aggiornamenti del gioco — se non ci sono mappe li', ripiega su
-  `assets/maps/` dentro il progetto) e mettici le tue battlemap PNG/JPG, poi **🔄 Ricarica
-  mappe**. `WorldBuilder` le cuce in un open-world: griglia perfetta (ordine alfabetico, ~√N
-  colonne, chunk di formato diverso riscalati alla cella comune — zero buchi), **coerenza
-  visiva** (micro color-grading per-chunk verso la media globale del set, clamp 0.85–1.18; seam
-  blending via shader condiviso che fonde i bordi verso un tono neutro comune; `CanvasModulate`
-  per giorno/tramonto/notte/dungeon dalla mini-toolbar), inquadratura automatica dell'intera
-  mega-mappa all'apertura, e il culling VRAM di `MapEngineOptimized` riusato tale e quale.
-  Matematica di grading/griglia/riscalo verificata a tavolino. Vedi `assets/maps/README.md`.
+- **🧩 Mondo cucito (direttiva OMEGA)**: quarta vista del centro. Il modo più semplice di
+  aggiungere battlemap: **TRASCINA i file immagine (PNG/JPG/WebP) sulla finestra del gioco**
+  mentre la vista è aperta — vengono copiati in `user://maps` e il mondo si ricuce da solo.
+  In alternativa **📁 Apri cartella mappe** apre `user://maps` nel file manager (fuori dal
+  progetto: sopravvive per sempre agli aggiornamenti — se non ci sono mappe lì, ripiega su
+  `assets/maps/` dentro il progetto), poi **🔄 Ricarica mappe**. `WorldBuilder` le cuce in un
+  open-world: griglia perfetta (ordine alfabetico, ~√N colonne, chunk di formato diverso
+  riscalati alla cella comune — zero buchi), **coerenza visiva** (micro color-grading per-chunk
+  verso la media globale del set, clamp 0.85–1.18; seam blending via shader condiviso che fonde
+  i bordi verso un tono neutro comune; `CanvasModulate` per giorno/tramonto/notte/dungeon dalla
+  mini-toolbar), inquadratura automatica dell'intera mega-mappa all'apertura (**🗺 Inquadra
+  tutto** per tornarci dopo l'esplorazione; la rotellina riparte dolcemente dal livello di fit,
+  senza scatti), e il culling VRAM di `MapEngineOptimized` riusato tale e quale. Matematica di
+  grading/griglia/riscalo/zoom verificata a tavolino. Vedi `assets/maps/README.md`.
 
 ## Nota sulla verifica
 
