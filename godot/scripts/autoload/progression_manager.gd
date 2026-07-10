@@ -136,6 +136,7 @@ func _apply_level_up(character_id: String, from_level: int, to_level: int) -> vo
 			hit_die = int(m.get_string(1))
 	var hp_gain: int = 0
 	for _l: int in range(from_level + 1, to_level + 1):
+		@warning_ignore("integer_division")  # meta' del dado vita (regola 5e): intero voluto
 		hp_gain += maxi(1, int(hit_die / 2) + 1 + con_mod)
 	var prof: int = _proficiency_by_level(to_level)
 	CharacterManager.apply_level_up(character_id, hp_gain, to_level, prof)
@@ -166,6 +167,7 @@ func _loot_for_enemy(combatant: Dictionary) -> Dictionary:
 	var ref: int = int(_xp_by_name.get(bn, 30))
 	for id: String in ArmeriaManager.roll_drop_nemico(ref):
 		items.append(id)
+	@warning_ignore("integer_division")  # oro scalato sull'XP del nemico: intero voluto
 	var gold: int = randi_range(1, maxi(3, int(ref / 8)))
 	return { "items": items, "gold": gold, "enemyName": bn }
 

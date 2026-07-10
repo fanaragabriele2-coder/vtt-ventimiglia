@@ -53,7 +53,10 @@ func get_class_def(class_id: String) -> Dictionary:
 	return classes[0] if not classes.is_empty() else {}
 
 
-static func ability_modifier(score: int) -> int:
+## Non statica: la si chiama sempre o "nuda" dentro i metodi di questo autoload, o via il singleton
+## CharacterCreation.ability_modifier(...) — mai come statica pura, quindi restare metodo d'istanza
+## evita l'avviso "funzione statica chiamata da un'istanza".
+func ability_modifier(score: int) -> int:
 	return int(floor((score - 10) / 2.0))
 
 

@@ -67,8 +67,8 @@ func _refresh() -> void:
 
 func _on_turn_changed(combatant_id: String, round_number: int) -> void:
 	var combatant: Dictionary = CombatManager.get_combatant(combatant_id)
-	var name: String = String(combatant.get("name", combatant_id))
-	_turn_label.text = "Turno: %s (round %d)" % [name, round_number]
+	var nome: String = String(combatant.get("name", combatant_id))
+	_turn_label.text = "Turno: %s (round %d)" % [nome, round_number]
 	_refresh()
 
 

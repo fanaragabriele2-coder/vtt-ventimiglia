@@ -134,6 +134,7 @@ static func _genera_bsp(rng: RandomNumberGenerator) -> Dictionary:
 	stanze.sort_custom(func(a: Rect2i, b: Rect2i) -> bool: return a.get_center().x < b.get_center().x)
 	for i: int in range(stanze.size() - 1):
 		_corridoio(celle, w, stanze[i].get_center(), stanze[i + 1].get_center(), rng)
+	@warning_ignore("integer_division")  # un quarto delle stanze (arrotondato in giu'): voluto
 	for _i: int in range(maxi(1, stanze.size() / 4)):
 		var a: Rect2i = stanze[rng.randi() % stanze.size()]
 		var b: Rect2i = stanze[rng.randi() % stanze.size()]
@@ -223,6 +224,7 @@ static func _genera_caverna(rng: RandomNumberGenerator) -> Dictionary:
 	var partenza := Vector2i(-1, -1)
 	for raggio: int in range(maxi(w, h)):
 		for d: Vector2i in [Vector2i(0, 0)] + VICINI_8:
+			@warning_ignore("integer_division")  # centro della griglia in celle: intero voluto
 			var c := Vector2i(w / 2 + d.x * raggio, h / 2 + d.y * raggio)
 			if c.x > 0 and c.y > 0 and c.x < w - 1 and c.y < h - 1 and muro[c.y * w + c.x] == 0:
 				partenza = c
@@ -268,6 +270,7 @@ static func _scava_fiume(dati: Dictionary, rng: RandomNumberGenerator, spessore:
 	var h: int = int(dati["altezza"])
 	var celle: PackedInt32Array = dati["celle"]
 	var overhead: PackedInt32Array = dati["overhead"]
+	@warning_ignore("integer_division")  # banda centrale della mappa (celle): interi voluti
 	var y: int = rng.randi_range(h / 4, h * 3 / 4)
 	for x: int in range(w):
 		for dy: int in range(spessore):

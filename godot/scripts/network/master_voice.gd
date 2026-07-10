@@ -164,6 +164,7 @@ func _ripulisci(testo: String) -> String:
 	if pulito.length() <= MAX_CARATTERI:
 		return pulito
 	var taglio: int = pulito.rfind(".", MAX_CARATTERI)
+	@warning_ignore("integer_division")  # meta' del limite: divisione intera voluta
 	if taglio < MAX_CARATTERI / 2:
 		taglio = MAX_CARATTERI
 	return pulito.substr(0, taglio + 1).strip_edges()

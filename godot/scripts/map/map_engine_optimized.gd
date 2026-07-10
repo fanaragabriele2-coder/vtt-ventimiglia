@@ -203,7 +203,17 @@ func _culla_chunks(vista: Rect2) -> void:
 		sprite.visible = vista.intersects(rect)
 
 
+## Carica un'immagine come Texture2D, robusto per ENTRAMBI i casi:
+## - file DENTRO il progetto (res://): Godot lo importa come Texture2D, e Image.load_from_file()
+##   su un file importato FALLISCE — va caricato col ResourceLoader (questo era il bug dello
+##   schermo nero del "Mondo cucito": le mappe in res://assets/maps erano tutte importate);
+## - file GREZZO su disco (percorso assoluto scelto dall'utente, user://, o file non importato):
+##   decodifica diretta dei byte con Image.load_from_file.
 func _carica_texture(percorso: String) -> Texture2D:
+	if percorso.begins_with("res://") and ResourceLoader.exists(percorso):
+		var risorsa: Resource = load(percorso)
+		if risorsa is Texture2D:
+			return risorsa as Texture2D
 	var img: Image = Image.load_from_file(percorso)
 	if img == null:
 		push_warning("MapEngineOptimized: immagine non caricabile: " + percorso)
