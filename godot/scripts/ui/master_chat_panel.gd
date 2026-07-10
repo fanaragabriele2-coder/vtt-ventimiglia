@@ -17,6 +17,7 @@ var _groq_provider_btn: Button
 var _status: Label
 var _send_button: Button
 var _streaming_active: bool = false
+var _combattimento_attivo: bool = false
 
 
 func _ready() -> void:
@@ -30,6 +31,9 @@ func _ready() -> void:
 	# Canale unico di annuncio (GameState.announce): level-up, bottino, condizioni, superfici,
 	# elevazione, IA nemici... ogni sistema di gioco scrive qui senza conoscere questo pannello.
 	GameState.event_published.connect(_on_game_event)
+	# Durante il combattimento la chat si BLOCCA: si combatte coi comandi a turni (Attacca/Bonus/
+	# Termina turno) e i dadi, non raccontando lo scontro al Master. Si riapre a scontro finito.
+	GameState.combat_active_changed.connect(_on_combat_active_changed)
 	_refresh_provider_ui()
 
 
@@ -146,6 +150,10 @@ func _build_ui() -> void:
 # --- Invio del prompt al Master remoto ---
 
 func _on_input_submitted(text: String) -> void:
+	if _combattimento_attivo:
+		_append_system("⚔ Combattimento in corso: usa i comandi sotto la mappa (Attacca / "
+			+ "Bonus / Termina turno). La chat riprende a scontro finito.")
+		return
 	var prompt: String = text.strip_edges()
 	if prompt.is_empty() or AIBridge.is_busy():
 		return
@@ -199,15 +207,39 @@ func _on_master_chunk(piece: String) -> void:
 
 func _on_master_complete(_narration: String, commands: Array) -> void:
 	_streaming_active = false
-	_send_button.disabled = false
+	_aggiorna_blocco()
 	if not commands.is_empty():
 		_append_system("(%d comando/i di gioco applicati dal Master)" % commands.size())
 
 
 func _on_master_error(message: String) -> void:
 	_streaming_active = false
-	_send_button.disabled = false
+	_aggiorna_blocco()
 	_log.append_text("\n[color=#c9362b]⚠ " + message + "[/color]")
+
+
+func _on_combat_active_changed(active: bool) -> void:
+	if active == _combattimento_attivo:
+		return
+	_combattimento_attivo = active
+	_aggiorna_blocco()
+	if active:
+		_append_system("⚔ Il combattimento e' iniziato: la chat e' in pausa. Combatti coi comandi "
+			+ "a turni sotto la mappa; la chat riprende quando lo scontro finisce.")
+	else:
+		_append_system("🕊 Lo scontro e' finito: puoi di nuovo parlare col Master.")
+
+
+## Blocca/sblocca l'invio: disattivo mentre il Master risponde (streaming) o durante un
+## combattimento. Il campo di testo diventa non editabile e cambia suggerimento quando e' in pausa.
+func _aggiorna_blocco() -> void:
+	var bloccato: bool = _combattimento_attivo or _streaming_active
+	_send_button.disabled = bloccato
+	_input.editable = not _combattimento_attivo
+	if _combattimento_attivo:
+		_input.placeholder_text = "⚔ Combattimento in corso — usa i comandi sotto la mappa…"
+	else:
+		_input.placeholder_text = "Scrivi al Master o descrivi la tua azione…"
 
 
 func _on_game_event(event_name: String, payload: Variant) -> void:

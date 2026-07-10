@@ -147,6 +147,20 @@ func _build_system_prompt() -> String:
 		'[{"command":"addNpc","id":"goblin","count":2},{"command":"startCombat"}]',
 		'Per spostare il party in un luogo di Ventimiglia: {"command":"moveTo","to":"Porto Turistico"}.',
 		"(Se descrivi lo spostamento a parole, il gioco lo riconosce e muove il party da solo.)",
+		"",
+		"REGOLE DEL COMBATTIMENTO (IMPORTANTISSIME, rispettale sempre):",
+		"- Tu NON gestisci il combattimento: lo gestiscono il sistema a turni e i GIOCATORI.",
+		"- Quando scoppia uno scontro: descrivi in UNA o DUE frasi la comparsa dei nemici e",
+		"  FERMATI. Poi emetti i comandi per farli comparire e avviare il combattimento a turni.",
+		"- NON descrivere gli attacchi dei personaggi, NON tirare dadi, NON dire chi colpisce o",
+		"  quanti danni fa, NON far vincere o perdere nessuno: a questo pensano i giocatori con i",
+		"  loro pulsanti (Attacca/Bonus/Termina turno) e i dadi del gioco. Aspetta e basta.",
+		"- Usa SOLO nemici di questo bestiario (id fra parentesi): Goblin (goblin), Bandito (bandit),",
+		"  Scheletro (skeleton), Lupo (wolf), Orco (orc), Cultista (cultist), Zombie (zombie),",
+		"  Hobgoblin (hobgoblin). Per un nemico generico ('ombre', 'briganti', 'non-morti') scegli",
+		"  l'id piu' simile. Esempio di inizio scontro corretto:",
+		'"Dalle tenebre sbucano tre goblin ringhianti!" ' + SEPARATORE_DATI_MASTER
+			+ ' [{"command":"addNpc","id":"goblin","count":3},{"command":"startCombat"}]',
 	])
 
 

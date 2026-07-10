@@ -27,7 +27,32 @@ const BESTIARIO: Array[Dictionary] = [
 ]
 
 # Parole che segnalano che lo scontro sta INIZIANDO ora (non una semplice menzione di un goblin).
-const PAROLE_COMBATTIMENTO: String = "(?i)(combattiment|attacc|assal|agguato|imboscata|iniziativa|battaglia|scontro|vi circondano|ostil|minacci|balzano|si scagliano|sguainano)"
+const PAROLE_COMBATTIMENTO: String = (
+	"(?i)(combattiment|attacc|assal|agguato|imboscata|iniziativa|battaglia|scontro|vi circondano|"
+	+ "ostil|minacci|balzano|si scagliano|si lanciano|sguainano|piombano|caricano)"
+)
+
+# Nemici GENERICI: se il Master narra uno scontro nominando creature non del bestiario ("ombre",
+# "briganti", "non-morti"), le si mappa sul mostro piu' simile — cosi' il combattimento a turni
+# parte DAVVERO invece di svolgersi solo a parole in chat.
+const GENERICI: Array[Dictionary] = [
+	{ "nome": "Bandito", "singolare": "brigante", "plurale": "briganti" },
+	{ "nome": "Bandito", "singolare": "predone", "plurale": "predoni" },
+	{ "nome": "Bandito", "singolare": "furfante", "plurale": "furfanti" },
+	{ "nome": "Scheletro", "singolare": "ombra", "plurale": "ombre" },
+	{ "nome": "Scheletro", "singolare": "non-morto", "plurale": "non-morti" },
+	{ "nome": "Zombie", "singolare": "putrefatto", "plurale": "putrefatti" },
+	{ "nome": "Lupo", "singolare": "belva", "plurale": "belve" },
+]
+
+# Ultima spiaggia: uno scontro annunciato con un termine puramente generico ("i nemici vi
+# circondano", "delle creature vi assalgono") fa comparire comunque un manipolo di default.
+const PAROLE_NEMICI_GENERICI: String = (
+	"(?i)\\b(nemic[oi]|avversari[oi]?|creatur[ae]|mostr[oi]|figur[ae]|sagom[ae]|bestie|"
+	+ "assalitori|aggressori)\\b"
+)
+const DEFAULT_GENERICO: String = "Bandito"
+const DEFAULT_GENERICO_QUANTITA: int = 2
 
 const NUMERI: Dictionary = {
 	"un": 1, "uno": 1, "una": 1, "due": 2, "tre": 3, "quattro": 4,
@@ -73,10 +98,25 @@ func rileva_nemici_da_testo(testo: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if testo.strip_edges().is_empty() or _re_combattimento.search(testo) == null:
 		return out
+	# 1) creature del bestiario nominate esplicitamente.
 	for voce: Dictionary in BESTIARIO:
 		var n: int = conta_creatura(testo, voce)
 		if n > 0:
 			out.append({ "name": voce["nome"], "count": n })
+	if not out.is_empty():
+		return out
+	# 2) nessuna creatura nota: prova i sinonimi generici mappati sul bestiario ("ombre" -> Scheletro).
+	for voce: Dictionary in GENERICI:
+		var n: int = conta_creatura(testo, voce)
+		if n > 0:
+			out.append({ "name": voce["nome"], "count": n })
+	if not out.is_empty():
+		return out
+	# 3) scontro coi soli termini generici ("i nemici vi circondano"): manipolo di default.
+	var re_generico := RegEx.new()
+	re_generico.compile(PAROLE_NEMICI_GENERICI)
+	if re_generico.search(testo) != null:
+		out.append({ "name": DEFAULT_GENERICO, "count": DEFAULT_GENERICO_QUANTITA })
 	return out
 
 
@@ -85,7 +125,8 @@ func rileva_nemici_da_testo(testo: String) -> Array[Dictionary]:
 ##    distinti (una singola menzione "goblin 8" e' quasi sempre il NOME di un nemico esistente,
 ##    non un conteggio — interpretarla come 8 creature evocava un'orda a ogni citazione);
 ## 2) numero (cifra o parola) davanti al nome: "tre goblin", "4 banditi";
-## 3) semplice menzione -> 1.
+## 3) menzione al PLURALE senza numero ("le ombre si lanciano") -> 2 (un plurale e' almeno due);
+## 4) semplice menzione al singolare -> 1.
 func conta_creatura(testo: String, voce: Dictionary) -> int:
 	var singolare: String = String(voce["singolare"])
 	var plurale: String = String(voce["plurale"])
@@ -110,6 +151,14 @@ func conta_creatura(testo: String, voce: Dictionary) -> int:
 		if valore == 0:
 			valore = maxi(1, int(parola))
 		return clampi(valore, 1, MAX_PER_TIPO)
+
+	# Plurale senza numero ("le ombre", "i briganti"): almeno due. Solo se il plurale differisce dal
+	# singolare (goblin/zombie/hobgoblin hanno forma unica: restano 1 se non c'e' un numero esplicito).
+	if plurale != singolare:
+		var re_plurale := RegEx.new()
+		re_plurale.compile("(?i)\\b" + plurale + "\\b")
+		if re_plurale.search(testo) != null:
+			return 2
 
 	var re_menzione := RegEx.new()
 	re_menzione.compile("(?i)\\b(?:%s|%s)\\b" % [singolare, plurale])
