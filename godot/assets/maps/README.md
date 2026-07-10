@@ -20,3 +20,15 @@ Consigli pratici:
 
 Nota export: il gioco legge questi file come file grezzi — dall'editor funziona subito; se
 un giorno esporti l'eseguibile, includi `*.png,*.jpg` nei filtri di export non-risorsa.
+
+## Se una mappa non si carica (schermo nero / vista vuota)
+
+La vista te lo dice ora in chat, col nome del file. La causa più comune è il **formato
+colore**: Godot legge JPG/PNG solo in **RGB**, non in **CMYK** (molti pacchetti di mappe
+venduti come stock art escono da Adobe in CMYK). Se un file fallisce:
+
+1. aprilo con un editor immagini (anche Paint/Anteprima/GIMP) e **risalvalo** — la maggior
+   parte dei programmi lo converte automaticamente in RGB in fase di export;
+2. verifica che l'estensione corrisponda davvero al contenuto (un file `.png` che in realtà
+   è un altro formato non si carica);
+3. controlla che il file non sia corrotto (si apre normalmente fuori da Godot?).

@@ -53,14 +53,18 @@ var _motore: MapEngineOptimized
 var _camera: VTTCamera
 var _tinta: CanvasModulate
 var _materiale_cuciture: ShaderMaterial
+var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 
 
 func _ready() -> void:
 	_costruisci_ambiente()
 	var chunks: Array[Sprite2D] = _cuci_mappe()
 	if chunks.is_empty():
-		GameState.announce("🌍 Mondo: nessuna mappa trovata in %s — copia li' le tue battlemap "
-			% CARTELLA_MAPPE + "PNG/JPG e riapri la vista.")
+		# Se dei file erano presenti ma sono tutti falliti, _cuci_mappe() ha gia' spiegato il
+		# motivo (formato/CMYK) file per file: qui si avvisa solo se la cartella era proprio vuota.
+		if not _file_trovati:
+			GameState.announce("🌍 Mondo: nessuna mappa trovata in %s — copia li' le tue "
+				% CARTELLA_MAPPE + "battlemap PNG/JPG e riapri la vista.")
 		return
 	_uniforma_colori(chunks)
 	_inquadra()
@@ -94,7 +98,13 @@ func _cuci_mappe() -> Array[Sprite2D]:
 		if ESTENSIONI.has(nome_file.get_extension().to_lower()):
 			nomi.append(nome_file)
 	nomi.sort()  # ordine alfabetico = layout deterministico, riga per riga
+	_file_trovati = not nomi.is_empty()
+	if nomi.is_empty():
+		return out  # "nessuna mappa trovata" lo annuncia gia' _ready()
 	var colonne: int = maxi(1, ceili(sqrt(float(nomi.size()))))
+	# I fallimenti di caricamento andavano prima solo in console (push_warning, invisibile a chi
+	# gioca): ora finiscono anche in chat con nome del file, cosi' il motivo si legge in gioco.
+	var falliti: PackedStringArray = []
 	for i: int in range(nomi.size()):
 		var riga: int = floori(float(i) / float(colonne))
 		var sprite: Sprite2D = _motore.aggiungi_chunk(
@@ -102,6 +112,14 @@ func _cuci_mappe() -> Array[Sprite2D]:
 		if sprite != null:
 			sprite.material = _materiale_cuciture  # seam blending, materiale CONDIVISO
 			out.append(sprite)
+		else:
+			falliti.append(nomi[i])
+	if not falliti.is_empty():
+		GameState.announce(("🌍 Mondo: %d immagine/i non caricata/e (%s) — formato non " % [
+			falliti.size(), ", ".join(falliti)])
+			+ "supportato o file danneggiato. Causa piu' frequente: JPG salvato in CMYK "
+			+ "invece che RGB (Godot legge solo JPG/PNG in RGB). Riesporta l'immagine come "
+			+ "PNG o JPG standard (RGB) e riprova.")
 	return out
 
 
