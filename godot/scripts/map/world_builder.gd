@@ -54,6 +54,9 @@ var _camera: VTTCamera
 var _tinta: CanvasModulate
 var _materiale_cuciture: ShaderMaterial
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
+# one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
+var _da_inquadrare: bool = false
+var _rect_mappa: Rect2
 
 
 func _ready() -> void:
@@ -67,11 +70,30 @@ func _ready() -> void:
 				% CARTELLA_MAPPE + "battlemap PNG/JPG e riapri la vista.")
 		return
 	_uniforma_colori(chunks)
-	_inquadra()
+	# Inquadra tutta la mega-mappa: differito, perche' durante _ready il SubViewport puo' non avere
+	# ancora una dimensione (la prende dal container dopo il layout). Un _process one-shot aspetta
+	# il primo frame con viewport valido, cosi' l'apertura mostra SEMPRE il mondo intero.
+	_rect_mappa = _motore.rettangolo_mappa()
+	_da_inquadrare = true
+	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
 	_motore.configura(_camera, [])
 	GameState.announce(
 		"🌍 Mondo cucito: %d mappe in griglia, coerenza visiva applicata." % chunks.size())
+
+
+## One-shot: appena il SubViewport ha una dimensione reale, inquadra l'intera mega-mappa e si
+## spegne (il culling continua per conto suo dentro MapEngineOptimized).
+func _process(_delta: float) -> void:
+	if not _da_inquadrare:
+		set_process(false)
+		return
+	if get_viewport_rect().size.x <= 0.0:
+		return  # viewport non ancora dimensionato: si riprova al prossimo frame
+	_da_inquadrare = false
+	_camera.imposta_limiti(_rect_mappa)
+	_camera.adatta_a(_rect_mappa)
+	set_process(false)
 
 
 ## Cambia l'ora del mondo ("giorno", "tramonto", "notte", "dungeon"): un'unica manopola globale,
@@ -140,10 +162,19 @@ func _uniforma_colori(chunks: Array[Sprite2D]) -> void:
 
 
 ## Media RGB della texture, misurata su una miniatura (CAMPIONE_PX^2 letture, non milioni).
+## Robusto: una texture importata puo' non restituire un'immagine leggibile (get_image null,
+## compressa in un formato che decompress non gestisce, o vuota) — in quel caso si torna un grigio
+## neutro (nessuna correzione), MAI un crash che lascerebbe il mondo nero.
 func _media_cromatica(tex: Texture2D) -> Color:
+	if tex == null:
+		return Color(0.5, 0.5, 0.5)
 	var img: Image = tex.get_image()
-	if img.is_compressed():
-		img.decompress()
+	if img == null:
+		return Color(0.5, 0.5, 0.5)
+	if img.is_compressed() and img.decompress() != OK:
+		return Color(0.5, 0.5, 0.5)
+	if img.get_width() == 0 or img.get_height() == 0:
+		return Color(0.5, 0.5, 0.5)
 	img.resize(CAMPIONE_PX, CAMPIONE_PX, Image.INTERPOLATE_BILINEAR)
 	var somma: Color = Color(0, 0, 0)
 	for y: int in range(CAMPIONE_PX):
@@ -179,9 +210,3 @@ func _costruisci_ambiente() -> void:
 
 	_camera = VTTCamera.new()
 	add_child(_camera)
-
-
-func _inquadra() -> void:
-	var rect: Rect2 = _motore.rettangolo_mappa()
-	_camera.imposta_limiti(rect)
-	_camera.centra_su(rect.get_center())

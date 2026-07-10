@@ -74,6 +74,21 @@ func centra_su(world_pos: Vector2) -> void:
 	position = _target_pos
 
 
+## Inquadra l'INTERO rettangolo del mondo (usato dal "Mondo cucito": all'apertura si vede tutta la
+## mega-mappa, poi si zooma coi comandi). Puo' scendere SOTTO ZOOM_MIN: un open-world cucito e'
+## molto piu' grande dello schermo, quindi qui il limite minimo di zoom non deve valere.
+func adatta_a(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var vp: Vector2 = get_viewport_rect().size
+	if vp.x <= 0.0 or vp.y <= 0.0:
+		vp = Vector2(1152, 648)  # fallback se il viewport non ha ancora una dimensione
+	var fit: float = minf(vp.x / rect.size.x, vp.y / rect.size.y) * 0.95
+	_target_zoom = clampf(fit, 0.03, ZOOM_MAX)  # floor bassissimo: la mega-mappa ci sta tutta
+	zoom = Vector2(_target_zoom, _target_zoom)
+	centra_su(rect.get_center())
+
+
 func _clamp_target() -> void:
 	if _limiti.size == Vector2.ZERO:
 		return
