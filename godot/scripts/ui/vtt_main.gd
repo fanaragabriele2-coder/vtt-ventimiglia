@@ -8,9 +8,11 @@ extends Control
 var _tactical_map: TacticalMap
 var _overworld_map: OverworldMap
 var _nexus_view: NexusView
+var _world_view: WorldView
 var _view_tactical_btn: Button
 var _view_overworld_btn: Button
 var _view_nexus_btn: Button
+var _view_world_btn: Button
 var _ai_toggle_btn: Button
 var _voce_btn: Button
 var _dadi_telefono_btn: Button
@@ -107,6 +109,13 @@ func _build_layout() -> void:
 	_nexus_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_nexus_view.visible = false
 	center.add_child(_nexus_view)
+
+	# Quarta vista: il Mondo cucito (WorldBuilder, direttiva OMEGA) — le battlemap dell'utente
+	# in assets/maps unite in un open-world con coerenza visiva e culling VRAM.
+	_world_view = WorldView.new()
+	_world_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_world_view.visible = false
+	center.add_child(_world_view)
 
 	var combat_hud := CombatHUD.new()
 	center.add_child(combat_hud)
@@ -324,9 +333,11 @@ func _build_view_toggle() -> HBoxContainer:
 	_view_tactical_btn = _toolbar_button("🗺 Mappa tattica", _show_tactical)
 	_view_overworld_btn = _toolbar_button("🌍 Ventimiglia", _show_overworld)
 	_view_nexus_btn = _toolbar_button("🏰 Dungeon Nexus", _show_nexus)
+	_view_world_btn = _toolbar_button("🧩 Mondo cucito", _show_world)
 	row.add_child(_view_tactical_btn)
 	row.add_child(_view_overworld_btn)
 	row.add_child(_view_nexus_btn)
+	row.add_child(_view_world_btn)
 	_update_toggle_state("tactical")
 	return row
 
@@ -343,10 +354,15 @@ func _show_nexus() -> void:
 	_apply_view("nexus")
 
 
+func _show_world() -> void:
+	_apply_view("world")
+
+
 func _apply_view(quale: String) -> void:
 	_tactical_map.visible = quale == "tactical"
 	_overworld_map.visible = quale == "overworld"
 	_nexus_view.visible = quale == "nexus"
+	_world_view.visible = quale == "world"
 	_update_toggle_state(quale)
 
 
@@ -355,6 +371,7 @@ func _update_toggle_state(attiva: String) -> void:
 	_view_tactical_btn.disabled = attiva == "tactical"
 	_view_overworld_btn.disabled = attiva == "overworld"
 	_view_nexus_btn.disabled = attiva == "nexus"
+	_view_world_btn.disabled = attiva == "world"
 
 
 func _on_party_traveled(poi_name: String, _poi: Dictionary) -> void:

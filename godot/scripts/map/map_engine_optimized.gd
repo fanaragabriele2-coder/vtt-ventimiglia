@@ -74,23 +74,28 @@ func carica_cartella(percorso_cartella: String, colonne: int = 0) -> int:
 	for i: int in range(nomi.size()):
 		var percorso: String = percorso_cartella.path_join(nomi[i])
 		var riga: int = floori(float(i) / float(larghezza))
-		if aggiungi_chunk(percorso, i % larghezza, riga):
+		if aggiungi_chunk(percorso, i % larghezza, riga) != null:
 			caricati += 1
 	return caricati
 
 
-## Cuce un singolo chunk (immagine locale) alla posizione di griglia data. La dimensione della
-## cella di cucitura e' quella del PRIMO chunk caricato: gli asset di uno stesso pacchetto mappa
-## (stile Crosshead) condividono il formato, e' la loro convenzione.
-func aggiungi_chunk(percorso_immagine: String, colonna: int, riga: int) -> bool:
+## Cuce un singolo chunk (immagine locale) alla posizione di griglia data e ritorna il suo
+## Sprite2D (null se l'immagine non si carica) — chi chiama puo' applicarci grading/materiali.
+## La cella di cucitura e' la dimensione del PRIMO chunk caricato; un chunk di formato diverso
+## viene RISCALATO alla cella: griglia sempre perfetta, zero intercapedini e zero sovrapposizioni
+## anche mischiando pacchetti mappa di dimensioni differenti.
+func aggiungi_chunk(percorso_immagine: String, colonna: int, riga: int) -> Sprite2D:
 	var tex: Texture2D = _carica_texture(percorso_immagine)
 	if tex == null:
-		return false
+		return null
 	if _dimensione_chunk == Vector2.ZERO:
 		_dimensione_chunk = tex.get_size()
 	var sprite := Sprite2D.new()
 	sprite.texture = tex
 	sprite.centered = false
+	var naturale: Vector2 = tex.get_size()
+	if naturale != _dimensione_chunk and naturale.x > 0.0 and naturale.y > 0.0:
+		sprite.scale = _dimensione_chunk / naturale
 	sprite.position = Vector2(colonna, riga) * _dimensione_chunk
 	sprite.z_index = -10  # il terreno cucito sta sotto a tutto il resto della scena
 	add_child(sprite)
@@ -98,7 +103,7 @@ func aggiungi_chunk(percorso_immagine: String, colonna: int, riga: int) -> bool:
 		"sprite": sprite, "percorso": percorso_immagine,
 		"rect": Rect2(sprite.position, _dimensione_chunk),
 	})
-	return true
+	return sprite
 
 
 ## Estensione totale della mappa cucita (per impostare i limiti della camera).

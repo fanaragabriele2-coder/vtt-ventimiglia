@@ -243,12 +243,20 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   chunk lontani SCARICATE dalla VRAM (si ricaricano dal disco quando la camera torna vicina) e
   `CanvasModulate` per uniformare l'illuminazione dei lotti. I TileMapLayer non vengono toccati:
   Godot li culla già da solo per quadranti.
+- **🧩 Mondo cucito (direttiva OMEGA)**: quarta vista del centro. Copia le tue battlemap PNG/JPG
+  in `assets/maps/` e `WorldBuilder` le cuce in un open-world: griglia perfetta (ordine
+  alfabetico, ~√N colonne, chunk di formato diverso riscalati alla cella comune — zero buchi),
+  **coerenza visiva** (micro color-grading per-chunk verso la media globale del set, clamp
+  0.85–1.18; seam blending via shader condiviso che fonde i bordi verso un tono neutro comune;
+  `CanvasModulate` per giorno/tramonto/notte/dungeon dalla mini-toolbar), e il culling VRAM di
+  `MapEngineOptimized` riusato tale e quale. Matematica di grading/griglia/riscalo verificata a
+  tavolino. Vedi `assets/maps/README.md` per le convenzioni.
 
 ## Nota sulla verifica
 
 Non ho potuto eseguire l'editor Godot in questo ambiente cloud (nessun binario, download bloccato
 dalla policy di rete). Ho invece installato **gdtoolkit** (il parser GDScript reale, la stessa
-grammatica usata da Godot) e validato con esso **tutti** i 50 script — zero errori di sintassi —
+grammatica usata da Godot) e validato con esso **tutti** i 52 script — zero errori di sintassi —
 oltre a verificare i 9 file JSON con un parser reale e incrociare ogni riferimento a autoload/
 classi nel codice con quanto dichiarato, per scovare eventuali refusi. **Al primo avvio in Godot**,
 se qualche nome d'API dell'engine (non coperto da gdtoolkit, che non conosce le classi native)
