@@ -243,14 +243,17 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   chunk lontani SCARICATE dalla VRAM (si ricaricano dal disco quando la camera torna vicina) e
   `CanvasModulate` per uniformare l'illuminazione dei lotti. I TileMapLayer non vengono toccati:
   Godot li culla già da solo per quadranti.
-- **🧩 Mondo cucito (direttiva OMEGA)**: quarta vista del centro. Copia le tue battlemap PNG/JPG
-  in `assets/maps/` e `WorldBuilder` le cuce in un open-world: griglia perfetta (ordine
-  alfabetico, ~√N colonne, chunk di formato diverso riscalati alla cella comune — zero buchi),
-  **coerenza visiva** (micro color-grading per-chunk verso la media globale del set, clamp
-  0.85–1.18; seam blending via shader condiviso che fonde i bordi verso un tono neutro comune;
-  `CanvasModulate` per giorno/tramonto/notte/dungeon dalla mini-toolbar), e il culling VRAM di
-  `MapEngineOptimized` riusato tale e quale. Matematica di grading/griglia/riscalo verificata a
-  tavolino. Vedi `assets/maps/README.md` per le convenzioni.
+- **🧩 Mondo cucito (direttiva OMEGA)**: quarta vista del centro. In gioco, premi **📁 Apri
+  cartella mappe** per aprire `user://maps` nel file manager del sistema (fuori dal progetto:
+  sopravvive per sempre agli aggiornamenti del gioco — se non ci sono mappe li', ripiega su
+  `assets/maps/` dentro il progetto) e mettici le tue battlemap PNG/JPG, poi **🔄 Ricarica
+  mappe**. `WorldBuilder` le cuce in un open-world: griglia perfetta (ordine alfabetico, ~√N
+  colonne, chunk di formato diverso riscalati alla cella comune — zero buchi), **coerenza
+  visiva** (micro color-grading per-chunk verso la media globale del set, clamp 0.85–1.18; seam
+  blending via shader condiviso che fonde i bordi verso un tono neutro comune; `CanvasModulate`
+  per giorno/tramonto/notte/dungeon dalla mini-toolbar), inquadratura automatica dell'intera
+  mega-mappa all'apertura, e il culling VRAM di `MapEngineOptimized` riusato tale e quale.
+  Matematica di grading/griglia/riscalo verificata a tavolino. Vedi `assets/maps/README.md`.
 
 ## Nota sulla verifica
 

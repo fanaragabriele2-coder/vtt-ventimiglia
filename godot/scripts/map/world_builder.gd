@@ -21,8 +21,17 @@ extends Node2D
 ##
 ## NOTA EXPORT: le mappe si leggono come FILE grezzi (Image.load_from_file) — dall'editor
 ## funziona subito; in un progetto esportato vanno inclusi i *.png/jpg nei filtri di export.
-
-const CARTELLA_MAPPE: String = "res://assets/maps"
+##
+## DUE cartelle possibili, in ordine di priorita':
+## 1. user://maps — FUORI dal progetto (nella cartella dati dell'utente del sistema operativo).
+##    E' la scelta CONSIGLIATA: sostituire il progetto con una versione piu' recente (un nuovo
+##    zip, un git pull...) non la tocca mai, quindi le mappe qui dentro sopravvivono per sempre
+##    agli aggiornamenti del gioco. Creata automaticamente vuota al primo avvio; apri_cartella_
+##    mappe() la apre nel file manager del sistema, senza percorsi da copiare a mano.
+## 2. res://assets/maps — dentro il repository Git, per chi preferisce versionare le mappe col
+##    progetto. Usata SOLO se user://maps non contiene immagini valide.
+const CARTELLA_MAPPE_UTENTE: String = "user://maps"
+const CARTELLA_MAPPE_PROGETTO: String = "res://assets/maps"
 const ESTENSIONI: Array[String] = ["png", "jpg", "jpeg"]
 const CAMPIONE_PX: int = 32     # le statistiche cromatiche si misurano su una miniatura
 const GRADING_MIN: float = 0.85  # micro-correzioni: mai stravolgere l'artwork originale
@@ -54,6 +63,7 @@ var _camera: VTTCamera
 var _tinta: CanvasModulate
 var _materiale_cuciture: ShaderMaterial
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
+var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
 var _da_inquadrare: bool = false
 var _rect_mappa: Rect2
@@ -61,13 +71,16 @@ var _rect_mappa: Rect2
 
 func _ready() -> void:
 	_costruisci_ambiente()
+	_assicura_cartella_utente()
 	var chunks: Array[Sprite2D] = _cuci_mappe()
 	if chunks.is_empty():
 		# Se dei file erano presenti ma sono tutti falliti, _cuci_mappe() ha gia' spiegato il
-		# motivo (formato/CMYK) file per file: qui si avvisa solo se la cartella era proprio vuota.
+		# motivo (formato/CMYK) file per file: qui si avvisa solo se ENTRAMBE le cartelle erano vuote.
 		if not _file_trovati:
-			GameState.announce("🌍 Mondo: nessuna mappa trovata in %s — copia li' le tue "
-				% CARTELLA_MAPPE + "battlemap PNG/JPG e riapri la vista.")
+			GameState.announce(("🌍 Mondo: nessuna mappa trovata. Metti le tue battlemap PNG/JPG " +
+				"in %s (pulsante \"📁 Apri cartella mappe\" per aprirla subito) — questa cartella " +
+				"e' FUORI dal progetto: i prossimi aggiornamenti del gioco non la cancellano mai.")
+				% percorso_cartella_utente())
 		return
 	_uniforma_colori(chunks)
 	# Inquadra tutta la mega-mappa: differito, perche' durante _ready il SubViewport puo' non avere
@@ -78,8 +91,11 @@ func _ready() -> void:
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
 	_motore.configura(_camera, [])
-	GameState.announce(
-		"🌍 Mondo cucito: %d mappe in griglia, coerenza visiva applicata." % chunks.size())
+	var da_dove: String = "user://maps (permanente)" if _cartella_attiva == CARTELLA_MAPPE_UTENTE \
+		else "assets/maps del progetto"
+	GameState.announce("🌍 Mondo cucito: %d mappe da %s, coerenza visiva applicata." % [
+		chunks.size(), da_dove,
+	])
 
 
 ## One-shot: appena il SubViewport ha una dimensione reale, inquadra l'intera mega-mappa e si
@@ -108,11 +124,50 @@ func statistiche() -> Dictionary:
 	return _motore.statistiche() if _motore != null else {}
 
 
+## Crea user://maps se non esiste ancora: cosi' e' li' pronta da trovare (col pulsante "Apri
+## cartella") anche PRIMA che l'utente ci abbia mai messo un file dentro.
+func _assicura_cartella_utente() -> void:
+	if not DirAccess.dir_exists_absolute(CARTELLA_MAPPE_UTENTE):
+		DirAccess.make_dir_recursive_absolute(CARTELLA_MAPPE_UTENTE)
+
+
+## Percorso reale sul disco di user://maps (per aprirla in Esplora File/Finder/Nautilus).
+func percorso_cartella_utente() -> String:
+	return ProjectSettings.globalize_path(CARTELLA_MAPPE_UTENTE)
+
+
+## Apre la cartella mappe consigliata nel file manager del sistema operativo: zero percorsi da
+## copiare o digitare a mano. Usato dal pulsante "📁 Apri cartella mappe" della toolbar.
+## shell_show_in_file_manager (non il piu' generico shell_open, meno affidabile su alcune
+## piattaforme per aprire una CARTELLA) e' l'API di Godot pensata apposta per questo.
+func apri_cartella_mappe() -> void:
+	OS.shell_show_in_file_manager(percorso_cartella_utente())
+
+
+func cartella_attiva() -> String:
+	return _cartella_attiva
+
+
 # --- Macro-funzione 1: auto-stitching ---
 
+## user://maps ha priorita' (sopravvive agli aggiornamenti del gioco); si ripiega su
+## res://assets/maps SOLO se la cartella utente non ha proprio nessuna immagine.
 func _cuci_mappe() -> Array[Sprite2D]:
+	var out: Array[Sprite2D] = _cuci_da_cartella(CARTELLA_MAPPE_UTENTE)
+	if not out.is_empty() or _file_trovati:
+		_cartella_attiva = CARTELLA_MAPPE_UTENTE
+		return out
+	out = _cuci_da_cartella(CARTELLA_MAPPE_PROGETTO)
+	if not out.is_empty() or _file_trovati:
+		_cartella_attiva = CARTELLA_MAPPE_PROGETTO
+	return out
+
+
+## Cuce tutte le immagini di UNA cartella (res:// o user://) in griglia. Imposta _file_trovati
+## SOLO se trova almeno un nome file (distingue "cartella vuota" da "file presenti ma falliti").
+func _cuci_da_cartella(cartella: String) -> Array[Sprite2D]:
 	var out: Array[Sprite2D] = []
-	var dir: DirAccess = DirAccess.open(CARTELLA_MAPPE)
+	var dir: DirAccess = DirAccess.open(cartella)
 	if dir == null:
 		return out
 	var nomi: Array[String] = []
@@ -120,17 +175,16 @@ func _cuci_mappe() -> Array[Sprite2D]:
 		if ESTENSIONI.has(nome_file.get_extension().to_lower()):
 			nomi.append(nome_file)
 	nomi.sort()  # ordine alfabetico = layout deterministico, riga per riga
-	_file_trovati = not nomi.is_empty()
 	if nomi.is_empty():
-		return out  # "nessuna mappa trovata" lo annuncia gia' _ready()
+		return out
+	_file_trovati = true
 	var colonne: int = maxi(1, ceili(sqrt(float(nomi.size()))))
 	# I fallimenti di caricamento andavano prima solo in console (push_warning, invisibile a chi
 	# gioca): ora finiscono anche in chat con nome del file, cosi' il motivo si legge in gioco.
 	var falliti: PackedStringArray = []
 	for i: int in range(nomi.size()):
 		var riga: int = floori(float(i) / float(colonne))
-		var sprite: Sprite2D = _motore.aggiungi_chunk(
-			CARTELLA_MAPPE.path_join(nomi[i]), i % colonne, riga)
+		var sprite: Sprite2D = _motore.aggiungi_chunk(cartella.path_join(nomi[i]), i % colonne, riga)
 		if sprite != null:
 			sprite.material = _materiale_cuciture  # seam blending, materiale CONDIVISO
 			out.append(sprite)

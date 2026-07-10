@@ -1,7 +1,26 @@
 # assets/maps — le battlemap del Mondo cucito (WorldBuilder)
 
-Copia qui le tue battlemap **PNG/JPG** (quelle estratte dai pacchetti che possiedi). Alla
-prossima apertura della vista **🧩 Mondo cucito**, il `WorldBuilder`:
+⚠️ **Questa cartella NON è più il posto consigliato per le tue mappe.** Ogni volta che il
+progetto viene aggiornato (un nuovo zip, un `git pull`...), questa cartella fa parte del
+repository e può essere sovrascritta — le immagini che avevi messo qui **rischiano di
+sparire** al prossimo aggiornamento.
+
+## Metti le tue mappe in `user://maps` invece
+
+In gioco, apri la vista **🧩 Mondo cucito** e premi **📁 Apri cartella mappe**: si apre
+direttamente la cartella giusta nel file manager del sistema (Esplora File su Windows), senza
+bisogno di cercare o digitare percorsi. Quella cartella (`user://maps`, fuori dal progetto,
+nella cartella dati dell'utente del sistema operativo) **non viene mai toccata** dagli
+aggiornamenti del gioco: le mappe che ci metti restano per sempre.
+
+Dopo aver aggiunto o tolto immagini, premi **🔄 Ricarica mappe** nella stessa vista (non serve
+riavviare il gioco).
+
+Il `WorldBuilder` cerca PRIMA in `user://maps`; se è vuota, ripiega su questa cartella
+(`res://assets/maps`) — quindi questa cartella del repository resta utile solo per chi
+preferisce versionare le mappe insieme al codice (sapendo il rischio di cui sopra).
+
+## Cosa fa il Mondo cucito con le tue mappe
 
 1. le cuce in una **griglia perfetta** (ordine alfabetico, riga per riga; se i formati
    differiscono, i chunk vengono riscalati alla cella comune — zero buchi);
@@ -19,7 +38,8 @@ Consigli pratici:
 - le immagini restano TUE e locali: niente viene scaricato né inviato da nessuna parte.
 
 Nota export: il gioco legge questi file come file grezzi — dall'editor funziona subito; se
-un giorno esporti l'eseguibile, includi `*.png,*.jpg` nei filtri di export non-risorsa.
+un giorno esporti l'eseguibile, includi `*.png,*.jpg` nei filtri di export non-risorsa
+(non serve per `user://maps`, che esiste sempre a runtime).
 
 ## Se una mappa non si carica (schermo nero / vista vuota)
 
