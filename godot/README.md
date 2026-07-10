@@ -255,8 +255,12 @@ Trasparenza sui gap noti, per chi continua il lavoro:
   i bordi verso un tono neutro comune; `CanvasModulate` per giorno/tramonto/notte/dungeon dalla
   mini-toolbar), inquadratura automatica dell'intera mega-mappa all'apertura (**🗺 Inquadra
   tutto** per tornarci dopo l'esplorazione; la rotellina riparte dolcemente dal livello di fit,
-  senza scatti), e il culling VRAM di `MapEngineOptimized` riusato tale e quale. Matematica di
-  grading/griglia/riscalo/zoom verificata a tavolino. Vedi `assets/maps/README.md`.
+  senza scatti), **minimappa cliccabile** in basso a destra (miniatura composta una volta al
+  caricamento + rettangolo dell'inquadratura; un click teletrasporta la camera), **▦ griglia
+  da battaglia** opzionale (cicla OFF/64/128/256 px; disegna solo le linee dentro
+  l'inquadratura e si nasconde da sola a zoom lontano — costo ~zero), e il culling VRAM di
+  `MapEngineOptimized` riusato tale e quale. Matematica di grading/griglia/riscalo/zoom/
+  minimappa verificata a tavolino. Vedi `assets/maps/README.md`.
 
 ## Nota sulla verifica
 

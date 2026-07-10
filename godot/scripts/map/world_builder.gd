@@ -36,6 +36,7 @@ const ESTENSIONI: Array[String] = ["png", "jpg", "jpeg", "webp"]
 const CAMPIONE_PX: int = 32     # le statistiche cromatiche si misurano su una miniatura
 const GRADING_MIN: float = 0.85  # micro-correzioni: mai stravolgere l'artwork originale
 const GRADING_MAX: float = 1.18
+const MINIMAPPA_LATO_MAX: int = 220  # lato maggiore della minimappa (composta UNA volta, al load)
 
 ## Il ciclo del giorno: tinte del CanvasModulate globale (tutti i chunk vi reagiscono insieme).
 const ORE: Dictionary = {
@@ -62,6 +63,8 @@ var _motore: MapEngineOptimized
 var _camera: VTTCamera
 var _tinta: CanvasModulate
 var _materiale_cuciture: ShaderMaterial
+var _griglia: WorldGrid
+var _minimappa: ImageTexture
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
@@ -87,6 +90,7 @@ func _ready() -> void:
 	# ancora una dimensione (la prende dal container dopo il layout). Un _process one-shot aspetta
 	# il primo frame con viewport valido, cosi' l'apertura mostra SEMPRE il mondo intero.
 	_rect_mappa = _motore.rettangolo_mappa()
+	_componi_minimappa(chunks)
 	_da_inquadrare = true
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
@@ -146,6 +150,30 @@ func apri_cartella_mappe() -> void:
 
 func cartella_attiva() -> String:
 	return _cartella_attiva
+
+
+## Griglia da battaglia sovrapposta: 0 = spenta, altrimenti lato cella in pixel-mappa.
+## Creata pigramente al primo uso; sta SOPRA i chunk (-10) e sotto token/luci.
+func imposta_griglia(cella_px: float) -> void:
+	if _griglia == null:
+		_griglia = WorldGrid.new()
+		_griglia.z_index = -5
+		add_child(_griglia)
+		_griglia.configura(_rect_mappa, _camera)
+	_griglia.imposta_cella(cella_px)
+
+
+## La miniatura dell'intero mondo per la minimappa (null se nessuna mappa e' caricata).
+func minimappa_texture() -> Texture2D:
+	return _minimappa
+
+
+func rettangolo() -> Rect2:
+	return _rect_mappa
+
+
+func camera_vtt() -> VTTCamera:
+	return _camera
 
 
 ## Re-inquadra l'INTERO mondo cucito (pulsante "🗺 Inquadra tutto"): dopo aver zoomato ed
@@ -272,6 +300,39 @@ func _correzione(media: Color, bersaglio: Color) -> Color:
 		clampf(bersaglio.b / maxf(media.b, 0.02), GRADING_MIN, GRADING_MAX),
 		1.0
 	)
+
+
+## Compone la miniatura dell'INTERO mondo per la minimappa: ogni chunk viene rimpicciolito e
+## incollato alla sua posizione (in scala) su una tela unica. Succede UNA volta al caricamento
+## (le texture sono tutte ancora in VRAM: il culling non ha ancora scaricato nulla), poi la
+## minimappa vive di rendita — zero costo per frame. Un chunk illeggibile resta fondo scuro.
+func _componi_minimappa(chunks: Array[Sprite2D]) -> void:
+	if _rect_mappa.size.x <= 0.0 or _rect_mappa.size.y <= 0.0:
+		return
+	var scala: float = float(MINIMAPPA_LATO_MAX) / maxf(_rect_mappa.size.x, _rect_mappa.size.y)
+	var tela := Image.create(
+		maxi(1, roundi(_rect_mappa.size.x * scala)),
+		maxi(1, roundi(_rect_mappa.size.y * scala)),
+		false, Image.FORMAT_RGBA8
+	)
+	tela.fill(Color(0.08, 0.07, 0.06))
+	for sprite: Sprite2D in chunks:
+		if sprite.texture == null:
+			continue
+		var img: Image = sprite.texture.get_image()
+		if img == null or (img.is_compressed() and img.decompress() != OK):
+			continue
+		if img.get_width() == 0 or img.get_height() == 0:
+			continue
+		# Estensione mondo del chunk: dimensione naturale x scala sprite (il riscalo alla cella).
+		var rect_chunk := Rect2(sprite.position, sprite.texture.get_size() * sprite.scale)
+		var thumb_w: int = maxi(1, roundi(rect_chunk.size.x * scala))
+		var thumb_h: int = maxi(1, roundi(rect_chunk.size.y * scala))
+		img.convert(Image.FORMAT_RGBA8)
+		img.resize(thumb_w, thumb_h, Image.INTERPOLATE_BILINEAR)
+		var pos := Vector2i(((rect_chunk.position - _rect_mappa.position) * scala).round())
+		tela.blit_rect(img, Rect2i(0, 0, thumb_w, thumb_h), pos)
+	_minimappa = ImageTexture.create_from_image(tela)
 
 
 # --- Costruzione ambiente (tinta globale, shader cuciture, camera) ---

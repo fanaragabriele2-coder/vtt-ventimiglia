@@ -23,6 +23,16 @@ Dopo aver aggiunto o tolto immagini a mano, premi **🔄 Ricarica mappe** nella 
 (non serve riavviare il gioco). **🗺 Inquadra tutto** riporta la camera a vedere l'intero
 mondo dopo che hai zoomato ed esplorato.
 
+## Navigazione e griglia
+
+- **Minimappa** (angolo in basso a destra): miniatura dell'intero mondo con il rettangolo di
+  ciò che stai inquadrando — **un click** sulla minimappa teletrasporta la camera in quel
+  punto. Il modo più veloce di attraversare un mondo gigante.
+- **▦ Griglia**: sovrappone una griglia da battaglia al mondo; il pulsante cicla
+  OFF → 64 → 128 → 256 px per cella (128 è lo standard "1 quadretto = 5 piedi" della maggior
+  parte dei pacchetti di battlemap). A zoom molto lontano si nasconde da sola (le celle
+  sarebbero illeggibili); riappare appena ti avvicini.
+
 Il `WorldBuilder` cerca PRIMA in `user://maps`; se è vuota, ripiega su questa cartella
 (`res://assets/maps`) — quindi questa cartella del repository resta utile solo per chi
 preferisce versionare le mappe insieme al codice (sapendo il rischio di cui sopra).
