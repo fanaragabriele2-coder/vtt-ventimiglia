@@ -159,6 +159,40 @@ def is_available_anywhere(timeout: float = 1.2) -> bool:
     return resolve_base_url(timeout=timeout) is not None
 
 
+def can_generate(base_url: str, timeout: float = 3.0) -> bool:
+    """True se l'endpoint di generazione ``/sdapi/v1/txt2img`` è montato.
+
+    Sondato in GET: FastAPI risponde **405** (metodo non consentito) per una
+    route POST esistente e **404** se la route non è registrata. Questo
+    endpoint viene montato SOLTANTO quando la WebUI è avviata con ``--api``,
+    quindi è il segnale affidabile che la generazione via API è davvero
+    possibile — a differenza di ``/sdapi/v1/loras``, che alcune estensioni
+    registrano anche senza ``--api`` (fonte del "verde ingannevole" visto in
+    alcune build: endpoint presente ma generazione impossibile).
+    """
+    try:
+        response = requests.get(f"{base_url}/sdapi/v1/txt2img", timeout=timeout)
+    except requests.RequestException:
+        return False
+    return response.status_code != 404
+
+
+def find_webui(timeout: float = 1.2) -> tuple[str | None, bool]:
+    """Individua la WebUI e verifica se può davvero generare.
+
+    Returns:
+        ``(url, can_generate)``:
+        * ``(None, False)`` — nessun endpoint sdapi risponde (WebUI spenta);
+        * ``(url, False)`` — WebUI trovata ma ``/sdapi/v1/txt2img`` assente
+          (``--api`` non attivo): rilevabile per guidare l'utente al fix;
+        * ``(url, True)`` — pronta a generare.
+    """
+    url = resolve_base_url(force=True, timeout=timeout)
+    if url is None:
+        return None, False
+    return url, can_generate(url, timeout=max(timeout, 3.0))
+
+
 def list_models(base_url: str | None = None, timeout: float = 10.0) -> list[str]:
     """Elenca i checkpoint disponibili (lista vuota in caso di errore)."""
     url = base_url or resolve_base_url() or DEFAULT_BASE_URL

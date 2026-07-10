@@ -33,10 +33,11 @@ def _component_status() -> dict[str, Any]:
     """Verifica lo stato dei componenti locali (cache 30s per non pesare)."""
     from utils import chroma_rag, llm_wiki, sd_api, triposr_helpers
 
-    sd_url = sd_api.resolve_base_url()
+    sd_url, sd_can_generate = sd_api.find_webui()
     return {
         "chromadb": chroma_rag.is_available(),
-        "sd_api": sd_url is not None,
+        "sd_api": sd_can_generate,
+        "sd_found_no_api": sd_url is not None and not sd_can_generate,
         "sd_port": sd_url.rsplit(":", 1)[-1] if sd_url else None,
         "triposr": triposr_helpers.triposr_available(),
         "trellis": triposr_helpers.trellis_available(),
@@ -56,18 +57,32 @@ ICONS = {True: "🟢", False: "🔴"}
 
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("ChromaDB", ICONS[status["chromadb"]] + " installato" if status["chromadb"] else "🔴 assente")
-col2.metric("Stable Diffusion", ICONS[status["sd_api"]] + (f" :{status['sd_port']}" if status["sd_api"] else " offline"))
+if status["sd_api"]:
+    _sd_label = f"🟢 :{status['sd_port']}"
+elif status["sd_found_no_api"]:
+    _sd_label = "🟠 no --api"
+else:
+    _sd_label = "🔴 offline"
+col2.metric("Stable Diffusion", _sd_label)
 col3.metric("TripoSR", ICONS[status["triposr"]] + (" pronto" if status["triposr"] else " non trovato"))
 col4.metric("TRELLIS.2", ICONS[status["trellis"]] + (" configurato" if status["trellis"] else " opzionale"))
 col5.metric("Indice Wiki", ICONS[status["wiki_index"]] + (" attivo" if status["wiki_index"] else " da costruire"))
 
-if not status["sd_api"]:
+if status["sd_found_no_api"]:
+    st.warning(
+        f"🟠 **Stable Diffusion è avviato (porta {status['sd_port']}) ma senza "
+        "`--api`.** La WebUI grafica funziona, ma l'Hub genera via API e "
+        "l'endpoint `/sdapi/v1/txt2img` non è montato. Aggiungi `--api` agli "
+        "argomenti del tuo launcher (es. la riga `set COMMANDLINE_ARGS=...` in "
+        "`Avvia_StableDiffusion.bat`) e riavvia Stable Diffusion.",
+        icon="🎨",
+    )
+elif not status["sd_api"]:
     st.info(
         "💡 **Stable Diffusion non trovato** — l'Hub ha provato automaticamente "
-        "le porte comuni (7860-7866, 8000, 8080) senza successo. Avvia la WebUI "
-        "da Stability Matrix con `--api` nelle Launch Options per abilitare "
-        "Asset Forge e Generatore Personaggi. L'Hub resta comunque utilizzabile "
-        "per RAG, Wiki e Orchestratore.",
+        "le porte comuni (7860-7866, 8000, 8080) senza successo. Avvia la tua "
+        "WebUI per abilitare Asset Forge e Generatore Personaggi. L'Hub resta "
+        "comunque utilizzabile per RAG, Wiki e Orchestratore.",
         icon="🎨",
     )
 

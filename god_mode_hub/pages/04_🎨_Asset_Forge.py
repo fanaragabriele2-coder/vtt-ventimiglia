@@ -26,17 +26,26 @@ st.caption(
     "`asset_forge/tokens/`."
 )
 
-sd_url = sd_api.resolve_base_url(force=True)
-sd_online = sd_url is not None
+sd_url, sd_online = sd_api.find_webui()
 if sd_online:
-    st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
+    st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}` (API di generazione attiva)")
+elif sd_url is not None:
+    st.warning(
+        f"🟠 **WebUI trovata su `{sd_url}` ma l'API di generazione NON è attiva.** "
+        "L'endpoint `/sdapi/v1/txt2img` non esiste: manca il flag `--api`. "
+        "La WebUI grafica funziona lo stesso, ma l'Hub genera via API e serve "
+        "quel flag. **Aggiungi `--api` agli argomenti del tuo "
+        "`Avvia_StableDiffusion.bat`** (di solito nella riga "
+        "`set COMMANDLINE_ARGS=...`) e riavvia Stable Diffusion. Apri la "
+        "diagnostica qui sotto per la conferma.",
+        icon="🎨",
+    )
 else:
     st.error(
         "🔴 **Stable Diffusion non raggiungibile** su nessuna porta comune "
         f"({', '.join(str(p) for p in sd_api.COMMON_PORTS)}). Avvia la tua "
-        "WebUI con `--api` attivo, oppure imposta la variabile d'ambiente "
-        "`SD_API_URL` se usa una porta non elencata. Puoi comunque preparare "
-        "i parametri qui sotto.",
+        "WebUI (es. `Avvia_StableDiffusion.bat`), oppure imposta la variabile "
+        "d'ambiente `SD_API_URL` se usa una porta non elencata.",
         icon="🎨",
     )
 

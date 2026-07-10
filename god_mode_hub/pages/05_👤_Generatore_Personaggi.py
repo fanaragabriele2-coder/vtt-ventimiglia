@@ -26,8 +26,7 @@ st.caption(
     "Output in `asset_forge/characters/<slug>/`."
 )
 
-sd_url = sd_api.resolve_base_url()
-sd_online = sd_url is not None
+sd_url, sd_online = sd_api.find_webui()
 backends = triposr_helpers.backend_status()
 
 # ---------------------------------------------------------------------------
@@ -61,11 +60,17 @@ with st.expander("⚙️ Parametri generazione 2D"):
     )
 
 if sd_online:
-    st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
+    st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}` (API di generazione attiva)")
+elif sd_url is not None:
+    st.warning(
+        f"🟠 WebUI trovata su `{sd_url}` ma manca il flag `--api` "
+        "(`/sdapi/v1/txt2img` assente). Aggiungi `--api` al tuo "
+        "`Avvia_StableDiffusion.bat` e riavvia Stable Diffusion.",
+        icon="👤",
+    )
 else:
     st.error(
-        "🔴 Stable Diffusion non raggiungibile su nessuna porta comune: avvia "
-        "la WebUI con `--api` nelle Launch Options per generare.",
+        "🔴 Stable Diffusion non raggiungibile: avvia la WebUI per generare.",
         icon="👤",
     )
 

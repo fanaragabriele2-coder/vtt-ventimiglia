@@ -38,12 +38,17 @@ tab_sprite, tab_rig, tab_export = st.tabs(
 # TAB 1 — Sprite sheet 2D
 # ---------------------------------------------------------------------------
 with tab_sprite:
-    sd_url = sd_api.resolve_base_url()
-    sd_online = sd_url is not None
+    sd_url, sd_online = sd_api.find_webui()
     if sd_online:
-        st.caption(f"🟢 Stable Diffusion trovato su `{sd_url}`")
+        st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}`")
+    elif sd_url is not None:
+        st.warning(
+            f"🟠 WebUI su `{sd_url}` ma senza `--api` (`/sdapi/v1/txt2img` "
+            "assente): aggiungi `--api` al launcher e riavvia.",
+            icon="🎞️",
+        )
     else:
-        st.error("🔴 Stable Diffusion non raggiungibile su nessuna porta comune.", icon="🎞️")
+        st.error("🔴 Stable Diffusion non raggiungibile.", icon="🎞️")
     subject = st.text_input(
         "Soggetto dell'animazione",
         placeholder="es. fiamma magica viola che pulsa, vista dall'alto",
