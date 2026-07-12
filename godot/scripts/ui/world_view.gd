@@ -16,6 +16,20 @@ const ORE_BOTTONI: Array[Array] = [
 # Il pulsante griglia CICLA tra questi lati di cella (pixel-mappa); 0 = spenta.
 const CELLE_GRIGLIA: Array[float] = [0.0, 64.0, 128.0, 256.0]
 
+## Vignettatura cinematografica + grana di pellicola leggerissima, sopra il viewport del mondo.
+## E' un overlay passivo (mouse_filter IGNORE): non tocca input, camera o culling.
+const SHADER_VIGNETTA: String = """
+shader_type canvas_item;
+uniform float forza = 0.34;
+uniform float grana = 0.05;
+void fragment() {
+	float v = smoothstep(0.42, 0.98, length(UV - 0.5) * 1.42);
+	float g = (fract(sin(dot(UV + fract(TIME * 7.0), vec2(12.9898, 78.233)))
+		* 43758.5453) - 0.5) * grana;
+	COLOR = vec4(vec3(g * 0.6), v * forza + abs(g) * 0.4);
+}
+"""
+
 var _viewport: SubViewport
 var _builder: WorldBuilder
 var _minimap: WorldMinimap
@@ -56,6 +70,18 @@ func _build_viewport() -> void:
 
 	_builder = WorldBuilder.new()
 	_viewport.add_child(_builder)
+
+	# Vignetta + grana SOPRA il SubViewportContainer ma FUORI dal SubViewport: non entra nel
+	# mondo (niente interferenze con culling/zoom), e' solo un velo da regia sul vetro.
+	var vignetta := ColorRect.new()
+	vignetta.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vignetta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shader := Shader.new()
+	shader.code = SHADER_VIGNETTA
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	vignetta.material = mat
+	add_child(vignetta)
 
 
 func _build_toolbar() -> void:

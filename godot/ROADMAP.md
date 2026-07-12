@@ -54,6 +54,8 @@ disposizione nella griglia; usa mappe della stessa risoluzione per il risultato 
 - [x] Drag & drop dei file sulla finestra
 - [x] Minimappa cliccabile + griglia da battaglia + fix zoom + Inquadra tutto
 - [x] 9 battlemap incluse (mondo 3×3 senza cuciture visibili)
+- [x] **Atmosfera**: ombre di nuvole in movimento, lucciole di notte, pulviscolo di
+      giorno, transizioni dell'ora in dissolvenza (1.2s), vignetta + grana cinematografica
 
 ### 🔜 Fase B — Il mondo si gioca (prossima)
 - [ ] **Token del party sul Mondo cucito**: trascinabili, con snap alla griglia
@@ -65,7 +67,9 @@ disposizione nella griglia; usa mappe della stessa risoluzione per il risultato 
 ### 🔮 Fase C — Props e regia
 - [ ] **Props posizionabili** (alberi, casse, mobili PNG con alfa — qui brillano gli asset
       di Forgotten Adventures scaricati dall'utente): posizionamento con snap, rotazione,
-      layer sopra/sotto i token
+      layer sopra/sotto i token. **Punto di partenza già pronto**: `tools/blender/
+      genera_props.py` renderizza 8 props top-down trasparenti direttamente da Blender
+      (via Claude Desktop + Blender MCP, o a mano — vedi `tools/blender/README.md`)
 - [ ] Salvataggio del layout props in `user://` (sopravvive agli aggiornamenti)
 - [ ] Pennello luci: piazza PointLight2D (falò, lanterne) con un click
 - [ ] Musiche/ambience per zona del mondo (bosco ≠ villaggio ≠ palude)

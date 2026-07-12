@@ -65,6 +65,8 @@ var _tinta: CanvasModulate
 var _materiale_cuciture: ShaderMaterial
 var _griglia: WorldGrid
 var _minimappa: ImageTexture
+var _atmosfera: WorldAtmosphere
+var _tween_ora: Tween
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
@@ -91,6 +93,10 @@ func _ready() -> void:
 	# il primo frame con viewport valido, cosi' l'apertura mostra SEMPRE il mondo intero.
 	_rect_mappa = _motore.rettangolo_mappa()
 	_componi_minimappa(chunks)
+	# Atmosfera (nuvole in movimento, lucciole, pulviscolo): solo se c'e' un mondo da vestire.
+	_atmosfera = WorldAtmosphere.new()
+	add_child(_atmosfera)
+	_atmosfera.configura(_rect_mappa, _camera)
 	_da_inquadrare = true
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
@@ -117,11 +123,18 @@ func _process(_delta: float) -> void:
 
 
 ## Cambia l'ora del mondo ("giorno", "tramonto", "notte", "dungeon"): un'unica manopola globale,
-## tutti i chunk reagiscono insieme via CanvasModulate.
+## tutti i chunk reagiscono insieme via CanvasModulate. La tinta non scatta piu': fa una
+## DISSOLVENZA di ~1.2s (come un tramonto vero), e l'atmosfera si adegua (nuvole/lucciole).
 func imposta_ora(nome: String) -> void:
 	if not ORE.has(nome):
 		return
-	_tinta.color = ORE[nome]
+	if _tween_ora != null and _tween_ora.is_valid():
+		_tween_ora.kill()  # un click impaziente non lascia due dissolvenze a contendersi la tinta
+	_tween_ora = create_tween()
+	_tween_ora.tween_property(_tinta, "color", ORE[nome], 1.2) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if _atmosfera != null:
+		_atmosfera.imposta_ora(nome)
 
 
 func statistiche() -> Dictionary:
