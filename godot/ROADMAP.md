@@ -133,6 +133,47 @@ Import: **trascina sulla finestra** (mappe) o copia in `user://tokens` / `user:/
 
 ---
 
+## PARTE 4 — Audit "verso il capolavoro" (luglio 2026)
+
+### ✅ Combat system: 4 bug reali TROVATI e CORRETTI (lettura integrale dei moduli)
+1. **La scheda non contava nulla in attacco**: tutti i PG colpivano con +4 e 1d8+2 fissi.
+   Ora bonus = competenza + miglior modificatore (FOR/DES/INT/SAG) e danno = dado della
+   classe (barbaro 1d12, mago 1d10, chierico 1d6…) + modificatore — e si aggiorna al
+   level-up. Un barbaro adesso picchia da barbaro.
+2. **Condizioni e superfici infestavano lo scontro successivo**: nessuno chiamava i
+   `reset()` — col round riazzerato la scadenza non scattava MAI (differenza negativa) e
+   il combattimento nuovo partiva con veleni e fiamme fantasma del precedente. Ora
+   `end_combat()` li pulisce (l'elevazione resta: è terreno, non un effetto).
+3. **Turno assegnato a un morto** dopo la rimozione di un PNG da parte del Master: il
+   giro poteva bloccarsi su un combattente sconfitto. Ora passa al prossimo VIVO.
+4. **I nemici si accatastavano sulla stessa cella**: l'IA ora evita le celle occupate
+   (accorcia il passo fino a trovarne una libera).
+   Tutte le correzioni verificate con specchi Python (attacco da scheda, salto dei
+   morti, anti-sovrapposizione).
+
+### 🗺 Mondo v2: LA mappa giocabile
+Rigenerato il mondo 3×3 come un luogo vero: **sentieri che collegano ogni tappa della
+campagna**, villaggio con palizzata (varchi sulle strade), pozzo in piazza e 8 case,
+**cerchio di pietre con alone violaceo nella Palude Grigia** (l'arena del finale si
+riconosce da lontano), accampamento alle Rocce con tende/gabbie vuote/braci (il racconto
+del capitolo 5 è NEL disegno), molo e barchetta sul Lago Chiaro, rovine di una torre nei
+Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei prati.
+
+### 🎯 Prossimi passi per il capolavoro (in ordine di impatto)
+1. **Attacco a distanza**: portata per arco/incantesimi (oggi tutto è mischia a 1 cella;
+   ranger e mago dovrebbero colpire da lontano, e l'IA arciera tenere la distanza)
+2. **Export eseguibile Windows** (Fase E): giocare con un doppio click, senza editor
+3. **Feedback di colpo**: flash/scossa del token colpito, numeri di danno fluttuanti,
+   suono di dadi e lame — il "game feel" che trasforma un tracker in un gioco
+4. **Tiri salvezza e aree**: palla di fuoco → tiro DES + superficie di fuoco (già pronta)
+5. **IA tattica**: i nemici cercano il fiancheggiamento e l'altura invece di caricare
+6. **Musica e SFX di combattimento** (l'AmbienceManager c'è; mancano gli stinger)
+7. **Multiplayer Supabase** e ruoli Master/giocatore
+8. **Asset "veri" dell'utente**: i render Blender (props/miniature) e i pacchetti
+   Forgotten Adventures in `user://` — la pipeline è già tutta in piedi
+
+---
+
 ## Come continuare lo sviluppo
 
 Ogni sessione con Claude: chiedi una voce della Fase D/E/F, o incolla uno script di

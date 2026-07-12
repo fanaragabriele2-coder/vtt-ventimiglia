@@ -34,6 +34,12 @@ signal combatant_removed(combatant_id: String)
 
 const MONSTERS_PATH: String = "res://data/monsters.json"
 const PC_PREFIX: String = "pc-"
+# Dado di danno dell'arma "di elezione" di ogni classe (senza il modificatore, aggiunto a parte):
+# la scheda ORA conta — un barbaro picchia da barbaro, un chierico no.
+const DADO_DANNO_CLASSE: Dictionary = {
+	"guerriero": "1d8", "barbaro": "1d12", "ladro": "1d8",
+	"ranger": "1d8", "mago": "1d10", "chierico": "1d6",
+}
 
 var _monster_catalog: Array[Dictionary] = []
 var _combatants: Array[Dictionary] = []
@@ -74,8 +80,26 @@ func character_id_di(combatant_id: String) -> String:
 	return String(c.get("characterId", "")) if not c.is_empty() else ""
 
 
+## Statistiche d'attacco DERIVATE DALLA SCHEDA (prima erano fisse 4 / 1d8+2 per tutti):
+## bonus = competenza + il miglior modificatore da combattimento (FOR/DES/INT/SAG — copre
+## marziali, schermitori e incantatori); danno = dado della classe + lo stesso modificatore.
+func _attacco_da_scheda(c: CharacterData) -> Dictionary:
+	var mod: int = maxi(
+		maxi(c.modifier_of("str"), c.modifier_of("dex")),
+		maxi(c.modifier_of("int"), c.modifier_of("wis"))
+	)
+	var dado: String = String(DADO_DANNO_CLASSE.get(c.class_name_label.to_lower(), "1d8"))
+	var formula: String = dado
+	if mod > 0:
+		formula += "+%d" % mod
+	elif mod < 0:
+		formula += str(mod)
+	return { "bonus": c.proficiency_bonus + mod, "formula": formula }
+
+
 func _make_pc_combatant(c: CharacterData) -> Dictionary:
 	# Specchia la scheda del membro; gli HP restano autorevoli in CharacterManager, qui e' un riflesso.
+	var attacco: Dictionary = _attacco_da_scheda(c)
 	return {
 		"id": pc_id_di(c.id), "kind": "pc", "characterId": c.id,
 		"name": c.character_name,
@@ -85,7 +109,9 @@ func _make_pc_combatant(c: CharacterData) -> Dictionary:
 		"temporaryHitPoints": c.hp_temporary,
 		"initiative": 0,
 		"initiativeBonus": c.modifier_of("dex"),
-		"attackBonus": 4, "damageFormula": "1d8+2", "defeated": c.hp_current <= 0,
+		"attackBonus": int(attacco["bonus"]),
+		"damageFormula": String(attacco["formula"]),
+		"defeated": c.hp_current <= 0,
 	}
 
 
@@ -266,6 +292,12 @@ func end_combat() -> void:
 	_round = 0
 	_current_turn_index = -1
 	_last_event = "Combattimento terminato."
+	# Gli EFFETTI TRANSITORI muoiono con lo scontro: condizioni e superfici di un combattimento
+	# non devono infestare il successivo (il round riparte da 1 e la loro scadenza non
+	# scatterebbe MAI: "round_attuale - appliedAt" diventerebbe negativo). L'elevazione invece
+	# resta: e' terreno dell'arena, non un effetto.
+	ConditionsManager.reset()
+	SurfacesManager.reset()
 	GameState.set_combat_active(false)
 	combat_ended.emit()
 	_allinea_pc_roster()
@@ -327,6 +359,10 @@ func _sync_pcs_from_characters() -> void:
 		pc["temporaryHitPoints"] = c.hp_temporary
 		pc["initiativeBonus"] = c.modifier_of("dex")
 		pc["defeated"] = c.hp_current <= 0
+		# Anche l'attacco segue la scheda (level-up o caratteristiche cambiate a meta' campagna).
+		var attacco: Dictionary = _attacco_da_scheda(c)
+		pc["attackBonus"] = int(attacco["bonus"])
+		pc["damageFormula"] = String(attacco["formula"])
 
 
 # --- Dadi e formule di danno (porting fedele di rollD20WithMode / rollDamageFormula) ---
@@ -599,9 +635,12 @@ func remove_combatant(combatant_id: String) -> bool:
 		# tolto l'ultimo nemico: e' comunque una fine dello scontro (senza vittoria "da uccisione")
 		end_combat()
 	elif era_suo_turno:
-		_current_turn_index = _current_turn_index % maxi(1, _combatants.size())
-		var corrente: Dictionary = _combatants[_current_turn_index]
-		turn_changed.emit(String(corrente["id"]), _round)
+		# Il turno passa al PROSSIMO VIVO, non semplicemente a chi e' scivolato in quell'indice
+		# (che potrebbe essere un combattente gia' sconfitto: il giro si bloccherebbe su di lui).
+		var prossimo: int = _find_next_living_index(_current_turn_index - 1)
+		if prossimo >= 0:
+			_current_turn_index = prossimo
+			turn_changed.emit(String(_combatants[_current_turn_index]["id"]), _round)
 	return true
 
 

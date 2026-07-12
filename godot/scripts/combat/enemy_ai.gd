@@ -98,7 +98,7 @@ func _agisci_nemico(cur: Dictionary) -> void:
 	if npc_cell != null and pc_cell != null:
 		var dist: int = chebyshev(npc_cell, pc_cell)
 		if dist > 1:
-			var dest: Variant = cella_verso_bersaglio(npc_cell, pc_cell, PORTATA_MOVIMENTO)
+			var dest: Variant = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
 			if dest != null:
 				CombatManager.set_combatant_cell(String(cur["id"]), dest)
 				GameState.announce("👣 %s avanza verso %s." % [String(cur["name"]), String(bersaglio["name"])])
@@ -113,6 +113,27 @@ func _agisci_nemico(cur: Dictionary) -> void:
 		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
 
 	CombatManager.next_turn()
+
+
+## Come cella_verso_bersaglio, ma MAI su una cella gia' occupata da un altro combattente
+## (prima i nemici si accatastavano sullo stesso quadretto): se la destinazione ideale e'
+## presa, accorcia il passo finche' trova una cella libera; se sono tutte prese resta fermo.
+func _cella_libera_verso(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i) -> Variant:
+	var occupate: Dictionary = {}
+	for c: Dictionary in CombatManager.get_state()["combatants"]:
+		var cid: String = String(c["id"])
+		if cid == npc_id or bool(c["defeated"]):
+			continue
+		var cella: Variant = CombatManager.get_combatant_cell(cid)
+		if cella != null:
+			occupate[cella] = true
+	for passi: int in range(PORTATA_MOVIMENTO, 0, -1):
+		var dest: Variant = cella_verso_bersaglio(npc_cell, pc_cell, passi)
+		if dest == null:
+			return null
+		if not occupate.has(dest):
+			return dest
+	return null
 
 
 func set_enabled(enabled: bool) -> void:
