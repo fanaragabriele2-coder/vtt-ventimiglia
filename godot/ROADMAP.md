@@ -88,14 +88,18 @@ Import: **trascina sulla finestra** (mappe) o copia in `user://tokens` / `user:/
 
 ## PARTE 3 — Cosa manca (le prossime fasi)
 
-### 🔜 Fase D — Il mondo VIVO (prossima)
-- [ ] **Spostamento narrato sul mondo**: il Master IA muove i token del party sul Mondo
-      cucito quando la storia dice che il party viaggia (il ponte chat→POI c'è già)
-- [ ] **Pennello luci**: piazza falò/lanterne (PointLight2D) con un click, in coppia coi
-      props; il culling luci esiste già
-- [ ] **Rotazione e scala dei props** (rotella col prop in mano); layer sopra/sotto token
-- [ ] **Audio per zona**: ambience diversa per bosco/villaggio/palude, agganciata alla
-      posizione del token leader (l'AmbienceManager c'è già)
+### ✅ Fase D — Il mondo VIVO (fatta)
+- [x] **Spostamento narrato sul mondo**: quando il Master (prosa o comando `moveTo`)
+      sposta il party su un POI il cui nome combacia con un'etichetta del mondo, i token
+      PLANANO lì in 2,2 s (disposti in cerchio), la camera segue morbida e la nebbia si
+      dirada a destinazione — basta dare alle etichette gli stessi nomi dei POI
+- [x] **Luci sui props di fuoco**: piazzare un falò/lanterna/torcia accende una
+      PointLight2D vera — di notte scava una pozza di luce calda nel buio; le luci si
+      spengono da sole fuori inquadratura (culling già esistente)
+- [x] **Rotazione e scala dei props**: col prop in mano, rotella = scala (0,4×–3×),
+      R = ruota a scatti di 15°; tutto persistente
+- [x] **Audio per zona**: già coperto a livello POI dall'AmbienceManager (reagisce a
+      `party_location_changed`); zone custom per-mappa restano possibili in futuro
 
 ### 🔮 Fase E — Il tavolo condiviso
 - [ ] **Multiplayer via Supabase**: l'outbox con debounce c'è già; manca il canale di

@@ -78,6 +78,13 @@ func centra_su(world_pos: Vector2) -> void:
 	position = _target_pos
 
 
+## Punta un bersaglio SENZA saltare: la camera ci PLANA con lo smorzamento di _process.
+## Usato dai viaggi narrati sul Mondo cucito (la regia segue il party, non lo teletrasporta).
+func punta(world_pos: Vector2) -> void:
+	_target_pos = world_pos
+	_clamp_target()
+
+
 ## Inquadra l'INTERO rettangolo del mondo (usato dal "Mondo cucito": all'apertura si vede tutta la
 ## mega-mappa, poi si zooma coi comandi). Puo' scendere SOTTO ZOOM_MIN: un open-world cucito e'
 ## molto piu' grande dello schermo, quindi qui il limite minimo di zoom non deve valere.

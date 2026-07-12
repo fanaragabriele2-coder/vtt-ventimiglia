@@ -221,7 +221,7 @@ func _riempi_palette() -> void:
 		if primo == null:
 			primo = b
 	var aiuto := Label.new()
-	aiuto.text = "  click: piazza · trascina: sposta · destro: elimina"
+	aiuto.text = "  click: piazza · trascina: sposta (rotella: scala, R: ruota) · destro: elimina"
 	aiuto.add_theme_color_override("font_color", Color(0.6, 0.55, 0.48))
 	_palette_row.add_child(aiuto)
 	if primo != null:

@@ -32,6 +32,7 @@ var _camera: Camera2D
 var _gettoni: Array[Dictionary] = []   # { "id", "nome", "colore": Color, "pos": Vector2 }
 var _trascinato: int = -1
 var _ultimo_zoom: float = 0.0
+var _tween_viaggio: Tween
 
 
 func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
@@ -49,6 +50,35 @@ func posizioni() -> Array[Vector2]:
 	for g: Dictionary in _gettoni:
 		out.append(g["pos"])
 	return out
+
+
+## VIAGGIO NARRATO: tutto il party PLANA verso il punto (2.2s, disposto in cerchio all'arrivo).
+## Un nuovo viaggio interrompe il precedente. All'arrivo: salvataggio + token_spostato per
+## ogni PG (cosi' la nebbia si dirada a destinazione).
+func muovi_tutti_verso(punto: Vector2) -> void:
+	if _gettoni.is_empty():
+		return
+	if _tween_viaggio != null and _tween_viaggio.is_valid():
+		_tween_viaggio.kill()
+	_tween_viaggio = create_tween().set_parallel(true)
+	for i: int in range(_gettoni.size()):
+		var angolo: float = TAU * float(i) / float(_gettoni.size())
+		var arrivo: Vector2 = _dentro_mappa(punto + Vector2.from_angle(angolo) * 90.0)
+		_tween_viaggio.tween_method(_muovi_gettone.bind(i), _gettoni[i]["pos"] as Vector2,
+			arrivo, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_tween_viaggio.chain().tween_callback(_fine_viaggio)
+
+
+func _muovi_gettone(pos: Vector2, indice: int) -> void:
+	if indice < _gettoni.size():
+		_gettoni[indice]["pos"] = pos
+		queue_redraw()
+
+
+func _fine_viaggio() -> void:
+	for g: Dictionary in _gettoni:
+		token_spostato.emit(String(g["id"]), g["pos"] as Vector2)
+	_salva()
 
 
 func _process(_delta: float) -> void:

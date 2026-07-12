@@ -40,6 +40,47 @@ func carica(cartella: String) -> int:
 	return _voci.size()
 
 
+## Trova l'etichetta che meglio corrisponde a un nome narrato ("il guado", "Lago Chiaro"...):
+## match esatto normalizzato, altrimenti contenimento a parole (vince il nome piu' lungo).
+## Ritorna la voce { "nome", "pos" } o un Dictionary vuoto.
+func trova(nome: String) -> Dictionary:
+	var cercato: String = _normalizza(nome)
+	if cercato.is_empty():
+		return {}
+	var migliore: Dictionary = {}
+	var migliore_lunghezza: int = 0
+	for voce: Dictionary in _voci:
+		var candidato: String = _normalizza(String(voce["nome"]))
+		if candidato == cercato:
+			return voce
+		if candidato.length() <= migliore_lunghezza:
+			continue
+		var imbottito_c: String = " " + cercato + " "
+		var imbottito_v: String = " " + candidato + " "
+		if imbottito_c.contains(" " + candidato + " ") or imbottito_v.contains(" " + cercato + " "):
+			migliore_lunghezza = candidato.length()
+			migliore = voce
+	return migliore
+
+
+## Minuscolo, accenti ridotti, tutto cio' che non e' alfanumerico -> spazio singolo.
+func _normalizza(testo: String) -> String:
+	var s: String = testo.to_lower()
+	var accenti: Dictionary = {
+		"à": "a", "á": "a", "è": "e", "é": "e", "ì": "i", "í": "i",
+		"ò": "o", "ó": "o", "ù": "u", "ú": "u",
+	}
+	for k: String in accenti:
+		s = s.replace(k, accenti[k])
+	var pulito: String = ""
+	for i: int in range(s.length()):
+		var ch: String = s[i]
+		pulito += ch if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") else " "
+	while pulito.contains("  "):
+		pulito = pulito.replace("  ", " ")
+	return pulito.strip_edges()
+
+
 func _process(_delta: float) -> void:
 	if _voci.is_empty() or _camera == null:
 		return

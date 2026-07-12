@@ -129,10 +129,15 @@ func _ready() -> void:
 	_righello.z_index = 4
 	add_child(_righello)
 	_righello.configura(_camera)
+	# VIAGGIO NARRATO: quando il Master (prosa o comando moveTo) sposta il party su un POI,
+	# se un'etichetta del mondo ha quel nome anche i token viaggiano li'. Connessione a metodo
+	# (non lambda): si scollega da sola quando il builder viene liberato dal "Ricarica mappe".
+	GameState.party_location_changed.connect(_su_viaggio_party)
 	_da_inquadrare = true
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
-	_motore.configura(_camera, [])
+	# _props nel gruppo cullabile: le PointLight2D dei falo' si SPENGONO fuori inquadratura.
+	_motore.configura(_camera, [_props])
 	var da_dove: String = "user://maps (permanente)" if _cartella_attiva == CARTELLA_MAPPE_UTENTE \
 		else "assets/maps del progetto"
 	GameState.announce("🌍 Mondo cucito: %d mappe da %s, coerenza visiva applicata." % [
@@ -233,6 +238,27 @@ func attiva_props(valore: bool) -> void:
 
 func props() -> WorldProps:
 	return _props
+
+
+## VIAGGIO NARRATO sul mondo: cerca il luogo per nome tra le etichette; se c'e', il party
+## ci plana (token in cerchio), la camera segue morbida e la nebbia si dirada a destinazione.
+func viaggia_verso(nome_luogo: String) -> bool:
+	if _etichette == null or _tokens == null:
+		return false
+	var voce: Dictionary = _etichette.trova(nome_luogo)
+	if voce.is_empty():
+		return false
+	var pos: Vector2 = voce["pos"]
+	_tokens.muovi_tutti_verso(pos)
+	_camera.punta(pos)
+	if _nebbia != null and _nebbia.attiva():
+		_nebbia.rivela(pos)
+	GameState.announce("🌍 Sul mondo cucito il party si dirige verso %s." % String(voce["nome"]))
+	return true
+
+
+func _su_viaggio_party(location: Dictionary) -> void:
+	viaggia_verso(String(location.get("name", "")))
 
 
 ## I token si trascinano solo quando NE' il righello NE' la modalita' props reclamano il mouse.
