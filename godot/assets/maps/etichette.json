@@ -1,0 +1,10 @@
+[
+	{ "nome": "Bosco Vecchio", "x": 500, "y": 480 },
+	{ "nome": "Prati del Nord", "x": 1600, "y": 380 },
+	{ "nome": "Lago Chiaro", "x": 2600, "y": 430 },
+	{ "nome": "Villaggio di Confine", "x": 1536, "y": 1380 },
+	{ "nome": "Il Guado", "x": 2720, "y": 1470 },
+	{ "nome": "Rocce del Tramonto", "x": 460, "y": 2620 },
+	{ "nome": "Campi Dorati", "x": 1500, "y": 2620 },
+	{ "nome": "Palude Grigia", "x": 2620, "y": 2720 }
+]

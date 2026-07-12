@@ -57,11 +57,14 @@ disposizione nella griglia; usa mappe della stessa risoluzione per il risultato 
 - [x] **Atmosfera**: ombre di nuvole in movimento, lucciole di notte, pulviscolo di
       giorno, transizioni dell'ora in dissolvenza (1.2s), vignetta + grana cinematografica
 
-### 🔜 Fase B — Il mondo si gioca (prossima)
-- [ ] **Token del party sul Mondo cucito**: trascinabili, con snap alla griglia
-- [ ] **Righello**: click-e-trascina per misurare distanze in celle/metri
-- [ ] **POI ed etichette**: nomi dei luoghi sopra la mappa (Ventimiglia, il guado…)
-- [ ] **Fog of war del mondo**: si dirada dove il party è passato
+### ✅ Fase B — Il mondo si gioca (fatta)
+- [x] **Token del party sul Mondo cucito**: uno per PG del roster, trascinabili col sinistro,
+      snap alla griglia quando è accesa, posizioni salvate in `user://` (per sempre)
+- [x] **📏 Righello**: click-e-trascina misura in celle e metri (1 cella = 1,5 m, D&D 5e)
+- [x] **Etichette dei luoghi**: `etichette.json` nella cartella mappe attiva (le mappe
+      incluse hanno già 8 nomi); stanno SOTTO la nebbia: i nomi si scoprono esplorando
+- [x] **🌫 Fog of war**: il mondo si scopre spostando i token; l'esplorato è persistente
+      (`user://world_fog.png`, si azzera cancellando il file o cambiando set di mappe)
 - [ ] Spostamento narrato: il Master IA muove il party sul mondo (già c'è per i POI 2D)
 
 ### 🔮 Fase C — Props e regia

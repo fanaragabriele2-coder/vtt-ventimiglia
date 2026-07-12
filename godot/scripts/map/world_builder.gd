@@ -67,6 +67,10 @@ var _griglia: WorldGrid
 var _minimappa: ImageTexture
 var _atmosfera: WorldAtmosphere
 var _tween_ora: Tween
+var _tokens: WorldTokens
+var _righello: WorldRuler
+var _etichette: WorldLabels
+var _nebbia: WorldFog
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
@@ -97,6 +101,27 @@ func _ready() -> void:
 	_atmosfera = WorldAtmosphere.new()
 	add_child(_atmosfera)
 	_atmosfera.configura(_rect_mappa, _camera)
+	# Livelli di gioco sopra il terreno, dal basso verso l'alto: etichette dei luoghi (1, sotto
+	# la nebbia: i nomi si scoprono esplorando), nebbia (2), token del party (3), righello (4).
+	_etichette = WorldLabels.new()
+	_etichette.z_index = 1
+	add_child(_etichette)
+	_etichette.configura(_camera)
+	_etichette.carica(_cartella_attiva)  # ogni set di mappe porta i propri nomi dei luoghi
+	_nebbia = WorldFog.new()
+	_nebbia.z_index = 2
+	add_child(_nebbia)
+	_nebbia.configura(_rect_mappa)
+	_tokens = WorldTokens.new()
+	_tokens.z_index = 3
+	add_child(_tokens)
+	_tokens.configura(_rect_mappa, _camera)
+	_tokens.token_spostato.connect(func(_id: String, pos: Vector2) -> void:
+		_nebbia.rivela(pos))
+	_righello = WorldRuler.new()
+	_righello.z_index = 4
+	add_child(_righello)
+	_righello.configura(_camera)
 	_da_inquadrare = true
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
@@ -174,6 +199,30 @@ func imposta_griglia(cella_px: float) -> void:
 		add_child(_griglia)
 		_griglia.configura(_rect_mappa, _camera)
 	_griglia.imposta_cella(cella_px)
+	# Griglia e resto del tavolo vanno a braccetto: snap dei token e conteggio del righello.
+	if _tokens != null:
+		_tokens.cella = cella_px
+	if _righello != null:
+		_righello.cella = cella_px if cella_px > 0.0 else 128.0
+
+
+## Accende/spegne il righello ("📏"): mentre misura, i token non rispondono al mouse.
+func attiva_righello(valore: bool) -> void:
+	if _righello == null:
+		return
+	_righello.imposta_attivo(valore)
+	if _tokens != null:
+		_tokens.blocco_input = valore
+
+
+## Accende/spegne la nebbia ("🌫"): all'accensione rivela subito attorno ai token del party.
+func attiva_nebbia(valore: bool) -> void:
+	if _nebbia == null:
+		return
+	_nebbia.imposta_attiva(valore)
+	if valore and _tokens != null:
+		for pos: Vector2 in _tokens.posizioni():
+			_nebbia.rivela(pos)
 
 
 ## La miniatura dell'intero mondo per la minimappa (null se nessuna mappa e' caricata).

@@ -34,7 +34,10 @@ var _viewport: SubViewport
 var _builder: WorldBuilder
 var _minimap: WorldMinimap
 var _griglia_btn: Button
-var _griglia_idx: int = 0  # lo stato vive QUI: sopravvive alla ricreazione del builder
+# Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
+var _griglia_idx: int = 0
+var _righello_on: bool = false
+var _nebbia_on: bool = false
 
 
 func _ready() -> void:
@@ -143,6 +146,24 @@ func _build_toolbar() -> void:
 	_griglia_btn.pressed.connect(_su_griglia)
 	row.add_child(_griglia_btn)
 
+	var righello := Button.new()
+	righello.text = "📏 Righello"
+	righello.toggle_mode = true
+	righello.tooltip_text = "Misura le distanze: click-e-trascina col sinistro. " \
+		+ "1 cella = 1,5 m (D&D 5e). Mentre e' attivo i token non si trascinano."
+	righello.custom_minimum_size = Vector2(0, 34)
+	righello.toggled.connect(_su_righello)
+	row.add_child(righello)
+
+	var nebbia := Button.new()
+	nebbia.text = "🌫 Nebbia"
+	nebbia.toggle_mode = true
+	nebbia.tooltip_text = "Fog of war: il mondo si scopre spostando i token del party. " \
+		+ "L'esplorato resta salvato tra le sessioni."
+	nebbia.custom_minimum_size = Vector2(0, 34)
+	nebbia.toggled.connect(_su_nebbia)
+	row.add_child(nebbia)
+
 
 ## Minimappa in basso a destra: miniatura del mondo intero + rettangolo dell'inquadratura,
 ## click per teletrasportare la camera. Ri-agganciata a ogni ricostruzione del builder.
@@ -178,6 +199,16 @@ func _su_griglia() -> void:
 	_builder.imposta_griglia(cella)
 
 
+func _su_righello(acceso: bool) -> void:
+	_righello_on = acceso
+	_builder.attiva_righello(acceso)
+
+
+func _su_nebbia(accesa: bool) -> void:
+	_nebbia_on = accesa
+	_builder.attiva_nebbia(accesa)
+
+
 ## File trascinati sulla finestra del gioco: se questa vista e' quella attiva, le immagini valide
 ## vengono copiate in user://maps e il mondo si ricuce da solo. La guardia di visibilita' evita
 ## che un drop fatto in un'altra vista (Nexus, scheda PG...) importi mappe di nascosto.
@@ -199,8 +230,12 @@ func _su_ricarica() -> void:
 	_builder.queue_free()
 	_builder = WorldBuilder.new()
 	_viewport.add_child(_builder)  # add_child esegue il _ready del builder QUI, in modo sincrono
-	# Il nuovo builder parte "nudo": si ri-applica lo stato che vive nella vista (griglia) e si
-	# ri-aggancia la minimappa alla sua nuova miniatura/camera.
+	# Il nuovo builder parte "nudo": si ri-applica lo stato che vive nella vista (griglia,
+	# righello, nebbia) e si ri-aggancia la minimappa alla sua nuova miniatura/camera.
 	if CELLE_GRIGLIA[_griglia_idx] > 0.0:
 		_builder.imposta_griglia(CELLE_GRIGLIA[_griglia_idx])
+	if _righello_on:
+		_builder.attiva_righello(true)
+	if _nebbia_on:
+		_builder.attiva_nebbia(true)
 	_aggancia_minimap()
