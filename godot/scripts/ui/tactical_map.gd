@@ -205,19 +205,38 @@ func _draw_token(token: Dictionary) -> void:
 	var center: Vector2 = _cell_to_pixel_center(cell)
 	var radius: float = _cell_size * 0.36
 	var is_pc: bool = token["kind"] == "pc"
-	# Anello di selezione / turno.
+	# Corpo: ARTE del token se esiste (user://tokens prima, poi assets/tokens — vedi TokenArt),
+	# altrimenti il cerchio colorato di sempre. Un PG senza ritratto col proprio nome ripiega
+	# sull'arte della sua CLASSE (guerriero, mago...).
+	var tex: Texture2D = TokenArt.per_nome(String(token["name"]))
+	if tex == null and is_pc:
+		tex = TokenArt.per_nome(_classe_di(String(token["name"])))
+	var raggio_corpo: float = radius
+	if tex != null:
+		raggio_corpo = radius * 1.18  # il PNG porta con se' anello e ombra propri
+		draw_texture_rect(tex, Rect2(center - Vector2(raggio_corpo, raggio_corpo),
+			Vector2(raggio_corpo, raggio_corpo) * 2.0), false)
+	else:
+		draw_circle(center, radius, COL_PC if is_pc else COL_NPC)
+		draw_arc(center, radius, 0, TAU, 32, COL_PC_RING if is_pc else COL_NPC_RING, 2.0)
+	# Anelli di selezione/turno DOPO il corpo: visibili anche sopra l'arte.
 	if token["id"] == _selected_id:
-		draw_arc(center, radius + 4.0, 0, TAU, 32, COL_SELECT, 3.0)
+		draw_arc(center, raggio_corpo + 4.0, 0, TAU, 32, COL_SELECT, 3.0)
 	if not _current_combatant_id.is_empty() and token.get("combatant_id", "") == _current_combatant_id:
-		draw_arc(center, radius + 7.0, 0, TAU, 32, COL_TURN_RING, 2.5)
-	# Corpo + bordo.
-	draw_circle(center, radius, COL_PC if is_pc else COL_NPC)
-	draw_arc(center, radius, 0, TAU, 32, COL_PC_RING if is_pc else COL_NPC_RING, 2.0)
+		draw_arc(center, raggio_corpo + 7.0, 0, TAU, 32, COL_TURN_RING, 2.5)
 	# Nome sotto il token.
 	var font: Font = ThemeDB.fallback_font
 	var fsize: int = maxi(10, int(_cell_size * 0.32))
-	draw_string(font, Vector2(center.x - _cell_size * 0.5, center.y + radius + fsize),
+	draw_string(font, Vector2(center.x - _cell_size * 0.5, center.y + raggio_corpo + fsize),
 		String(token["name"]), HORIZONTAL_ALIGNMENT_CENTER, _cell_size, fsize, Color(0.85, 0.8, 0.7))
+
+
+## Classe del PG col nome dato (per l'arte di fallback dei token senza ritratto dedicato).
+func _classe_di(nome_pg: String) -> String:
+	for pg: CharacterData in CharacterManager.get_party():
+		if pg.character_name == nome_pg:
+			return pg.class_name_label
+	return ""
 
 
 # --- Sfondo mappa personalizzato (immagine locale scelta dall'utente) ---

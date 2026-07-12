@@ -87,13 +87,23 @@ func _draw() -> void:
 		var g: Dictionary = _gettoni[i]
 		var pos: Vector2 = g["pos"]
 		var colore: Color = g["colore"]
-		draw_circle(pos, r * 1.14, Color(0.08, 0.06, 0.05, 0.9))     # bordo scuro
-		draw_circle(pos, r, colore)
-		draw_circle(pos, r * 0.78, colore.lightened(0.18))           # cuore piu' chiaro
-		var iniziale: String = String(g["nome"]).left(1).to_upper()
-		var dim: int = int(r * 1.1)
-		draw_string(font, pos + Vector2(-r, r * 0.42), iniziale,
-			HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, dim, Color(0.1, 0.08, 0.05))
+		# ARTE del token se esiste (ritratto col nome del PG, o arte della sua classe);
+		# altrimenti il gettone disegnato con l'iniziale.
+		var tex: Texture2D = TokenArt.per_nome(String(g["nome"]))
+		if tex == null:
+			tex = TokenArt.per_nome(String(g["classe"]))
+		if tex != null:
+			var lato: float = r * 2.4
+			draw_texture_rect(tex, Rect2(pos - Vector2(lato, lato) * 0.5,
+				Vector2(lato, lato)), false)
+		else:
+			draw_circle(pos, r * 1.14, Color(0.08, 0.06, 0.05, 0.9))   # bordo scuro
+			draw_circle(pos, r, colore)
+			draw_circle(pos, r * 0.78, colore.lightened(0.18))         # cuore piu' chiaro
+			var iniziale: String = String(g["nome"]).left(1).to_upper()
+			var dim: int = int(r * 1.1)
+			draw_string(font, pos + Vector2(-r, r * 0.42), iniziale,
+				HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, dim, Color(0.1, 0.08, 0.05))
 		if _camera.zoom.x >= ZOOM_NOME:
 			var dim_nome: int = int(maxf(18.0, r * 0.5))
 			var y_nome: float = r * 1.5 + dim_nome
@@ -157,7 +167,7 @@ func _ricostruisci_roster() -> void:
 			var angolo: float = TAU * float(i) / maxf(1.0, float(party.size()))
 			pos = _rect.get_center() + Vector2.from_angle(angolo) * 150.0
 		_gettoni.append({
-			"id": pg.id, "nome": pg.character_name,
+			"id": pg.id, "nome": pg.character_name, "classe": pg.class_name_label,
 			"colore": PALETTE[i % PALETTE.size()], "pos": pos,
 		})
 	queue_redraw()

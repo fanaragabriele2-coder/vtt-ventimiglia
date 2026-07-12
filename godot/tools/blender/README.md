@@ -1,9 +1,19 @@
-# tools/blender — generatore di props per il VTT
+# tools/blender — generatori di asset per il VTT
 
-`genera_props.py` è uno script da eseguire **dentro Blender** (4.x o 5.x): genera 8 props
-stilizzati (albero, pino, cespuglio, roccia, botte, cassa, falò acceso, pozzo), li
-renderizza **dall'alto** con camera ortografica e **sfondo trasparente**, e salva i PNG
-512×512 in una cartella `vtt_props` sul Desktop.
+Due script da eseguire **dentro Blender** (4.x o 5.x):
+
+- **`genera_props.py`** — 8 props di scena (albero, pino, cespuglio, roccia, botte, cassa,
+  falò acceso, pozzo) → PNG 512×512 trasparenti in `Desktop/vtt_props`;
+- **`genera_bestiario.py`** — le 14 MINIATURE del gioco: gli 8 mostri del bestiario
+  (goblin, bandito, scheletro, lupo, orco, cultista, zombie, hobgoblin) e le 6 classi eroi
+  (guerriero, barbaro, ladro, ranger, mago, chierico), ognuna modellata in 3D su basetta
+  colore-fazione (rossa nemici, oro eroi) → PNG 512×512 trasparenti in `Desktop/vtt_tokens`.
+
+**Le miniature entrano nel gioco da sole**: copia i PNG di `vtt_tokens` nella cartella
+`user://tokens` del gioco (è accanto a `user://maps`: dal gioco premi "📁 Apri cartella
+mappe", risali di una cartella ed entra in `tokens`). I nomi file coincidono con gli id del
+gioco, quindi mappa tattica e Mondo cucito li usano subito al posto dei token inclusi —
+e `user://` sopravvive a ogni aggiornamento del gioco.
 
 ## Come eseguirlo
 

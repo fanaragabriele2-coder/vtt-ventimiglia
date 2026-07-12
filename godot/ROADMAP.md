@@ -56,6 +56,10 @@ disposizione nella griglia; usa mappe della stessa risoluzione per il risultato 
 - [x] 9 battlemap incluse (mondo 3×3 senza cuciture visibili)
 - [x] **Atmosfera**: ombre di nuvole in movimento, lucciole di notte, pulviscolo di
       giorno, transizioni dell'ora in dissolvenza (1.2s), vignetta + grana cinematografica
+- [x] **Token art del bestiario e delle classi**: 14 token inclusi (8 mostri + 6 eroi,
+      `assets/tokens`), caricatore `TokenArt` con priorità a `user://tokens` (i render
+      Blender di `tools/blender/genera_bestiario.py` rimpiazzano i token inclusi al volo),
+      integrati nella mappa tattica e nei gettoni del Mondo cucito con fallback al cerchio
 
 ### ✅ Fase B — Il mondo si gioca (fatta)
 - [x] **Token del party sul Mondo cucito**: uno per PG del roster, trascinabili col sinistro,
