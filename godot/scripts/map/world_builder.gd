@@ -71,6 +71,7 @@ var _tokens: WorldTokens
 var _righello: WorldRuler
 var _etichette: WorldLabels
 var _nebbia: WorldFog
+var _props: WorldProps
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
@@ -101,6 +102,12 @@ func _ready() -> void:
 	_atmosfera = WorldAtmosphere.new()
 	add_child(_atmosfera)
 	_atmosfera.configura(_rect_mappa, _camera)
+	# Props a -4: sopra la griglia (-5) ma sotto le ombre delle nuvole (-3), che cosi'
+	# accarezzano anche alberi e casse; la nebbia (2) li copre finche' non si esplora.
+	_props = WorldProps.new()
+	_props.z_index = -4
+	add_child(_props)
+	_props.configura(_rect_mappa, _camera)
 	# Livelli di gioco sopra il terreno, dal basso verso l'alto: etichette dei luoghi (1, sotto
 	# la nebbia: i nomi si scoprono esplorando), nebbia (2), token del party (3), righello (4).
 	_etichette = WorldLabels.new()
@@ -199,11 +206,13 @@ func imposta_griglia(cella_px: float) -> void:
 		add_child(_griglia)
 		_griglia.configura(_rect_mappa, _camera)
 	_griglia.imposta_cella(cella_px)
-	# Griglia e resto del tavolo vanno a braccetto: snap dei token e conteggio del righello.
+	# Griglia e resto del tavolo vanno a braccetto: snap di token e props, conteggio righello.
 	if _tokens != null:
 		_tokens.cella = cella_px
 	if _righello != null:
 		_righello.cella = cella_px if cella_px > 0.0 else 128.0
+	if _props != null:
+		_props.cella = cella_px
 
 
 ## Accende/spegne il righello ("📏"): mentre misura, i token non rispondono al mouse.
@@ -211,8 +220,28 @@ func attiva_righello(valore: bool) -> void:
 	if _righello == null:
 		return
 	_righello.imposta_attivo(valore)
-	if _tokens != null:
-		_tokens.blocco_input = valore
+	_aggiorna_blocco_token()
+
+
+## Accende/spegne la modalita' props ("🌳"): il layer e' della vista, qui solo lo stato.
+func attiva_props(valore: bool) -> void:
+	if _props == null:
+		return
+	_props.imposta_modalita(valore)
+	_aggiorna_blocco_token()
+
+
+func props() -> WorldProps:
+	return _props
+
+
+## I token si trascinano solo quando NE' il righello NE' la modalita' props reclamano il mouse.
+func _aggiorna_blocco_token() -> void:
+	if _tokens == null:
+		return
+	var righello_on: bool = _righello != null and _righello.attivo()
+	var props_on: bool = _props != null and _props.modalita()
+	_tokens.blocco_input = righello_on or props_on
 
 
 ## Accende/spegne la nebbia ("🌫"): all'accensione rivela subito attorno ai token del party.

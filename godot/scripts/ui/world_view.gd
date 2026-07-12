@@ -34,10 +34,15 @@ var _viewport: SubViewport
 var _builder: WorldBuilder
 var _minimap: WorldMinimap
 var _griglia_btn: Button
+var _righello_btn: Button
+var _props_btn: Button
+var _palette: PanelContainer
+var _palette_row: HBoxContainer
 # Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
 var _griglia_idx: int = 0
 var _righello_on: bool = false
 var _nebbia_on: bool = false
+var _props_on: bool = false
 
 
 func _ready() -> void:
@@ -45,6 +50,7 @@ func _ready() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_build_viewport()
 	_build_toolbar()
+	_build_palette()
 	_build_minimap()
 	# files_dropped vive sulla Window (la vista puo' essere ricreata, la finestra no): connesso
 	# qui e scollegato in _exit_tree, con guardia di visibilita' dentro il gestore — i drop
@@ -146,14 +152,24 @@ func _build_toolbar() -> void:
 	_griglia_btn.pressed.connect(_su_griglia)
 	row.add_child(_griglia_btn)
 
-	var righello := Button.new()
-	righello.text = "📏 Righello"
-	righello.toggle_mode = true
-	righello.tooltip_text = "Misura le distanze: click-e-trascina col sinistro. " \
+	_righello_btn = Button.new()
+	_righello_btn.text = "📏 Righello"
+	_righello_btn.toggle_mode = true
+	_righello_btn.tooltip_text = "Misura le distanze: click-e-trascina col sinistro. " \
 		+ "1 cella = 1,5 m (D&D 5e). Mentre e' attivo i token non si trascinano."
-	righello.custom_minimum_size = Vector2(0, 34)
-	righello.toggled.connect(_su_righello)
-	row.add_child(righello)
+	_righello_btn.custom_minimum_size = Vector2(0, 34)
+	_righello_btn.toggled.connect(_su_righello)
+	row.add_child(_righello_btn)
+
+	_props_btn = Button.new()
+	_props_btn.text = "🌳 Props"
+	_props_btn.toggle_mode = true
+	_props_btn.tooltip_text = "Arreda il mondo: click piazza il prop scelto, trascina " \
+		+ "sposta, click DESTRO elimina. Il layout si salva da solo. Metti i tuoi PNG " \
+		+ "in user://props per ampliare la palette."
+	_props_btn.custom_minimum_size = Vector2(0, 34)
+	_props_btn.toggled.connect(_su_props)
+	row.add_child(_props_btn)
 
 	var nebbia := Button.new()
 	nebbia.text = "🌫 Nebbia"
@@ -163,6 +179,53 @@ func _build_toolbar() -> void:
 	nebbia.custom_minimum_size = Vector2(0, 34)
 	nebbia.toggled.connect(_su_nebbia)
 	row.add_child(nebbia)
+
+
+## Palette dei props: seconda barra sotto la toolbar, visibile solo in modalita' "🌳 Props".
+## Un toggle per ogni immagine del catalogo (assets/props + user://props, quest'ultima vince).
+func _build_palette() -> void:
+	_palette = PanelContainer.new()
+	_palette.position = Vector2(8, 60)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.05, 0.045, 0.9)
+	sb.set_corner_radius_all(8)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	_palette.add_theme_stylebox_override("panel", sb)
+	_palette.visible = false
+	add_child(_palette)
+	_palette_row = HBoxContainer.new()
+	_palette_row.add_theme_constant_override("separation", 6)
+	_palette.add_child(_palette_row)
+	_riempi_palette()
+
+
+func _riempi_palette() -> void:
+	for figlio: Node in _palette_row.get_children():
+		figlio.queue_free()
+	var catalogo: Dictionary = _builder.props().catalogo()
+	var nomi: Array = catalogo.keys()
+	nomi.sort()
+	var gruppo := ButtonGroup.new()
+	var primo: Button = null
+	for nome: Variant in nomi:
+		var b := Button.new()
+		b.text = String(nome)
+		b.toggle_mode = true
+		b.button_group = gruppo
+		b.custom_minimum_size = Vector2(0, 30)
+		b.toggled.connect(_su_prop_scelto.bind(String(nome)))
+		_palette_row.add_child(b)
+		if primo == null:
+			primo = b
+	var aiuto := Label.new()
+	aiuto.text = "  click: piazza · trascina: sposta · destro: elimina"
+	aiuto.add_theme_color_override("font_color", Color(0.6, 0.55, 0.48))
+	_palette_row.add_child(aiuto)
+	if primo != null:
+		primo.button_pressed = true  # un prop e' sempre selezionato: il click piazza subito
 
 
 ## Minimappa in basso a destra: miniatura del mondo intero + rettangolo dell'inquadratura,
@@ -201,7 +264,23 @@ func _su_griglia() -> void:
 
 func _su_righello(acceso: bool) -> void:
 	_righello_on = acceso
+	if acceso and _props_btn != null and _props_btn.button_pressed:
+		_props_btn.button_pressed = false  # righello e props si contendono il sinistro: uno solo
 	_builder.attiva_righello(acceso)
+
+
+func _su_props(acceso: bool) -> void:
+	_props_on = acceso
+	if acceso and _righello_btn != null and _righello_btn.button_pressed:
+		_righello_btn.button_pressed = false
+	_builder.attiva_props(acceso)
+	if _palette != null:
+		_palette.visible = acceso
+
+
+func _su_prop_scelto(acceso: bool, nome: String) -> void:
+	if acceso:
+		_builder.props().seleziona(nome)
 
 
 func _su_nebbia(accesa: bool) -> void:
@@ -231,11 +310,14 @@ func _su_ricarica() -> void:
 	_builder = WorldBuilder.new()
 	_viewport.add_child(_builder)  # add_child esegue il _ready del builder QUI, in modo sincrono
 	# Il nuovo builder parte "nudo": si ri-applica lo stato che vive nella vista (griglia,
-	# righello, nebbia) e si ri-aggancia la minimappa alla sua nuova miniatura/camera.
+	# righello, nebbia, props) e si ri-agganciano minimappa e palette (nuove texture/catalogo).
 	if CELLE_GRIGLIA[_griglia_idx] > 0.0:
 		_builder.imposta_griglia(CELLE_GRIGLIA[_griglia_idx])
 	if _righello_on:
 		_builder.attiva_righello(true)
 	if _nebbia_on:
 		_builder.attiva_nebbia(true)
+	if _props_on:
+		_builder.attiva_props(true)
+	_riempi_palette()
 	_aggancia_minimap()

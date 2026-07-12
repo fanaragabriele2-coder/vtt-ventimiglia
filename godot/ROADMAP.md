@@ -1,87 +1,126 @@
-# ROADMAP — Asset gratuiti e evoluzione del gioco
+# ROADMAP COMPLETA — Ultimate VTT "Tavolo Oscuro di Ventimiglia" (Godot 4)
 
-## 1. Cosa c'è GIÀ nel progetto (da oggi)
+Lo stato di TUTTO il progetto: cosa c'è già, cosa arriva, come si usano gli asset.
+Aggiornata a: luglio 2026.
 
-In `assets/maps/` ci sono **9 battlemap incluse** (`mappa_01.png` … `mappa_09.png`): un unico
-mondo continuo 3072×3072 — bosco, prati, lago con fiume, strada con ponte sul guado,
-villaggio, campi arati, rocce e palude — disegnato per intero e poi tagliato in 9 tessere,
-così le cuciture combaciano **al pixel**. Aprendo la vista **🧩 Mondo cucito** il mondo
-appare subito, senza dover scaricare nulla. Sono generate proceduralmente per questo
-progetto: **nessun vincolo di licenza**, si possono ridistribuire, modificare, sostituire.
+---
 
-Sono il *set di partenza*: appena importi battlemap artistiche (vedi sotto) in `user://maps`,
-quelle prendono il posto di queste (la cartella utente ha priorità).
+## PARTE 1 — Cosa il gioco SA GIÀ FARE
 
-## 2. Asset gratuiti dai siti: quali, dove, e cosa dice la licenza
+### ⚔️ Cuore di gioco (portato dal monolite JS, tutto in Godot)
+- **Personaggi D&D 5e**: schede complete (caratteristiche, tiri salvezza, abilità,
+  competenze, dadi vita), creazione guidata con 6 classi (Guerriero, Barbaro, Ladro,
+  Ranger, Mago, Chierico) e razze, progressione/XP
+- **Combattimento a turni**: iniziativa, economia delle azioni (azione/bonus/movimento),
+  menu azioni dinamico da classe/razza/inventario, condizioni, fiancheggiamento,
+  elevazione, superfici, IA dei nemici
+- **Encounter Balancer**: budget di minaccia dal party REALE (numero, livelli, HP attuali)
+  — quantità e statistiche dei nemici scalate per uno scontro equo
+- **Bestiario**: 8 creature (Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie,
+  Hobgoblin) con statistiche 5e; la chat del Master fa PARTIRE il combattimento vero
+  quando narra uno scontro (sinonimi inclusi: "briganti"→Banditi, "ombre"→Scheletri)
+- **Armeria e loot**: rarità comune/rara/epica/leggendaria, armature, amuleti, armi di
+  classe; drop scalati sulla forza del nemico (CR); uso oggetti anche in combattimento
+- **Master IA**: bridge Ollama con endpoint remoto configurabile e streaming (Split-Rig:
+  il client resta leggero, l'LLM gira altrove); voce del Master (TTS con coda);
+  chat→viaggio sui POI di Ventimiglia
+- **Mappa tattica** (combattimento): griglia con click-to-move stile BG3, righello,
+  ostacoli/highground, sfondo immagine personalizzabile, **token art automatica**
+- **Dadi 3D**, barra XP, pannelli Master, salvataggi, memoria di campagna
 
-⚠️ **Regola d'oro**: *usare* un asset nel tuo gioco in locale e *ridistribuirlo* (committarlo
-in questo repository GitHub pubblico) sono due cose diverse. Quasi tutti i pacchetti gratuiti
-permettono la prima e **vietano la seconda**. Per questo il flusso consigliato è sempre:
-scarichi tu → trascini sulla finestra del gioco → finiscono in `user://maps` (fuori dal
-repository, sopravvivono agli aggiornamenti, e non violi nessuna licenza).
+### 🧩 Mondo cucito (open-world dalle battlemap — la vista "regia")
+- **Stitching a griglia perfetta**: le immagini in cartella diventano UN mondo continuo
+  (ordine alfabetico, ~√N colonne, riscalo alla cella comune: zero buchi)
+- **Coerenza visiva**: micro color-grading per-chunk verso la media del set + seam
+  blending shader + tinta globale — pacchetti diversi, un solo mondo
+- **Culling VRAM hardware-aware**: fuori vista si nasconde, lontano la texture LASCIA la
+  VRAM (budget per l'LLM locale sulla stessa macchina)
+- **Due cartelle mappe**: `user://maps` (SOPRAVVIVE agli aggiornamenti, consigliata) con
+  fallback `assets/maps`; **drag & drop** dei PNG/JPG/WebP direttamente sulla finestra
+- **9 battlemap incluse**: mondo 3×3 senza cuciture (bosco, lago, fiume col guado,
+  villaggio, campi, rocce, palude) — il Mondo cucito funziona appena installi
+- **Navigazione**: zoom-to-cursor senza scatti, "🗺 Inquadra tutto", **minimappa
+  cliccabile** (miniatura + rettangolo vista + click-teletrasporto)
+- **▦ Griglia da battaglia** (OFF/64/128/256), quasi a costo zero
+- **🎭 Token del party**: trascinabili, snap alla cella, posizioni persistenti, arte
+  della classe automatica
+- **📏 Righello**: distanze in celle e metri (1 cella = 1,5 m)
+- **🏷 Etichette dei luoghi**: `etichette.json` per set di mappe (8 nomi inclusi),
+  NASCOSTE dalla nebbia finché non esplori
+- **🌫 Fog of war**: si dirada spostando i token, esplorato persistente
+- **🌳 Props posizionabili**: alberi, rocce, botti, falò... click piazza, trascina
+  sposta, destro elimina; snap alla griglia; layout salvato in `user://`; palette
+  estendibile coi TUOI PNG (`user://props`); 8 props inclusi
+- **Atmosfera**: ombre di nuvole in movimento, lucciole al tramonto/notte, pulviscolo di
+  giorno, ciclo giorno/tramonto/notte/dungeon in DISSOLVENZA, vignetta cinematografica
+- **Ciclo del giorno** coordinato: tinta + nuvole + particelle cambiano insieme
 
-### Fonti consigliate
+### 🎨 Asset inclusi e pipeline Blender
+- **14 token** (8 mostri + 6 classi) in `assets/tokens` — stile anello pulito
+- **8 props 2D** in `assets/props`
+- **Script Blender** in `tools/blender/` (da eseguire sul TUO PC, anche via Claude
+  Desktop + Blender MCP):
+  - `genera_props.py` → 8 props 3D top-down → `Desktop/vtt_props`
+  - `genera_bestiario.py` → le 14 MINIATURE 3D su basetta → `Desktop/vtt_tokens`
+- **Le cartelle `user://` vincono sempre**: `user://tokens` e `user://props` sostituiscono
+  gli asset inclusi per nome, e sopravvivono a ogni aggiornamento
 
-| Fonte | Cosa offre gratis | Licenza | Può entrare nel repo? |
+---
+
+## PARTE 2 — Asset gratuiti dai siti (regole d'oro)
+
+⚠️ *Usare* un asset nel tuo gioco e *ridistribuirlo* (metterlo nel repository) sono cose
+diverse. Il flusso sicuro è sempre: scarichi tu → `user://` → nessuna licenza violata.
+
+| Fonte | Cosa | Licenza | Nel repo? |
 |---|---|---|---|
-| **Forgotten Adventures** (forgotten-adventures.net) | Mappe + enorme pack di token/asset (alberi, casse, mobili…) | Uso personale/commerciale nei propri contenuti, **niente ridistribuzione dei file** | ❌ solo `user://maps` |
-| **2-Minute Tabletop** (2minutetabletop.com) | Battlemap e asset PNG | perlopiù CC-BY-NC (attribuzione, non commerciale) | ❌ solo `user://maps` |
-| **Cze & Peku** (Patreon, post pubblici) | Battlemap di altissima qualità, pack gratuiti mensili | Uso personale | ❌ solo `user://maps` |
-| **Dyson Logos** (dysonlogos.blog) | Centinaia di mappe di dungeon disegnate a mano | Uso personale (e commerciale per molte, vedi singola mappa) | ❌ solo `user://maps` |
-| **Kenney** (kenney.nl) | Migliaia di asset di gioco (tileset, UI, icone) | **CC0** (dominio pubblico) | ✅ SÌ |
-| **OpenGameArt** (opengameart.org) | Di tutto — filtra per licenza | Varia: **filtra per CC0** | ✅ solo i CC0 |
-| **Dungeon Scrawl** (dungeonscrawl.com) | Editor di mappe gratuito nel browser | Le mappe che esporti sono TUE | ✅ SÌ |
+| Forgotten Adventures | mappe + token/asset enormi | personale, no ridistribuzione | ❌ solo `user://` |
+| 2-Minute Tabletop | battlemap e asset | CC-BY-NC | ❌ solo `user://` |
+| Cze & Peku | battlemap top | personale | ❌ solo `user://` |
+| Dyson Logos | dungeon disegnati a mano | personale | ❌ solo `user://` |
+| Kenney.nl | asset di gioco | **CC0** | ✅ sì |
+| OpenGameArt (filtro CC0) | di tutto | **CC0** | ✅ sì |
+| Dungeon Scrawl | editor mappe browser | le mappe sono TUE | ✅ sì |
 
-### Come importare (il flusso completo, 30 secondi)
+Import: **trascina sulla finestra** (mappe) o copia in `user://tokens` / `user://props`.
 
-1. Scarica il pacchetto dal sito (es. il *Free Pack* di Forgotten Adventures);
-2. estrai lo zip in una cartella qualsiasi;
-3. avvia il gioco → vista **🧩 Mondo cucito**;
-4. **trascina i PNG/JPG/WebP sulla finestra del gioco**: copiati in `user://maps`, mondo
-   ricucito in automatico. Fine.
-5. (in alternativa: **📁 Apri cartella mappe** e incollaci i file, poi **🔄 Ricarica mappe**)
+---
 
-Consigli: rinomina i file con prefissi ordinabili (`01_`, `02_`…) per controllare la
-disposizione nella griglia; usa mappe della stessa risoluzione per il risultato migliore.
+## PARTE 3 — Cosa manca (le prossime fasi)
 
-## 3. Roadmap delle funzionalità
+### 🔜 Fase D — Il mondo VIVO (prossima)
+- [ ] **Spostamento narrato sul mondo**: il Master IA muove i token del party sul Mondo
+      cucito quando la storia dice che il party viaggia (il ponte chat→POI c'è già)
+- [ ] **Pennello luci**: piazza falò/lanterne (PointLight2D) con un click, in coppia coi
+      props; il culling luci esiste già
+- [ ] **Rotazione e scala dei props** (rotella col prop in mano); layer sopra/sotto token
+- [ ] **Audio per zona**: ambience diversa per bosco/villaggio/palude, agganciata alla
+      posizione del token leader (l'AmbienceManager c'è già)
 
-### ✅ Fase A — Fondamenta del Mondo cucito (fatta)
-- [x] Stitcher a griglia con riscalo alla cella comune (zero buchi)
-- [x] Coerenza visiva: color grading + seam blending + ciclo giorno/notte
-- [x] Culling VRAM hardware-aware (target 6 GB, convivenza con LLM locale)
-- [x] Cartella `user://maps` persistente + fallback `assets/maps`
-- [x] Drag & drop dei file sulla finestra
-- [x] Minimappa cliccabile + griglia da battaglia + fix zoom + Inquadra tutto
-- [x] 9 battlemap incluse (mondo 3×3 senza cuciture visibili)
-- [x] **Atmosfera**: ombre di nuvole in movimento, lucciole di notte, pulviscolo di
-      giorno, transizioni dell'ora in dissolvenza (1.2s), vignetta + grana cinematografica
-- [x] **Token art del bestiario e delle classi**: 14 token inclusi (8 mostri + 6 eroi,
-      `assets/tokens`), caricatore `TokenArt` con priorità a `user://tokens` (i render
-      Blender di `tools/blender/genera_bestiario.py` rimpiazzano i token inclusi al volo),
-      integrati nella mappa tattica e nei gettoni del Mondo cucito con fallback al cerchio
+### 🔮 Fase E — Il tavolo condiviso
+- [ ] **Multiplayer via Supabase**: l'outbox con debounce c'è già; manca il canale di
+      ritorno e la riconciliazione degli stati
+- [ ] Ruoli Master/giocatore (il Master vede tutto, i giocatori vedono la nebbia)
+- [ ] **Export eseguibile Windows**: preset con filtri `*.png,*.jpg,*.webp,*.json`
+      (documentati); build one-click
 
-### ✅ Fase B — Il mondo si gioca (fatta)
-- [x] **Token del party sul Mondo cucito**: uno per PG del roster, trascinabili col sinistro,
-      snap alla griglia quando è accesa, posizioni salvate in `user://` (per sempre)
-- [x] **📏 Righello**: click-e-trascina misura in celle e metri (1 cella = 1,5 m, D&D 5e)
-- [x] **Etichette dei luoghi**: `etichette.json` nella cartella mappe attiva (le mappe
-      incluse hanno già 8 nomi); stanno SOTTO la nebbia: i nomi si scoprono esplorando
-- [x] **🌫 Fog of war**: il mondo si scopre spostando i token; l'esplorato è persistente
-      (`user://world_fog.png`, si azzera cancellando il file o cambiando set di mappe)
-- [ ] Spostamento narrato: il Master IA muove il party sul mondo (già c'è per i POI 2D)
+### 🏰 Fase F — La campagna
+- [ ] **Campagna demo di Ventimiglia**: POI, incontri, loot e lore già nel motore,
+      da legare in un arco giocabile con etichette e mappe dedicate
+- [ ] Editor incontri visuale (ora si fa da chat/JSON)
+- [ ] Import guidato dei pacchetti Forgotten Adventures (cartelle per categoria)
 
-### 🔮 Fase C — Props e regia
-- [ ] **Props posizionabili** (alberi, casse, mobili PNG con alfa — qui brillano gli asset
-      di Forgotten Adventures scaricati dall'utente): posizionamento con snap, rotazione,
-      layer sopra/sotto i token. **Punto di partenza già pronto**: `tools/blender/
-      genera_props.py` renderizza 8 props top-down trasparenti direttamente da Blender
-      (via Claude Desktop + Blender MCP, o a mano — vedi `tools/blender/README.md`)
-- [ ] Salvataggio del layout props in `user://` (sopravvive agli aggiornamenti)
-- [ ] Pennello luci: piazza PointLight2D (falò, lanterne) con un click
-- [ ] Musiche/ambience per zona del mondo (bosco ≠ villaggio ≠ palude)
+### 🧪 Debito tecnico e qualità
+- [ ] Test di integrazione in editor (gli script sono verificati col parser reale +
+      specchi Python della matematica, ma manca una suite dentro Godot)
+- [ ] Ripulire i warning stilistici del linter (righe lunghe legacy)
+- [ ] Profiling con molte mappe 4K+ (il culling regge, la minimappa va misurata)
 
-### 🌐 Fase D — Il tavolo completo
-- [ ] Multiplayer via Supabase (l'outbox è già pronto)
-- [ ] Export eseguibile Windows (filtri risorse `*.png,*.jpg,*.webp` già documentati)
-- [ ] Campagna demo di Ventimiglia inclusa (POI + incontri + loot già nel motore)
+---
+
+## Come continuare lo sviluppo
+
+Ogni sessione con Claude: chiedi una voce della Fase D/E/F, o incolla uno script di
+`tools/blender/` in Claude Desktop (Blender MCP) per generare nuovi asset. Le mappe, i
+token e i props che aggiungi in `user://` restano TUOI per sempre, aggiornamento dopo
+aggiornamento.
