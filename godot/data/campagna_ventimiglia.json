@@ -1,0 +1,135 @@
+{
+	"_comment": "Campagna demo 'L'Ombra sul Confine' — si gioca sul mondo cucito incluso (le 9 mappe di assets/maps e le loro etichette). Il CampaignDirector innesca ogni capitolo all'ARRIVO del party nel luogo indicato (trascina i token, o lascia che il Master IA li muova narrando). 'incontro' usa i nomi del bestiario; 'ricompensa' passa dalla stessa pipeline del loot (oggetti items/armeria + oro).",
+	"titolo": "L'Ombra sul Confine",
+	"introduzione": "Da tre lune, lungo la frontiera, la gente sparisce nel sonno. I mercanti evitano il guado, i contadini sbarrano le porte al tramonto, e nel Villaggio di Confine l'anziana Marta offre una borsa d'argento a chi avra' il coraggio di scoprire COSA striscia fuori dalla Palude Grigia. Radunate il party e raggiungete il villaggio.",
+	"epilogo": "Il cerchio di pietre affonda nel fango, muto. Con l'Occhio di Ventimiglia al collo del capofila, il party riattraversa i Campi Dorati mentre l'alba scioglie la nebbia: per la prima volta da mesi, nessuno e' sparito nella notte. Al villaggio vi accolgono come eroi — e Marta, versando il vino, mormora: 'Il confine ha mille ombre. Questa era solo la prima.'",
+	"capitoli": [
+		{
+			"id": "prologo",
+			"titolo": "Capitolo 1 — Il Villaggio che non dorme",
+			"luogo": "Villaggio di Confine",
+			"obiettivo": "Raggiungete il Villaggio di Confine: l'anziana Marta cerca avventurieri.",
+			"arrivo": "Le case si stringono attorno alla piazza come pecore nel temporale. Marta vi riceve al lume di candela: 'Mio nipote e' sparito al guado, sette notti fa. Le impronte finivano nell'acqua... e non ne uscivano.' Vi affida una pozione e le sue speranze.",
+			"incontro": [],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": [
+					"healingPotion"
+				],
+				"gold": 10
+			}
+		},
+		{
+			"id": "guado",
+			"titolo": "Capitolo 2 — L'agguato al Guado",
+			"luogo": "Il Guado",
+			"obiettivo": "Indagate al Guado sul fiume, dove finiscono tutte le impronte.",
+			"arrivo": "Il ponte di assi geme sotto il vento. Tra i canneti luccicano monete sparse — un'esca. Dai due argini sbucano lame: banditi, e con loro un hobgoblin che ringhia ordini. Qualcuno li paga per tenere TUTTI lontani dal fiume.",
+			"incontro": [
+				{
+					"name": "Bandito",
+					"count": 2
+				},
+				{
+					"name": "Hobgoblin",
+					"count": 1
+				}
+			],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": [
+					"r-pugnale-corsaro"
+				],
+				"gold": 25
+			}
+		},
+		{
+			"id": "bosco",
+			"titolo": "Capitolo 3 — I lupi del Bosco Vecchio",
+			"luogo": "Bosco Vecchio",
+			"obiettivo": "Sulle carte del capobanda: 'consegne al Bosco Vecchio'. Seguite la pista tra gli alberi.",
+			"arrivo": "Il bosco e' sbagliato: niente uccelli, resina che cola nera. Un branco di lupi vi taglia la strada — non cacciano, FUGGONO da qualcosa, e voi siete solo nel mezzo. Tra le radici, un cacciatore ferito sussurra: 'Vengono dalla palude... incappucciati... portano via la gente sui carri, verso le rocce.'",
+			"incontro": [
+				{
+					"name": "Lupo",
+					"count": 3
+				}
+			],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": [
+					"r-cuoio-rinforzato"
+				],
+				"gold": 15
+			}
+		},
+		{
+			"id": "lago",
+			"titolo": "Capitolo 4 — Le rune del Lago Chiaro",
+			"luogo": "Lago Chiaro",
+			"obiettivo": "Il cacciatore parlava di un 'occhio d'acqua che ricorda'. Cercate risposte al Lago Chiaro.",
+			"arrivo": "L'acqua e' cosi' limpida da far male. Sul fondale, rune antiche pulsano di un azzurro debole: raccontano di un CULTO sepolto sotto la palude e del sigillo che lo teneva a bada — un sigillo che qualcuno sta rosicchiando notte dopo notte. Tra i sassi della riva, un amuleto del viandante attende una nuova mano.",
+			"incontro": [],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": [
+					"r-amuleto-viandante"
+				],
+				"gold": 0
+			}
+		},
+		{
+			"id": "rocce",
+			"titolo": "Capitolo 5 — L'avamposto delle Rocce del Tramonto",
+			"luogo": "Rocce del Tramonto",
+			"obiettivo": "I carri coi prigionieri passano dalle Rocce del Tramonto. Liberate la via.",
+			"arrivo": "Tra i massi rossi di tramonto, gabbie vuote e braci ancora calde: l'avamposto dei carcerieri. Orchi al soldo del culto e i loro goblin sguatteri vi si parano davanti — oltre le loro schiene, la pista dei carri scende dritta nella Palude Grigia.",
+			"incontro": [
+				{
+					"name": "Orco",
+					"count": 2
+				},
+				{
+					"name": "Goblin",
+					"count": 2
+				}
+			],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": [
+					"e-giaco-runico"
+				],
+				"gold": 40
+			}
+		},
+		{
+			"id": "palude",
+			"titolo": "Capitolo 6 — Il cuore della Palude Grigia",
+			"luogo": "Palude Grigia",
+			"obiettivo": "E' l'ora: scendete nella Palude Grigia e spezzate il culto prima che spezzi il sigillo.",
+			"arrivo": "La nebbia sa di ferro e preghiere sbagliate. In un cerchio di pietre nere, i cultisti salmodiano attorno al sigillo crepato mentre i loro servi — ossa e carne rubata alle vostre genti — si voltano verso di voi. Non ci sara' una seconda alba per uno dei due schieramenti.",
+			"incontro": [
+				{
+					"name": "Cultista",
+					"count": 2
+				},
+				{
+					"name": "Scheletro",
+					"count": 3
+				},
+				{
+					"name": "Zombie",
+					"count": 1
+				}
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": [
+					"l-occhio-ventimiglia",
+					"r-pozione-maggiore"
+				],
+				"gold": 100
+			}
+		}
+	]
+}

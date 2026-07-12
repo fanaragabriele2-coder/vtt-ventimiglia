@@ -74,6 +74,7 @@ var _nebbia: WorldFog
 var _props: WorldProps
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
+var _ultimo_luogo: String = ""   # debounce degli arrivi ai luoghi (evento world:luogo)
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
 var _da_inquadrare: bool = false
 var _rect_mappa: Rect2
@@ -123,8 +124,7 @@ func _ready() -> void:
 	_tokens.z_index = 3
 	add_child(_tokens)
 	_tokens.configura(_rect_mappa, _camera)
-	_tokens.token_spostato.connect(func(_id: String, pos: Vector2) -> void:
-		_nebbia.rivela(pos))
+	_tokens.token_spostato.connect(_su_token_spostato)
 	_righello = WorldRuler.new()
 	_righello.z_index = 4
 	add_child(_righello)
@@ -259,6 +259,25 @@ func viaggia_verso(nome_luogo: String) -> bool:
 
 func _su_viaggio_party(location: Dictionary) -> void:
 	viaggia_verso(String(location.get("name", "")))
+
+
+## Ogni spostamento di token (a mano o da viaggio narrato) fa due cose: dirada la nebbia e,
+## se il token e' arrivato VICINO a un'etichetta (300 px), pubblica l'arrivo nel luogo —
+## e' il gancio su cui la campagna (CampaignDirector) innesca i capitoli. Il debounce evita
+## di rioannunciare lo stesso luogo finche' non ci si allontana.
+func _su_token_spostato(_id: String, pos: Vector2) -> void:
+	_nebbia.rivela(pos)
+	if _etichette == null:
+		return
+	var voce: Dictionary = _etichette.piu_vicina(pos, 300.0)
+	if voce.is_empty():
+		_ultimo_luogo = ""  # lontani da tutto: il prossimo arrivo puo' riannunciare
+		return
+	var nome: String = String(voce["nome"])
+	if nome == _ultimo_luogo:
+		return
+	_ultimo_luogo = nome
+	GameState.publish("world:luogo", { "name": nome })
 
 
 ## I token si trascinano solo quando NE' il righello NE' la modalita' props reclamano il mouse.

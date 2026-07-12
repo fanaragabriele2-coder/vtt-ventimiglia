@@ -109,10 +109,21 @@ Import: **trascina sulla finestra** (mappe) o copia in `user://tokens` / `user:/
       (documentati); build one-click
 
 ### 🏰 Fase F — La campagna
-- [ ] **Campagna demo di Ventimiglia**: POI, incontri, loot e lore già nel motore,
-      da legare in un arco giocabile con etichette e mappe dedicate
+- [x] **Campagna demo "L'Ombra sul Confine"**: 6 capitoli GIOCABILI sul mondo incluso.
+      Come si gioca: apri 🧩 Mondo cucito e porta i token del party nei luoghi degli
+      obiettivi (trascinandoli, o lasciando che il Master IA li muova narrando). Arrivati
+      nel posto giusto parte il capitolo: lore in chat, incontro BILANCIATO sul party
+      reale quando previsto, ricompensa dalla pipeline del loot alla vittoria (oggetti
+      dell'armeria + oro), obiettivo successivo annunciato. In caso di TPK il capitolo
+      resta lì: ci si rimette in forze e si torna. Progresso salvato in
+      `user://campagna.json` (cancella il file o chiama `CampaignDirector.reset_campagna()`
+      per rigiocarla). Arco: Villaggio di Confine → Il Guado (agguato) → Bosco Vecchio
+      (lupi) → Lago Chiaro (le rune) → Rocce del Tramonto (avamposto) → Palude Grigia
+      (il culto, finale "difficile") → epilogo con l'Occhio di Ventimiglia
 - [ ] Editor incontri visuale (ora si fa da chat/JSON)
 - [ ] Import guidato dei pacchetti Forgotten Adventures (cartelle per categoria)
+- [ ] Campagne su mappe utente: basta un `etichette.json` coi luoghi e un JSON di
+      campagna con quei nomi — il motore è già pronto
 
 ### 🧪 Debito tecnico e qualità
 - [ ] Test di integrazione in editor (gli script sono verificati col parser reale +

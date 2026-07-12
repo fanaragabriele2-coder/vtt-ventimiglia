@@ -63,6 +63,19 @@ func trova(nome: String) -> Dictionary:
 	return migliore
 
 
+## L'etichetta piu' vicina al punto entro `raggio` pixel-mondo (vuoto se nessuna): serve a
+## capire "in che luogo" e' appena arrivato un token del party.
+func piu_vicina(punto: Vector2, raggio: float) -> Dictionary:
+	var migliore: Dictionary = {}
+	var migliore_distanza: float = raggio
+	for voce: Dictionary in _voci:
+		var distanza: float = (voce["pos"] as Vector2).distance_to(punto)
+		if distanza <= migliore_distanza:
+			migliore_distanza = distanza
+			migliore = voce
+	return migliore
+
+
 ## Minuscolo, accenti ridotti, tutto cio' che non e' alfanumerico -> spazio singolo.
 func _normalizza(testo: String) -> String:
 	var s: String = testo.to_lower()
