@@ -1,7 +1,13 @@
 # assets/maps — le battlemap del Mondo cucito (WorldBuilder)
 
-⚠️ **Questa cartella NON è più il posto consigliato per le tue mappe.** Ogni volta che il
-progetto viene aggiornato (un nuovo zip, un `git pull`...), questa cartella fa parte del
+Le 9 immagini `mappa_01.png` … `mappa_09.png` sono il **mondo di partenza incluso nel
+progetto**: un unico mondo continuo (bosco, lago col fiume, strada col ponte, villaggio,
+campi, rocce, palude) tagliato in 9 tessere che il Mondo cucito rimonta al pixel. Generate
+proceduralmente per questo progetto: nessun vincolo di licenza. Appena metti le TUE mappe in
+`user://maps` (vedi sotto), prendono il loro posto.
+
+⚠️ **Questa cartella NON è il posto consigliato per le tue mappe personali.** Ogni volta che
+il progetto viene aggiornato (un nuovo zip, un `git pull`...), questa cartella fa parte del
 repository e può essere sovrascritta — le immagini che avevi messo qui **rischiano di
 sparire** al prossimo aggiornamento.
 
