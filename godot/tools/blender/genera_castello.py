@@ -83,13 +83,18 @@ def M():
         "ferro": materiale("ferro", (0.09, 0.09, 0.10), 0.45, metallo=0.8),
         "acqua": materiale("acqua", (0.03, 0.06, 0.08), 0.12),
         "terra": materiale("terra", (0.11, 0.10, 0.08), 1.0, bump=0.2),
-        "stoffa": materiale("stoffa", (0.30, 0.05, 0.05), 0.95),
-        "oro": materiale("oro", (0.55, 0.42, 0.12), 0.35, metallo=0.9),
+        "stoffa": materiale("stoffa", (0.46, 0.045, 0.05), 0.9),      # rosso piu' vivo
+        "oro": materiale("oro", (0.62, 0.47, 0.14), 0.3, metallo=0.9),
         "fiamma": materiale("fiamma", (1.0, 0.45, 0.08), 0.5,
                             emissione=(1.0, 0.42, 0.05), forza=18.0),
         "runa": materiale("runa", (0.35, 0.1, 0.5), 0.4,
                           emissione=(0.55, 0.15, 0.9), forza=8.0),
         "vuoto": materiale("vuoto", (0.005, 0.005, 0.008), 1.0),
+        # Tocchi di colore "vivo" nella pietra morta: muschio sulle basi umide (fossato,
+        # ombra delle torri) e ruggine sul ferro battuto — la varieta' cromatica che rende
+        # un castello CREDIBILE invece di un blocco di grigio uniforme.
+        "muschio": materiale("muschio", (0.16, 0.34, 0.13), 1.0, bump=0.4),
+        "ruggine": materiale("ruggine", (0.42, 0.20, 0.08), 0.7, metallo=0.3),
     }
 
 
@@ -150,12 +155,32 @@ def merli(x0, y0, x1, y1, h_base, passo=2.0):
 
 
 def stendardo(x, y, z, rot=0.0):
-    """Bandiera strappata: tre lembi di lunghezze diverse (silhouette lacera dall'alto/lato)."""
+    """Bandiera strappata: tre lembi di lunghezze diverse (silhouette lacera dall'alto/lato),
+    con una bordatura dorata in cima — il tocco araldico che dice "questo era un vessillo"."""
     m = M()
     for i, lembo in enumerate((-0.45, 0.0, 0.45)):
         lx = x + math.cos(rot) * lembo
         ly = y + math.sin(rot) * lembo
-        box(lx, ly, 0.42, 0.06, 2.6 - abs(i - 1) * 0.7, m["stoffa"], z=z - 2.6, rot=rot)
+        altezza = 2.6 - abs(i - 1) * 0.7
+        box(lx, ly, 0.42, 0.06, altezza, m["stoffa"], z=z - 2.6, rot=rot)
+        box(lx, ly, 0.46, 0.07, 0.18, m["oro"], z=z - 2.6 + altezza - 0.09, rot=rot)
+
+
+def chiazza_muschio(x, y, raggio=1.5, quante=6, seme=0):
+    """Chiazze di muschio a terra (lichene, umidita'): macchie verdi appiattite, viste
+    dall'alto come le classiche colate scure/verdi sulle pietre di un castello in rovina."""
+    m = M()
+    rnd = random.Random(seme)
+    for _ in range(quante):
+        a = rnd.random() * math.tau
+        rr = rnd.random() * raggio
+        dim = 0.3 + rnd.random() * 0.6
+        bpy.ops.mesh.primitive_ico_sphere_add(
+            subdivisions=1, radius=dim,
+            location=(x + math.cos(a) * rr, y + math.sin(a) * rr, dim * 0.1))
+        ob = bpy.context.object
+        ob.scale.z = 0.15
+        ob.data.materials.append(m["muschio"])
 
 
 def macerie(x, y, quante=8, raggio=2.2, seme=0):
@@ -199,14 +224,15 @@ def porta_legno(x, y, larghezza, rot=0.0):
 
 
 def sbarre(x0, y0, x1, y1, h=2.6, passo=0.5):
-    """Inferriata di una cella: barre verticali lungo un segmento."""
+    """Inferriata di una cella: barre verticali arrugginite (il ferro vecchio della prigione,
+    non l'acciaio lucido del corpo di guardia) lungo un segmento."""
     m = M()
     dx, dy = x1 - x0, y1 - y0
     n = max(2, int(math.hypot(dx, dy) / passo))
     for i in range(n + 1):
         t = i / n
-        cilindro(x0 + dx * t, y0 + dy * t, 0.05, h, m["ferro"], vertici=6)
-    box((x0 + x1) / 2, (y0 + y1) / 2, math.hypot(dx, dy), 0.08, 0.1, m["ferro"], z=h - 0.1,
+        cilindro(x0 + dx * t, y0 + dy * t, 0.05, h, m["ruggine"], vertici=6)
+    box((x0 + x1) / 2, (y0 + y1) / 2, math.hypot(dx, dy), 0.08, 0.1, m["ruggine"], z=h - 0.1,
         rot=math.atan2(dy, dx))
 
 
@@ -259,6 +285,8 @@ def costruisci_superficie():
     for lato in (-3.6, 3.6):
         for yy in range(-46, -38, 3):
             cilindro(lato, yy, 0.18, 1.2, m["legno"], vertici=8)  # parapetti del ponte
+    for mx in (-30, -15, 15, 30):                                 # muschio sulle rive del fossato
+        chiazza_muschio(mx, -40.5, raggio=3.0, quante=7, seme=int(mx) + 100)
 
     # cinta muraria: quadrato 78x78, spessore 3, alta 9, con CAMMINAMENTO e merli su
     # entrambi i lati; varco del portale a sud (8 m) e BRECCIA di battaglia a est.
@@ -288,6 +316,7 @@ def costruisci_superficie():
                 m["pietra_scura"], z=15.6)
         stendardo(tx, ty - 6.4, 15.0)
         torcia(tx, ty - 6.6, 5.0)
+        chiazza_muschio(tx, ty, raggio=7.0, quante=9, seme=int(tx + ty * 3))
 
     # corpo di guardia monumentale: due torrioni ai lati del portale + porte massicce
     for gx in (-7.0, 7.0):
@@ -400,6 +429,7 @@ def costruisci_sotterraneo():
         box(X + nx, 23.6, 1.6, 0.7, 2.2, m["vuoto"], z=0.3)         # nicchie nel muro nord
     torcia(X - 14, 16)
     torcia(X + 6, 16)
+    chiazza_muschio(X - 4, 22, raggio=9.0, quante=10, seme=200)   # umidita' nelle catacombe
 
     # CAMERA RITUALE: rotonda, cerchio runico emissivo, il cuore del male
     cilindro(X - 24, 16, 7.0, 0.24, m["pav_dungeon"])
@@ -432,6 +462,13 @@ def prepara_render():
     scena.render.resolution_x = RES
     scena.render.resolution_y = RES
     scena.render.image_settings.file_format = "PNG"
+    # Blender 4.x/5.x usa di default la gestione colore AgX: molto realistica ma DESATURA
+    # parecchio (e' la causa piu' comune di render che sembrano "grigi" nonostante materiali
+    # colorati). "Standard" mantiene i colori vividi come impostati — meglio per una
+    # battlemap, dove leggibilita' e colore contano piu' del realismo fotografico.
+    scena.view_settings.view_transform = "Standard"
+    scena.view_settings.look = "None"
+    scena.view_settings.exposure = 0.3   # leggermente piu' luminoso: si leggono anche le ombre
 
     # Stessa cautela sulla localizzazione: "World" (nome dato) e "Background" (nome nodo)
     # possono essere tradotti in Blender in italiano — si prende il primo World esistente
