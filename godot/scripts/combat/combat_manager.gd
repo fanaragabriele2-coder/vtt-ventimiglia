@@ -40,6 +40,13 @@ const DADO_DANNO_CLASSE: Dictionary = {
 	"guerriero": "1d8", "barbaro": "1d12", "ladro": "1d8",
 	"ranger": "1d8", "mago": "1d10", "chierico": "1d6",
 }
+# Gittata d'attacco in CELLE (1 cella = 1,5 m). Le classi da tiro colpiscono da lontano: il
+# ranger con l'arco (~24 celle) e il mago con gli incantesimi (~12); le altre sono da mischia
+# (1 cella). Un attacco a distanza NON riceve fiancheggiamento (richiede adiacenza) — corretto.
+const GITTATA_CLASSE: Dictionary = {
+	"ranger": 24, "mago": 12,
+}
+const GITTATA_MISCHIA: int = 1
 
 var _monster_catalog: Array[Dictionary] = []
 var _combatants: Array[Dictionary] = []
@@ -82,19 +89,24 @@ func character_id_di(combatant_id: String) -> String:
 
 ## Statistiche d'attacco DERIVATE DALLA SCHEDA (prima erano fisse 4 / 1d8+2 per tutti):
 ## bonus = competenza + il miglior modificatore da combattimento (FOR/DES/INT/SAG — copre
-## marziali, schermitori e incantatori); danno = dado della classe + lo stesso modificatore.
+## marziali, schermitori e incantatori); danno = dado della classe + lo stesso modificatore;
+## gittata = celle dalla classe (ranger/mago colpiscono da lontano), 1 per la mischia.
 func _attacco_da_scheda(c: CharacterData) -> Dictionary:
 	var mod: int = maxi(
 		maxi(c.modifier_of("str"), c.modifier_of("dex")),
 		maxi(c.modifier_of("int"), c.modifier_of("wis"))
 	)
-	var dado: String = String(DADO_DANNO_CLASSE.get(c.class_name_label.to_lower(), "1d8"))
+	var classe: String = c.class_name_label.to_lower()
+	var dado: String = String(DADO_DANNO_CLASSE.get(classe, "1d8"))
 	var formula: String = dado
 	if mod > 0:
 		formula += "+%d" % mod
 	elif mod < 0:
 		formula += str(mod)
-	return { "bonus": c.proficiency_bonus + mod, "formula": formula }
+	return {
+		"bonus": c.proficiency_bonus + mod, "formula": formula,
+		"range": int(GITTATA_CLASSE.get(classe, GITTATA_MISCHIA)),
+	}
 
 
 func _make_pc_combatant(c: CharacterData) -> Dictionary:
@@ -111,6 +123,7 @@ func _make_pc_combatant(c: CharacterData) -> Dictionary:
 		"initiativeBonus": c.modifier_of("dex"),
 		"attackBonus": int(attacco["bonus"]),
 		"damageFormula": String(attacco["formula"]),
+		"attackRange": int(attacco["range"]),
 		"defeated": c.hp_current <= 0,
 	}
 
@@ -243,6 +256,8 @@ func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 		"initiativeBonus": int(template["initiativeBonus"]),
 		"attackBonus": int(overrides.get("attackBonus", template["attackBonus"])),
 		"damageFormula": damage_formula,
+		# Gittata del PNG: dal bestiario ("attackRange" nel monster, per futuri arcieri), 1 se assente.
+		"attackRange": int(overrides.get("attackRange", template.get("attackRange", GITTATA_MISCHIA))),
 		"defeated": false,
 	}
 	_next_npc_number += 1
@@ -363,6 +378,7 @@ func _sync_pcs_from_characters() -> void:
 		var attacco: Dictionary = _attacco_da_scheda(c)
 		pc["attackBonus"] = int(attacco["bonus"])
 		pc["damageFormula"] = String(attacco["formula"])
+		pc["attackRange"] = int(attacco["range"])
 
 
 # --- Dadi e formule di danno (porting fedele di rollD20WithMode / rollDamageFormula) ---
@@ -510,11 +526,37 @@ func modalita_effettiva_per_attacco(attacker_id: String, target_id: String, mode
 	return ElevationManager.componi_modalita(mode_richiesta, vantaggio_extra, svantaggio_extra)
 
 
+## Gittata d'attacco di un combattente in celle (1 se non specificata: mischia).
+func attack_range_of(combatant_id: String) -> int:
+	var c: Dictionary = get_combatant(combatant_id)
+	return int(c.get("attackRange", GITTATA_MISCHIA)) if not c.is_empty() else GITTATA_MISCHIA
+
+
+## Il bersaglio e' a portata dell'attaccante? Vero anche se le posizioni non sono note (nessun
+## token piazzato: si combatte "in astratto", come prima della griglia). Falso solo quando
+## entrambe le celle esistono e la distanza supera la gittata.
+func in_attack_range(attacker_id: String, target_id: String) -> bool:
+	var dist: int = cell_distance(attacker_id, target_id)
+	if dist < 0:
+		return true  # posizione ignota: non si blocca l'attacco
+	return dist <= attack_range_of(attacker_id)
+
+
 func resolve_attack(attacker_id: String, target_id: String, mode: String = "normal") -> Dictionary:
 	var attacker: Dictionary = get_combatant(attacker_id)
 	var target: Dictionary = get_combatant(target_id)
 	if attacker.is_empty() or target.is_empty():
 		return { "ok": false }
+	# Fuori gittata: niente tiro (l'HUD valida prima e non spende l'azione; per IA/reazioni e'
+	# la rete di sicurezza). Ritorna un risultato "mancato per distanza" leggibile.
+	if not in_attack_range(attacker_id, target_id):
+		var fuori: Dictionary = {
+			"ok": true, "attacker": attacker_id, "target": target_id, "hit": false,
+			"outOfRange": true, "damage": 0,
+			"targetAc": int(target["armorClass"]), "attackTotal": 0,
+		}
+		attack_resolved.emit(fuori)
+		return fuori
 	var modalita_finale: String = modalita_effettiva_per_attacco(attacker_id, target_id, mode)
 	var d20: Dictionary = roll_d20_with_mode(modalita_finale)
 	var attack_total: int = int(d20["chosen"]) + int(attacker["attackBonus"])

@@ -233,7 +233,9 @@ func _update_card_hp(combatant_id: String, current_hp: int) -> void:
 
 
 func _on_attack_resolved(result: Dictionary) -> void:
-	if not bool(result.get("hit", false)):
+	if bool(result.get("outOfRange", false)):
+		_last_event.text = "Fuori gittata: il colpo non parte."
+	elif not bool(result.get("hit", false)):
 		_last_event.text = "Attacco mancato (%d vs CA %d)" % [int(result.get("attackTotal", 0)), int(result.get("targetAc", 0))]
 	else:
 		var crit: String = " CRITICO!" if bool(result.get("critical", false)) else ""
@@ -259,6 +261,12 @@ func _on_attack_pressed() -> void:
 		return
 	if not InventoryManager.can_afford("action"):
 		_last_event.text = "Azione gia' usata: fai un'azione bonus o termina il turno."
+		return
+	# Fuori gittata: non si spreca l'azione. Mischia = adiacente; ranger/mago colpiscono lontano.
+	if not CombatManager.in_attack_range(_actor_id(), target):
+		var g: int = CombatManager.attack_range_of(_actor_id())
+		_last_event.text = ("Bersaglio troppo lontano (gittata %d cell%s): avvicinati o "
+			+ "scegli un nemico piu' vicino.") % [g, "a" if g == 1 else "e"]
 		return
 	CombatManager.resolve_attack(_actor_id(), target, "normal")
 	InventoryManager.spend_action_resource("action")  # una sola azione base per turno

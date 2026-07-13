@@ -159,18 +159,27 @@ riconosce da lontano), accampamento alle Rocce con tende/gabbie vuote/braci (il 
 del capitolo 5 è NEL disegno), molo e barchetta sul Lago Chiaro, rovine di una torre nei
 Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei prati.
 
-### 🎯 Prossimi passi per il capolavoro (in ordine di impatto)
-1. **Attacco a distanza**: portata per arco/incantesimi (oggi tutto è mischia a 1 cella;
-   ranger e mago dovrebbero colpire da lontano, e l'IA arciera tenere la distanza)
-2. **Export eseguibile Windows** (Fase E): giocare con un doppio click, senza editor
-3. **Feedback di colpo**: flash/scossa del token colpito, numeri di danno fluttuanti,
-   suono di dadi e lame — il "game feel" che trasforma un tracker in un gioco
-4. **Tiri salvezza e aree**: palla di fuoco → tiro DES + superficie di fuoco (già pronta)
-5. **IA tattica**: i nemici cercano il fiancheggiamento e l'altura invece di caricare
-6. **Musica e SFX di combattimento** (l'AmbienceManager c'è; mancano gli stinger)
-7. **Multiplayer Supabase** e ruoli Master/giocatore
-8. **Asset "veri" dell'utente**: i render Blender (props/miniature) e i pacchetti
-   Forgotten Adventures in `user://` — la pipeline è già tutta in piedi
+### ✅ Fatto nel giro "capolavoro" (luglio 2026)
+- [x] **Attacco a distanza**: gittata dalla scheda in celle (ranger arco ~24, mago
+      incantesimi ~12, gli altri mischia 1). `resolve_attack` valida la gittata; l'HUD non
+      spreca l'azione se il bersaglio è troppo lontano e lo dice.
+- [x] **IA arciera (kiting)**: un PNG a distanza indietreggia se lo prendi in mischia, si
+      porta a tiro se sei fuori portata, e colpisce da lontano — evitando le celle occupate
+      e senza uscire dalla griglia. (I nemici da mischia caricano come prima.)
+- [x] **Game feel**: il token colpito **vibra e lampeggia di rosso**, e sale un **numero
+      di danno fluttuante** (rosso; verde per le cure; **"CRIT! -N" dorato** sui critici).
+      Effetti effimeri che si spengono da soli (nessun costo a riposo).
+- [x] **Export eseguibile Windows**: `export_presets.cfg` pronto (preset "Windows Desktop",
+      pck incorporato, filtri risorse giusti) + guida `ESPORTA_WINDOWS.md`. Giocare con un
+      doppio click, senza editor.
+
+### 🎯 Ancora da fare (in ordine di impatto)
+1. **SFX di combattimento**: dadi, lame, arco — gli stinger che mancano all'AmbienceManager
+2. **Tiri salvezza e aree**: palla di fuoco → tiro DES + superficie di fuoco (già pronta)
+3. **IA tattica avanzata**: i nemici cercano il fiancheggiamento e l'altura
+4. **Multiplayer Supabase** e ruoli Master/giocatore
+5. **Asset "veri" dell'utente**: render Blender (props/miniature) e pacchetti Forgotten
+   Adventures in `user://` — la pipeline è già tutta in piedi
 
 ---
 

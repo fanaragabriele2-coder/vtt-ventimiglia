@@ -13,6 +13,9 @@ extends Node
 
 const PORTATA_MOVIMENTO: int = 6   # celle percorribili in un turno (~9 m con celle da 1,5 m)
 const PAUSA_AZIONE_SEC: float = 0.5
+# Bordi della griglia tattica (coerenti con TacticalMap.GRID_COLS/ROWS): l'arciere non arretra fuori.
+const GRIGLIA_MAX_X: int = 25
+const GRIGLIA_MAX_Y: int = 17
 
 var _abilitata: bool = true
 var _ultima_chiave_turno: String = ""
@@ -94,25 +97,59 @@ func _agisci_nemico(cur: Dictionary) -> void:
 
 	var npc_cell: Variant = CombatManager.get_combatant_cell(String(cur["id"]))
 	var pc_cell: Variant = CombatManager.get_combatant_cell(String(bersaglio["id"]))
+	var gittata: int = CombatManager.attack_range_of(String(cur["id"]))
 
 	if npc_cell != null and pc_cell != null:
-		var dist: int = chebyshev(npc_cell, pc_cell)
-		if dist > 1:
-			var dest: Variant = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
-			if dest != null:
-				CombatManager.set_combatant_cell(String(cur["id"]), dest)
-				GameState.announce("👣 %s avanza verso %s." % [String(cur["name"]), String(bersaglio["name"])])
-			npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
-			dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else 999
-		if dist <= 1:
-			CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
+		if gittata > 1:
+			_agisci_a_distanza(cur, bersaglio, npc_cell, pc_cell, gittata)
 		else:
-			GameState.announce("🛡 %s non riesce a raggiungere %s e resta in guardia." % [String(cur["name"]), String(bersaglio["name"])])
+			_agisci_in_mischia(cur, bersaglio, npc_cell, pc_cell)
 	else:
-		# Nessuna posizione nota (nessun token piazzato): il PNG attacca comunque in mischia.
+		# Nessuna posizione nota (nessun token piazzato): il PNG attacca comunque.
 		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
 
 	CombatManager.next_turn()
+
+
+## Nemico da mischia: avanza (evitando le celle occupate) e colpisce se arriva adiacente.
+func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector2i, pc_cell: Vector2i) -> void:
+	var dist: int = chebyshev(npc_cell, pc_cell)
+	if dist > 1:
+		var dest: Variant = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
+		if dest != null:
+			CombatManager.set_combatant_cell(String(cur["id"]), dest)
+			GameState.announce("👣 %s avanza verso %s." % [String(cur["name"]), String(bersaglio["name"])])
+		npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
+		dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else 999
+	if dist <= 1:
+		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
+	else:
+		GameState.announce("🛡 %s non riesce a raggiungere %s e resta in guardia." % [String(cur["name"]), String(bersaglio["name"])])
+
+
+## Nemico da tiro (arco/incantesimo): fa KITING — se il bersaglio e' addosso (adiacente) indietreggia
+## per non farsi prendere in mischia, se e' fuori gittata si avvicina quel tanto che basta, e poi
+## tira se il bersaglio e' a portata. La distanza ideale e' ~gittata: sta lontano ma colpisce.
+func _agisci_a_distanza(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector2i, pc_cell: Vector2i, gittata: int) -> void:
+	var dist: int = chebyshev(npc_cell, pc_cell)
+	if dist <= 1:
+		var fuga: Variant = _cella_libera_lontano(String(cur["id"]), npc_cell, pc_cell, gittata)
+		if fuga != null:
+			CombatManager.set_combatant_cell(String(cur["id"]), fuga)
+			GameState.announce("🏹 %s indietreggia per prendere la mira su %s." % [String(cur["name"]), String(bersaglio["name"])])
+			npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
+			dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else dist
+	elif dist > gittata:
+		var dest: Variant = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
+		if dest != null:
+			CombatManager.set_combatant_cell(String(cur["id"]), dest)
+			GameState.announce("🏹 %s si porta a tiro di %s." % [String(cur["name"]), String(bersaglio["name"])])
+			npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
+			dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else dist
+	if dist >= 1 and dist <= gittata:
+		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
+	elif dist > gittata:
+		GameState.announce("🏹 %s non ha ancora %s a tiro." % [String(cur["name"]), String(bersaglio["name"])])
 
 
 ## Come cella_verso_bersaglio, ma MAI su una cella gia' occupata da un altro combattente
@@ -132,6 +169,32 @@ func _cella_libera_verso(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i) 
 		if dest == null:
 			return null
 		if not occupate.has(dest):
+			return dest
+	return null
+
+
+## Cella di FUGA per l'arciere: si allontana dal bersaglio (direzione opposta) di un passo di
+## movimento, restando dentro la griglia e su una cella libera. null se non puo' arretrare.
+func _cella_libera_lontano(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i, gittata: int) -> Variant:
+	var occupate: Dictionary = {}
+	for c: Dictionary in CombatManager.get_state()["combatants"]:
+		var cid: String = String(c["id"])
+		if cid == npc_id or bool(c["defeated"]):
+			continue
+		var cella: Variant = CombatManager.get_combatant_cell(cid)
+		if cella != null:
+			occupate[cella] = true
+	var dir_x: int = signi(npc_cell.x - pc_cell.x)
+	var dir_y: int = signi(npc_cell.y - pc_cell.y)
+	if dir_x == 0 and dir_y == 0:
+		dir_x = 1  # sovrapposti (raro): scegli una direzione qualunque per staccarti
+	# Prova a indietreggiare piu' che puoi, poi ripiega su passi piu' corti; mai oltre la gittata.
+	for passi: int in range(mini(PORTATA_MOVIMENTO, gittata - 1), 0, -1):
+		var dest := Vector2i(
+			clampi(npc_cell.x + dir_x * passi, 0, GRIGLIA_MAX_X),
+			clampi(npc_cell.y + dir_y * passi, 0, GRIGLIA_MAX_Y)
+		)
+		if dest != npc_cell and not occupate.has(dest):
 			return dest
 	return null
 

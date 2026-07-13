@@ -32,6 +32,15 @@ const COL_NPC_RING: Color = Color(0.94, 0.54, 0.5)
 const COL_TURN_RING: Color = Color(0.94, 0.83, 0.53)
 const COL_SELECT: Color = Color(0.36, 0.72, 0.78)
 
+# --- Game feel: flash sul colpo, scossa del token, numeri di danno fluttuanti ---
+const FLASH_DURATA: float = 0.32       # secondi di lampo rosso + scossa sul token colpito
+const FLASH_SCOSSA_PX: float = 5.0     # ampiezza massima della vibrazione (scala con la cella)
+const FLOATER_DURATA: float = 1.15     # vita di un numero fluttuante
+const FLOATER_SALITA_PX: float = 46.0  # di quanto sale mentre svanisce
+const COL_DANNO: Color = Color(0.96, 0.42, 0.36)
+const COL_CURA: Color = Color(0.5, 0.86, 0.5)
+const COL_CRIT: Color = Color(1.0, 0.82, 0.3)
+
 # Token: id -> { name, cell:Vector2i, kind, combatant_id }.
 var _tokens: Dictionary = {}
 var _revealed: Dictionary = {}         # "x,y" -> true
@@ -53,6 +62,11 @@ var _ruler_end: Vector2 = Vector2.ZERO
 var _cell_size: float = 32.0
 var _origin: Vector2 = Vector2.ZERO
 
+# Effetti effimeri del game feel (avanzano in _process, disegnati sopra i token).
+var _flashes: Dictionary = {}     # combatant_id -> tempo di flash residuo (secondi)
+var _floaters: Array[Dictionary] = []  # { "cell":Vector2i, "off":Vector2, "testo", "colore", "vita", "vita_max", "crit":bool }
+var _crit_in_arrivo: Dictionary = {}   # target_id -> true: il prossimo numero di danno e' un critico
+
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -68,6 +82,10 @@ func _ready() -> void:
 	# L'IA nemica (o qualunque altro sistema) puo' spostare un combattente SENZA passare dal click
 	# sulla mappa: questo signal tiene il token a schermo allineato alla posizione autorevole.
 	CombatManager.combatant_position_changed.connect(_on_combatant_position_changed)
+	# Game feel: il colpo si VEDE — lampo+scossa sul bersaglio e numero di danno che sale.
+	CombatManager.combatant_damaged.connect(_on_combatant_damaged_feel)
+	CombatManager.combatant_healed.connect(_on_combatant_healed_feel)
+	CombatManager.attack_resolved.connect(_on_attack_resolved_feel)
 	resized.connect(queue_redraw)
 
 
@@ -145,7 +163,10 @@ func _draw() -> void:
 				var rect := Rect2(_origin + Vector2(x * _cell_size, y * _cell_size), Vector2(_cell_size, _cell_size))
 				draw_rect(rect, COL_FOG, true)
 
-	# 6) Righello di misurazione: sempre sopra a tutto il resto, come un HUD.
+	# 6) Numeri di danno/cura fluttuanti: sopra token e nebbia (il feedback si legge sempre).
+	_draw_floaters()
+
+	# 7) Righello di misurazione: sempre sopra a tutto il resto, come un HUD.
 	if _ruler_active:
 		_draw_ruler()
 
@@ -202,9 +223,13 @@ func _draw_surfaces() -> void:
 
 func _draw_token(token: Dictionary) -> void:
 	var cell: Vector2i = token["cell"]
-	var center: Vector2 = _cell_to_pixel_center(cell)
-	var radius: float = _cell_size * 0.36
 	var is_pc: bool = token["kind"] == "pc"
+	# Game feel: se il combattente e' stato appena colpito, il token vibra (scossa) e lampeggia
+	# di rosso (tinta) per una frazione di secondo — il colpo si SENTE.
+	var feel: Dictionary = _flash_di(String(token.get("combatant_id", "")))
+	var center: Vector2 = _cell_to_pixel_center(cell) + (feel["scossa"] as Vector2)
+	var tinta: Color = feel["tinta"]
+	var radius: float = _cell_size * 0.36
 	# Corpo: ARTE del token se esiste (user://tokens prima, poi assets/tokens — vedi TokenArt),
 	# altrimenti il cerchio colorato di sempre. Un PG senza ritratto col proprio nome ripiega
 	# sull'arte della sua CLASSE (guerriero, mago...).
@@ -215,9 +240,9 @@ func _draw_token(token: Dictionary) -> void:
 	if tex != null:
 		raggio_corpo = radius * 1.18  # il PNG porta con se' anello e ombra propri
 		draw_texture_rect(tex, Rect2(center - Vector2(raggio_corpo, raggio_corpo),
-			Vector2(raggio_corpo, raggio_corpo) * 2.0), false)
+			Vector2(raggio_corpo, raggio_corpo) * 2.0), false, tinta)
 	else:
-		draw_circle(center, radius, COL_PC if is_pc else COL_NPC)
+		draw_circle(center, radius, (COL_PC if is_pc else COL_NPC) * tinta)
 		draw_arc(center, radius, 0, TAU, 32, COL_PC_RING if is_pc else COL_NPC_RING, 2.0)
 	# Anelli di selezione/turno DOPO il corpo: visibili anche sopra l'arte.
 	if token["id"] == _selected_id:
@@ -384,6 +409,96 @@ func _on_combatant_position_changed(combatant_id: String, cell: Vector2i) -> voi
 func _on_turn_changed(combatant_id: String, _round: int) -> void:
 	_current_combatant_id = combatant_id
 	queue_redraw()
+
+
+# --- Game feel: reazioni visibili a colpi e cure ---
+
+## Un critico appena tirato: il numero di danno che segue (stesso bersaglio) sara' evidenziato.
+func _on_attack_resolved_feel(result: Dictionary) -> void:
+	if bool(result.get("hit", false)) and bool(result.get("critical", false)):
+		_crit_in_arrivo[String(result.get("target", ""))] = true
+
+
+func _on_combatant_damaged_feel(combatant_id: String, amount: int, _hp: int) -> void:
+	if amount <= 0:
+		return
+	var crit: bool = _crit_in_arrivo.erase(combatant_id)  # true se c'era un critico in coda
+	_flashes[combatant_id] = FLASH_DURATA
+	_aggiungi_floater(combatant_id, ("CRIT! -%d" % amount) if crit else "-%d" % amount,
+		COL_CRIT if crit else COL_DANNO, crit)
+	_avvia_effetti()
+
+
+func _on_combatant_healed_feel(combatant_id: String, amount: int, _hp: int) -> void:
+	if amount <= 0:
+		return
+	_aggiungi_floater(combatant_id, "+%d" % amount, COL_CURA, false)
+	_avvia_effetti()
+
+
+func _aggiungi_floater(combatant_id: String, testo: String, colore: Color, crit: bool) -> void:
+	var token_id: String = "tok-" + combatant_id
+	if not _tokens.has(token_id):
+		return  # nessun token a schermo (combattimento "in astratto"): niente numero
+	_floaters.append({
+		"cell": _tokens[token_id]["cell"] as Vector2i, "off": Vector2.ZERO,
+		"testo": testo, "colore": colore, "vita": FLOATER_DURATA,
+		"vita_max": FLOATER_DURATA, "crit": crit,
+	})
+
+
+func _avvia_effetti() -> void:
+	set_process(true)
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	var attivo: bool = false
+	for cid: String in _flashes.keys():
+		_flashes[cid] = float(_flashes[cid]) - delta
+		if _flashes[cid] <= 0.0:
+			_flashes.erase(cid)
+		else:
+			attivo = true
+	for f: Dictionary in _floaters:
+		f["vita"] = float(f["vita"]) - delta
+		var t: float = 1.0 - float(f["vita"]) / float(f["vita_max"])
+		f["off"] = Vector2(0.0, -FLOATER_SALITA_PX * t)
+	_floaters = _floaters.filter(func(f: Dictionary) -> bool: return float(f["vita"]) > 0.0)
+	if not _floaters.is_empty():
+		attivo = true
+	queue_redraw()
+	if not attivo:
+		set_process(false)
+
+
+## Tinta di flash del token colpito (rosso che sfuma) e offset di scossa, dato il suo id.
+func _flash_di(combatant_id: String) -> Dictionary:
+	if not _flashes.has(combatant_id):
+		return { "tinta": Color(1, 1, 1, 1), "scossa": Vector2.ZERO }
+	var q: float = clampf(float(_flashes[combatant_id]) / FLASH_DURATA, 0.0, 1.0)
+	var ampiezza: float = FLASH_SCOSSA_PX * (_cell_size / 32.0) * q
+	return {
+		"tinta": Color(1, 1, 1, 1).lerp(COL_DANNO, q * 0.75),
+		"scossa": Vector2(randf_range(-ampiezza, ampiezza), randf_range(-ampiezza, ampiezza)),
+	}
+
+
+## Numeri di danno/cura fluttuanti, sopra i token (chiamato in coda a _draw).
+func _draw_floaters() -> void:
+	var font: Font = ThemeDB.fallback_font
+	for f: Dictionary in _floaters:
+		var base: Vector2 = _cell_to_pixel_center(f["cell"]) + (f["off"] as Vector2)
+		var alpha: float = clampf(float(f["vita"]) / float(f["vita_max"]), 0.0, 1.0)
+		var colore: Color = f["colore"]
+		colore.a = alpha
+		var dim: int = int(_cell_size * (0.62 if bool(f["crit"]) else 0.46))
+		var testo: String = String(f["testo"])
+		var largh: float = _cell_size * 3.0
+		var pos: Vector2 = base - Vector2(largh * 0.5, 0.0)
+		draw_string(font, pos + Vector2(1.5, 1.5), testo, HORIZONTAL_ALIGNMENT_CENTER,
+			largh, dim, Color(0, 0, 0, alpha * 0.8))
+		draw_string(font, pos, testo, HORIZONTAL_ALIGNMENT_CENTER, largh, dim, colore)
 
 
 ## Crea un token per ogni combattente che non ne ha gia' uno: i PG a sinistra, i nemici a destra
