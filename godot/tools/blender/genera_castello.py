@@ -46,7 +46,10 @@ def materiale(nome, colore, ruvido=0.9, emissione=None, forza=6.0, bump=0.0, met
     mat = bpy.data.materials.new(nome)
     mat.use_nodes = True
     nt = mat.node_tree
-    bsdf = nt.nodes.get("Principled BSDF")
+    # Cerca per TIPO, non per nome: in Blender localizzato (es. italiano) il nome del nodo
+    # creato automaticamente puo' essere tradotto ("Principled BSDF" -> altro), e nt.nodes.get()
+    # per stringa fallirebbe silenziosamente ritornando None.
+    bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
     bsdf.inputs["Base Color"].default_value = (*colore, 1.0)
     bsdf.inputs["Roughness"].default_value = ruvido
     if "Metallic" in bsdf.inputs:
@@ -430,10 +433,14 @@ def prepara_render():
     scena.render.resolution_y = RES
     scena.render.image_settings.file_format = "PNG"
 
-    mondo = bpy.data.worlds["World"] if bpy.data.worlds else bpy.data.worlds.new("World")
+    # Stessa cautela sulla localizzazione: "World" (nome dato) e "Background" (nome nodo)
+    # possono essere tradotti in Blender in italiano — si prende il primo World esistente
+    # (o se ne crea uno) e si cerca il nodo per TIPO, mai per stringa.
+    mondo = scena.world if scena.world is not None \
+        else (bpy.data.worlds[0] if len(bpy.data.worlds) > 0 else bpy.data.worlds.new("World"))
     scena.world = mondo
     mondo.use_nodes = True
-    fondo = mondo.node_tree.nodes.get("Background")
+    fondo = next((n for n in mondo.node_tree.nodes if n.type == "BACKGROUND"), None)
     if fondo is not None:
         fondo.inputs[0].default_value = (0.05, 0.06, 0.09, 1.0)  # notte blu, ma leggibile
         fondo.inputs[1].default_value = 0.35

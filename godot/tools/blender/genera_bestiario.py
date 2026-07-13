@@ -40,7 +40,9 @@ def pulisci_scena():
 def materiale(nome, colore, ruvido=0.85, emissione=None, forza_emissione=8.0):
     mat = bpy.data.materials.new(nome)
     mat.use_nodes = True
-    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    # Cerca per TIPO, non per nome: in Blender localizzato (es. italiano) il nome del nodo
+    # creato automaticamente puo' essere tradotto, e nodes.get() per stringa fallirebbe.
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
     bsdf.inputs["Base Color"].default_value = (*colore, 1.0)
     bsdf.inputs["Roughness"].default_value = ruvido
     if emissione is not None:
@@ -276,10 +278,11 @@ def prepara_scena():
     sole.data.energy = 3.5
     sole.data.angle = math.radians(15)
 
-    mondo = bpy.data.worlds["World"] if bpy.data.worlds else bpy.data.worlds.new("World")
+    mondo = scena.world if scena.world is not None \
+        else (bpy.data.worlds[0] if len(bpy.data.worlds) > 0 else bpy.data.worlds.new("World"))
     scena.world = mondo
     mondo.use_nodes = True
-    fondo = mondo.node_tree.nodes.get("Background")
+    fondo = next((n for n in mondo.node_tree.nodes if n.type == "BACKGROUND"), None)
     if fondo is not None:
         fondo.inputs[0].default_value = (0.35, 0.38, 0.42, 1.0)
         fondo.inputs[1].default_value = 0.6
