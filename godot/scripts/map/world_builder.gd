@@ -59,6 +59,12 @@ void fragment() {
 }
 """
 
+## Se impostata PRIMA che il nodo entri nell'albero (WorldView la scrive subito dopo il .new(),
+## prima di add_child), il builder carica SOLO da questa cartella — ignora user://maps e il
+## fallback assets/maps. E' il selettore "Set" della toolbar (Mondo/Castello/Banca): ogni set
+## bundled (assets/maps_castello, assets/maps_banca...) e' autosufficiente e ha il suo etichette.json.
+var cartella_forzata: String = ""
+
 var _motore: MapEngineOptimized
 var _camera: VTTCamera
 var _tinta: CanvasModulate
@@ -342,8 +348,13 @@ func importa_mappe(percorsi: PackedStringArray) -> int:
 # --- Macro-funzione 1: auto-stitching ---
 
 ## user://maps ha priorita' (sopravvive agli aggiornamenti del gioco); si ripiega su
-## res://assets/maps SOLO se la cartella utente non ha proprio nessuna immagine.
+## res://assets/maps SOLO se la cartella utente non ha proprio nessuna immagine. Un set
+## FORZATO (Castello/Banca dalla toolbar) salta questa logica: usa solo la sua cartella.
 func _cuci_mappe() -> Array[Sprite2D]:
+	if not cartella_forzata.is_empty():
+		var out_forzato: Array[Sprite2D] = _cuci_da_cartella(cartella_forzata)
+		_cartella_attiva = cartella_forzata
+		return out_forzato
 	var out: Array[Sprite2D] = _cuci_da_cartella(CARTELLA_MAPPE_UTENTE)
 	if not out.is_empty() or _file_trovati:
 		_cartella_attiva = CARTELLA_MAPPE_UTENTE

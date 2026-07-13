@@ -8,6 +8,10 @@ extends Control
 ## DRAG & DROP: trascina i file immagine (png/jpg/webp) direttamente sulla finestra del gioco
 ## mentre questa vista e' aperta — vengono copiati in user://maps e il mondo si ricostruisce da
 ## solo. Zero file manager, zero percorsi: il modo piu' semplice di aggiungere battlemap.
+##
+## SET: il menu a tendina "Mondo/Castello/Banca" cambia cartella e ricostruisce il builder. I
+## dungeon inclusi (assets/maps_castello, assets/maps_banca) sono set AUTOSUFFICIENTI — ignorano
+## user://maps — con le proprie etichette dei luoghi (WorldLabels le carica da sole per cartella).
 
 const ORE_BOTTONI: Array[Array] = [
 	["☀ Giorno", "giorno"], ["🌇 Tramonto", "tramonto"],
@@ -15,6 +19,13 @@ const ORE_BOTTONI: Array[Array] = [
 ]
 # Il pulsante griglia CICLA tra questi lati di cella (pixel-mappa); 0 = spenta.
 const CELLE_GRIGLIA: Array[float] = [0.0, 64.0, 128.0, 256.0]
+# Selettore di set: nome in toolbar -> cartella forzata ("" = Mondo cucito normale, user://maps
+# con fallback assets/maps). I dungeon sono bundled nel progetto, pronti all'uso.
+const SET_CARTELLE: Array[Array] = [
+	["🌍 Mondo", ""],
+	["🏰 Castello", "res://assets/maps_castello"],
+	["🏦 Banca", "res://assets/maps_banca"],
+]
 
 ## Vignettatura cinematografica + grana di pellicola leggerissima, sopra il viewport del mondo.
 ## E' un overlay passivo (mouse_filter IGNORE): non tocca input, camera o culling.
@@ -36,6 +47,7 @@ var _minimap: WorldMinimap
 var _griglia_btn: Button
 var _righello_btn: Button
 var _props_btn: Button
+var _set_option: OptionButton
 var _palette: PanelContainer
 var _palette_row: HBoxContainer
 # Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
@@ -43,6 +55,7 @@ var _griglia_idx: int = 0
 var _righello_on: bool = false
 var _nebbia_on: bool = false
 var _props_on: bool = false
+var _set_idx: int = 0
 
 
 func _ready() -> void:
@@ -113,6 +126,16 @@ func _build_toolbar() -> void:
 	titolo.text = "🌍 Mondo:"
 	titolo.add_theme_color_override("font_color", Color(0.78, 0.61, 0.24))
 	row.add_child(titolo)
+
+	_set_option = OptionButton.new()
+	for voce: Array in SET_CARTELLE:
+		_set_option.add_item(String(voce[0]))
+	_set_option.custom_minimum_size = Vector2(130, 34)
+	_set_option.tooltip_text = "Scegli quale mondo cucire: il Mondo (le tue mappe/quello " \
+		+ "incluso) o uno dei dungeon pronti — Castello o Banca del Drago d'Oro."
+	_set_option.item_selected.connect(_su_set_selezionato)
+	row.add_child(_set_option)
+
 	for voce: Array in ORE_BOTTONI:
 		var b := Button.new()
 		b.text = String(voce[0])
@@ -306,11 +329,26 @@ func _su_file_trascinati(percorsi: PackedStringArray) -> void:
 ## Dopo aver aggiunto/tolto file dalla cartella mappe, ricostruisce il mondo da zero (nuovo nodo
 ## WorldBuilder nello stesso SubViewport) senza dover chiudere e riaprire tutta la vista.
 func _su_ricarica() -> void:
-	_builder.queue_free()
+	_ricrea_builder()
+
+
+## Cambio di SET dal menu a tendina (Mondo/Castello/Banca): ricostruisce il builder puntandolo
+## alla cartella del set scelto (WorldBuilder.cartella_forzata, letta al suo _ready).
+func _su_set_selezionato(indice: int) -> void:
+	_set_idx = indice
+	_ricrea_builder()
+
+
+## Nodo condiviso da "Ricarica mappe" e dal cambio di Set: libera il builder attuale, ne crea
+## uno nuovo puntato alla cartella giusta (cartella_forzata va scritta PRIMA di add_child, cosi'
+## _ready() del builder la trova gia' pronta — add_child esegue _ready qui, in modo sincrono),
+## e ripristina lo stato dei comandi che vive nella vista (griglia, righello, nebbia, props).
+func _ricrea_builder() -> void:
+	if _builder != null:
+		_builder.queue_free()
 	_builder = WorldBuilder.new()
-	_viewport.add_child(_builder)  # add_child esegue il _ready del builder QUI, in modo sincrono
-	# Il nuovo builder parte "nudo": si ri-applica lo stato che vive nella vista (griglia,
-	# righello, nebbia, props) e si ri-agganciano minimappa e palette (nuove texture/catalogo).
+	_builder.cartella_forzata = String(SET_CARTELLE[_set_idx][1])
+	_viewport.add_child(_builder)
 	if CELLE_GRIGLIA[_griglia_idx] > 0.0:
 		_builder.imposta_griglia(CELLE_GRIGLIA[_griglia_idx])
 	if _righello_on:

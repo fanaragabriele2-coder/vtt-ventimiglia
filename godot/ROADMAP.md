@@ -196,10 +196,25 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       ("sale sull'altura, arco teso"). Helper `_celle_occupate` condiviso da tutte le
       manovre (niente più copie).
 
+### ✅ Dungeon giocabili: Castello + Banca del Drago d'Oro (luglio 2026)
+- [x] **Selettore di Set** nella toolbar del Mondo cucito: menu a tendina
+      **🌍 Mondo / 🏰 Castello / 🏦 Banca** — cambia cartella e ricostruisce il mondo al volo
+      (`WorldBuilder.cartella_forzata`, letta prima del `_ready`, bypassa `user://maps` e il
+      fallback `assets/maps` quando un set è selezionato).
+- [x] **🏰 Castello** (`assets/maps_castello`, 2 tessere): superficie con mura/torri/mastio/
+      sala del trono e sotterraneo con prigione/catacombe/camera rituale — dagli stessi
+      blueprint di `genera_castello.py`, con etichette dei luoghi incluse.
+- [x] **🏦 Banca del Drago d'Oro** (`assets/maps_banca`, 4 tessere): esterno, atrio, uffici,
+      caveau — dagli stessi blueprint di `genera_banca.py`/`PIANTA_BANCA.md`, con etichette.
+- [x] Entrambi generati come battlemap 2D (leggibili, colori vivi, stessa scala 1 cella =
+      1,5 m) così sono **giocabili subito**, senza aspettare i render 3D di Blender — che
+      restano disponibili come upgrade opzionale (sostituiscono i PNG con render migliori,
+      stesso nome cartella).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
-2. **Asset "veri" dell'utente**: render Blender (props/miniature) e pacchetti Forgotten
-   Adventures in `user://` — la pipeline è già tutta in piedi
+2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti
+   Forgotten Adventures in `user://` — la pipeline è già tutta in piedi
 
 ---
 

@@ -1,0 +1,47 @@
+[
+	{
+		"nome": "Piazza del Drago",
+		"x": 1024,
+		"y": 1664
+	},
+	{
+		"nome": "Tetto",
+		"x": 1024,
+		"y": 768
+	},
+	{
+		"nome": "Atrio",
+		"x": 3072,
+		"y": 981
+	},
+	{
+		"nome": "Ufficio del Direttore",
+		"x": 3712,
+		"y": 768
+	},
+	{
+		"nome": "Archivio Segreto",
+		"x": 704,
+		"y": 2421
+	},
+	{
+		"nome": "Balconata",
+		"x": 1024,
+		"y": 2795
+	},
+	{
+		"nome": "Porta del Caveau",
+		"x": 3029,
+		"y": 3424
+	},
+	{
+		"nome": "Sala del Tesoro",
+		"x": 3072,
+		"y": 3029
+	},
+	{
+		"nome": "Cripta",
+		"x": 3627,
+		"y": 3627
+	}
+]
