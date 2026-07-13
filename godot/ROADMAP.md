@@ -188,10 +188,17 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       sceglie la cella adiacente che crea FIANCHEGGIAMENTO con un alleato ("ti aggira e
       ti prende ai fianchi!") invece di mettersi in fila indiana.
 
+### ✅ Terzo giro "capolavoro" (luglio 2026)
+- [x] **IA e ALTURA**: il nemico da mischia sceglie la cella adiacente SOPRAELEVATA quando
+      non può fiancheggiare (gerarchia tattica: fianco > altura > prima libera — "guadagna
+      l'altura e incombe su di te!"); l'arciere già a tiro SALE sulla collina dipinta più
+      alta raggiungibile che tenga il bersaglio in gittata senza finire in mischia
+      ("sale sull'altura, arco teso"). Helper `_celle_occupate` condiviso da tutte le
+      manovre (niente più copie).
+
 ### 🎯 Ancora da fare
-1. **IA e altura**: i nemici cercano anche il terreno sopraelevato
-2. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
-3. **Asset "veri" dell'utente**: render Blender (props/miniature) e pacchetti Forgotten
+1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
+2. **Asset "veri" dell'utente**: render Blender (props/miniature) e pacchetti Forgotten
    Adventures in `user://` — la pipeline è già tutta in piedi
 
 ---
