@@ -9,9 +9,13 @@ extends Control
 ## mentre questa vista e' aperta — vengono copiati in user://maps e il mondo si ricostruisce da
 ## solo. Zero file manager, zero percorsi: il modo piu' semplice di aggiungere battlemap.
 ##
-## SET: il menu a tendina "Mondo/Castello/Banca" cambia cartella e ricostruisce il builder. I
-## dungeon inclusi (assets/maps_castello, assets/maps_banca) sono set AUTOSUFFICIENTI — ignorano
-## user://maps — con le proprie etichette dei luoghi (WorldLabels le carica da sole per cartella).
+## SET: il menu a tendina "Mondo/Castello/Banca/Terra di Mezzo" cambia cartella e ricostruisce
+## il builder. I set inclusi (assets/maps_castello, assets/maps_banca, assets/maps_terra_di_mezzo)
+## sono AUTOSUFFICIENTI — ignorano user://maps — con le proprie etichette dei luoghi (WorldLabels
+## le carica da sole per cartella).
+##
+## CAMPAGNA: il secondo menu a tendina sceglie l'arco narrativo (CampaignDirector.imposta_campagna).
+## Cambiare campagna alliena in automatico il Set giusto (evento "campagna:cambiata" di GameState).
 
 const ORE_BOTTONI: Array[Array] = [
 	["☀ Giorno", "giorno"], ["🌇 Tramonto", "tramonto"],
@@ -25,6 +29,7 @@ const SET_CARTELLE: Array[Array] = [
 	["🌍 Mondo", ""],
 	["🏰 Castello", "res://assets/maps_castello"],
 	["🏦 Banca", "res://assets/maps_banca"],
+	["🧙 Terra di Mezzo", "res://assets/maps_terra_di_mezzo"],
 ]
 
 ## Vignettatura cinematografica + grana di pellicola leggerissima, sopra il viewport del mondo.
@@ -48,6 +53,7 @@ var _griglia_btn: Button
 var _righello_btn: Button
 var _props_btn: Button
 var _set_option: OptionButton
+var _campagna_option: OptionButton
 var _palette: PanelContainer
 var _palette_row: HBoxContainer
 # Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
@@ -69,12 +75,15 @@ func _ready() -> void:
 	# qui e scollegato in _exit_tree, con guardia di visibilita' dentro il gestore — i drop
 	# valgono solo quando il Mondo cucito e' la vista attiva.
 	get_window().files_dropped.connect(_su_file_trascinati)
+	GameState.event_published.connect(_su_evento_globale)
 
 
 func _exit_tree() -> void:
 	var finestra: Window = get_window()
 	if finestra != null and finestra.files_dropped.is_connected(_su_file_trascinati):
 		finestra.files_dropped.disconnect(_su_file_trascinati)
+	if GameState.event_published.is_connected(_su_evento_globale):
+		GameState.event_published.disconnect(_su_evento_globale)
 
 
 func _build_viewport() -> void:
@@ -135,6 +144,16 @@ func _build_toolbar() -> void:
 		+ "incluso) o uno dei dungeon pronti — Castello o Banca del Drago d'Oro."
 	_set_option.item_selected.connect(_su_set_selezionato)
 	row.add_child(_set_option)
+
+	_campagna_option = OptionButton.new()
+	for voce: Dictionary in CampaignDirector.campagne_disponibili():
+		_campagna_option.add_item(String(voce["titolo"]))
+	_campagna_option.custom_minimum_size = Vector2(170, 34)
+	_campagna_option.tooltip_text = "Scegli l'arco narrativo da giocare: cambiarlo alliena " \
+		+ "in automatico il Set di mappe giusto (il progresso di ogni campagna resta separato)."
+	_campagna_option.selected = _indice_campagna(CampaignDirector.campagna_attuale_id())
+	_campagna_option.item_selected.connect(_su_campagna_selezionata)
+	row.add_child(_campagna_option)
 
 	for voce: Array in ORE_BOTTONI:
 		var b := Button.new()
@@ -332,10 +351,52 @@ func _su_ricarica() -> void:
 	_ricrea_builder()
 
 
-## Cambio di SET dal menu a tendina (Mondo/Castello/Banca): ricostruisce il builder puntandolo
-## alla cartella del set scelto (WorldBuilder.cartella_forzata, letta al suo _ready).
+## Cambio di SET dal menu a tendina (Mondo/Castello/Banca/Terra di Mezzo): ricostruisce il
+## builder puntandolo alla cartella del set scelto (WorldBuilder.cartella_forzata, letta al suo
+## _ready).
 func _su_set_selezionato(indice: int) -> void:
 	_set_idx = indice
+	_ricrea_builder()
+
+
+## Cambio di CAMPAGNA dal menu a tendina: CampaignDirector cambia arco e pubblica
+## "campagna:cambiata", che _su_evento_globale intercetta per allineare il Set di mappe.
+func _su_campagna_selezionata(indice: int) -> void:
+	var elenco: Array[Dictionary] = CampaignDirector.campagne_disponibili()
+	if indice < 0 or indice >= elenco.size():
+		return
+	CampaignDirector.imposta_campagna(String(elenco[indice]["id"]))
+
+
+## Indice nel menu a tendina della campagna dato il suo id ("" o non trovata -> 0).
+func _indice_campagna(id: String) -> int:
+	var elenco: Array[Dictionary] = CampaignDirector.campagne_disponibili()
+	for i: int in range(elenco.size()):
+		if String(elenco[i]["id"]) == id:
+			return i
+	return 0
+
+
+## Indice nel menu a tendina del Set dato il percorso cartella ("" -> Mondo cucito normale).
+func _indice_set(cartella: String) -> int:
+	for i: int in range(SET_CARTELLE.size()):
+		if String(SET_CARTELLE[i][1]) == cartella:
+			return i
+	return 0
+
+
+## Eventi globali del gioco che riguardano questa vista: al cambio campagna, allinea Set e
+## menu a tendina (senza toccare il resto: griglia/righello/nebbia/props restano come sono).
+func _su_evento_globale(nome_evento: String, payload: Variant) -> void:
+	if nome_evento != "campagna:cambiata" or not (payload is Dictionary):
+		return
+	var cartella: String = String((payload as Dictionary).get("cartella", ""))
+	var nuovo_idx: int = _indice_set(cartella)
+	if nuovo_idx == _set_idx:
+		return
+	_set_idx = nuovo_idx
+	if _set_option != null:
+		_set_option.selected = _set_idx
 	_ricrea_builder()
 
 

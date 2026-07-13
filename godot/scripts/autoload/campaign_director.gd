@@ -1,11 +1,16 @@
 extends Node
-## CampaignDirector (Autoload) — il REGISTA della campagna demo "L'Ombra sul Confine".
+## CampaignDirector (Autoload) — il REGISTA delle campagne giocabili.
 ##
-## Legge data/campagna_ventimiglia.json (capitoli con luogo, lore, incontro, ricompensa) e
-## conduce il party lungo l'arco: ogni capitolo si INNESCA quando il party ARRIVA nel luogo
-## giusto del Mondo cucito — trascinando i token vicino all'etichetta, o lasciando che il
-## Master IA li muova narrando (evento "world:luogo" pubblicato dal WorldBuilder; funzionano
-## anche gli arrivi ai POI dell'overworld, per campagne future su Ventimiglia).
+## Legge un file campagna (capitoli con luogo, lore, incontro, ricompensa) e conduce il party
+## lungo l'arco: ogni capitolo si INNESCA quando il party ARRIVA nel luogo giusto del Mondo
+## cucito — trascinando i token vicino all'etichetta, o lasciando che il Master IA li muova
+## narrando (evento "world:luogo" pubblicato dal WorldBuilder; funzionano anche gli arrivi ai
+## POI dell'overworld).
+##
+## MULTI-CAMPAGNA: CAMPAGNE elenca le campagne disponibili (id, titolo, file dati, Set di mappe
+## associato). imposta_campagna(id) cambia campagna a runtime: ricarica i capitoli, azzera
+## l'indice (ogni campagna ha il proprio salvataggio user://campagna_<id>.json) e pubblica
+## "campagna:cambiata" cosi' la UI del Mondo cucito puo' cambiare Set in automatico.
 ##
 ## All'innesco: lore in chat (e nella memoria di campagna), poi
 ## - se il capitolo ha un incontro -> lo spawna BILANCIATO sul party reale (EncounterBalancer)
@@ -13,11 +18,22 @@ extends Node
 ##   in caso di TPK il capitolo resta li': si torna sul luogo e si riprova;
 ## - senza incontro -> ricompensa e avanzamento immediati.
 ## Le ricompense passano dalla STESSA pipeline del loot (ProgressionManager.collect_loot:
-## oggetti items/armeria + oro, annuncio incluso). Il progresso vive in user://campagna.json.
+## oggetti items/armeria + oro, annuncio incluso).
 
-const CAMPAGNA_PATH: String = "res://data/campagna_ventimiglia.json"
-const SALVATAGGIO: String = "user://campagna.json"
+## Campagne selezionabili: id (per il salvataggio), titolo per la UI, file dati, cartella del
+## Set di mappe da attivare quando questa campagna diventa quella attiva ("" = Mondo cucito).
+const CAMPAGNE: Array[Dictionary] = [
+	{
+		"id": "ventimiglia", "titolo": "🏰 L'Ombra sul Confine",
+		"path": "res://data/campagna_ventimiglia.json", "cartella": "",
+	},
+	{
+		"id": "terra_di_mezzo", "titolo": "🧙 L'Ultima Alleanza si Spezza",
+		"path": "res://data/campagna_terra_di_mezzo.json", "cartella": "res://assets/maps_terra_di_mezzo",
+	},
+]
 
+var _campagna_id: String = ""
 var _dati: Dictionary = {}
 var _capitoli: Array = []
 var _indice: int = 0
@@ -25,27 +41,65 @@ var _in_scontro: bool = false
 
 
 func _ready() -> void:
-	if not FileAccess.file_exists(CAMPAGNA_PATH):
-		push_warning("CampaignDirector: campagna non trovata: " + CAMPAGNA_PATH)
-		return
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CAMPAGNA_PATH))
-	if parsed is not Dictionary:
-		push_warning("CampaignDirector: campagna illeggibile")
-		return
-	_dati = parsed
-	_capitoli = _dati.get("capitoli", [])
-	_carica_progresso()
 	GameState.event_published.connect(_su_evento)
 	GameState.party_location_changed.connect(_su_poi)
 	CombatManager.victory.connect(_su_vittoria)
 	CombatManager.party_wiped.connect(_su_sconfitta)
-	# L'annuncio d'apertura arriva DOPO che la UI e' in piedi (deferred: la chat deve esistere).
-	_annuncia_stato.call_deferred()
+	imposta_campagna(String(CAMPAGNE[0]["id"]), false)
+
+
+## Elenco delle campagne disponibili, per popolare un selettore in UI.
+func campagne_disponibili() -> Array[Dictionary]:
+	return CAMPAGNE
+
+
+## Id della campagna attualmente attiva ("" se nessuna caricata).
+func campagna_attuale_id() -> String:
+	return _campagna_id
+
+
+## Cambia la campagna attiva: ricarica i capitoli dal suo file dati, azzera lo scontro in corso
+## e carica il progresso SEPARATO di quella campagna. Pubblica "campagna:cambiata" (payload:
+## { id, titolo, cartella }) cosi' la vista del Mondo cucito puo' allineare il Set di mappe.
+## `annuncia`=false all'avvio (la chat non esiste ancora: l'annuncio arriva deferred da _ready).
+func imposta_campagna(id: String, annuncia: bool = true) -> bool:
+	var voce: Dictionary = {}
+	for c: Dictionary in CAMPAGNE:
+		if String(c["id"]) == id:
+			voce = c
+			break
+	if voce.is_empty():
+		push_warning("CampaignDirector: campagna sconosciuta: " + id)
+		return false
+	var percorso: String = String(voce["path"])
+	if not FileAccess.file_exists(percorso):
+		push_warning("CampaignDirector: campagna non trovata: " + percorso)
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(percorso))
+	if parsed is not Dictionary:
+		push_warning("CampaignDirector: campagna illeggibile: " + percorso)
+		return false
+	_campagna_id = id
+	_dati = parsed
+	_capitoli = _dati.get("capitoli", [])
+	_indice = 0
+	_in_scontro = false
+	_carica_progresso()
+	GameState.publish("campagna:cambiata", {
+		"id": id, "titolo": String(voce["titolo"]), "cartella": String(voce.get("cartella", "")),
+	})
+	if annuncia:
+		_annuncia_stato()
+	else:
+		# L'annuncio d'apertura arriva DOPO che la UI e' in piedi (deferred: la chat deve esistere).
+		_annuncia_stato.call_deferred()
+	return true
 
 
 ## Stato leggibile (per pannelli Master/debug): capitolo corrente e a che punto siamo.
 func stato() -> Dictionary:
 	return {
+		"campagna": _campagna_id,
 		"titolo": String(_dati.get("titolo", "")),
 		"capitolo": _indice,
 		"totale": _capitoli.size(),
@@ -155,15 +209,22 @@ func _annuncia_stato() -> void:
 		GameState.announce("🏰 Nuovo obiettivo: " + obiettivo_corrente())
 
 
+## Salvataggio SEPARATO per campagna: passare da un arco all'altro non tocca il progresso
+## dell'altro (si puo' giocare Ventimiglia e Terra di Mezzo in parallelo, ognuna al suo punto).
+func _percorso_salvataggio() -> String:
+	return "user://campagna_%s.json" % (_campagna_id if not _campagna_id.is_empty() else "default")
+
+
 func _salva_progresso() -> void:
-	var file: FileAccess = FileAccess.open(SALVATAGGIO, FileAccess.WRITE)
+	var file: FileAccess = FileAccess.open(_percorso_salvataggio(), FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify({ "indice": _indice }))
 
 
 func _carica_progresso() -> void:
-	if not FileAccess.file_exists(SALVATAGGIO):
+	var percorso: String = _percorso_salvataggio()
+	if not FileAccess.file_exists(percorso):
 		return
-	var dati: Variant = JSON.parse_string(FileAccess.get_file_as_string(SALVATAGGIO))
+	var dati: Variant = JSON.parse_string(FileAccess.get_file_as_string(percorso))
 	if dati is Dictionary:
 		_indice = clampi(int((dati as Dictionary).get("indice", 0)), 0, _capitoli.size())

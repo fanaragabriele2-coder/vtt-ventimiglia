@@ -211,6 +211,38 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       restano disponibili come upgrade opzionale (sostituiscono i PNG con render migliori,
       stesso nome cartella).
 
+### ✅ Modalità Terra di Mezzo (luglio 2026)
+- [x] **Bestiario** (`data/monsters.json`, +25 voci): tutte le fazioni della Guerra
+      dell'Anello — Goblin di Moria, Uomini Selvaggi di Dunland, Orchi di Isengard,
+      Corsari di Umbar, Uruk-hai (soldato/arciere Haradrim/capitano), Spettro della Palude,
+      Troll delle Caverne, Grima Vermilinguo, Guardiano nell'Acqua, gli 8 Nazgûl minori
+      nominati (Khamûl, Akhorahil, Ren, Adûnaphel, Uvatha, Hoarmurath, Dwar, Ji Indur), il
+      Re Stregone di Angmar, Saruman il Bianco, la Bocca di Sauron, il Drago delle Montagne
+      Grigie, Shelob e il Balrog di Morgoth — CR bilanciati sulla stessa scala del resto del
+      bestiario (l'Encounter Balancer li scala già su qualunque party, da livello 1 a 20).
+      L'Occhio di Sauron resta puramente narrativo (non è un mostro da combattere: è la
+      minaccia che si spegne nell'epilogo).
+- [x] **🧙 Set "Terra di Mezzo"** (`assets/maps_terra_di_mezzo`): stessi 9 tile del Mondo
+      cucito, nuove etichette storicamente coerenti sul terreno giusto — Bree (villaggio
+      di confine), Guado di Bruinen (il guado), Bosco Atro (bosco), Campi di Rohan
+      (pianura), Nen Hithoel (lago), Cancello Ovest di Moria (tile senza etichetta),
+      Emyn Muil (rocce), Campi del Pelennor (campi dorati), Paludi Morte (palude), più
+      Cirith Ungol e i Cancelli Neri.
+- [x] **Campagna "L'Ultima Alleanza si Spezza"** (`data/campagna_terra_di_mezzo.json`,
+      9 capitoli): Bree → Guado di Bruinen (inseguimento dei Nazgûl) → Bosco Atro → Moria
+      (Guardiano nell'Acqua al cancello, poi Balrog sul ponte di Khazad-dûm) → Rohan
+      (Grima Vermilinguo) → Campi del Pelennor (Re Stregone di Angmar) → Cirith Ungol
+      (Shelob) → Cancelli Neri (la Bocca di Sauron) → epilogo con lo spegnersi dell'Occhio
+      di Sauron. Ricompense nuove in `data/armeria.json` (Lama del Ramingo, Cotta di
+      Mithril, Arco Galadhrim, La Lama Ricomposta, Stella Serena...). Saruman e il Drago
+      restano nel bestiario come incontri opzionali per il Master, fuori dall'arco fisso.
+- [x] **Multi-campagna** in `CampaignDirector`: `CAMPAGNE` elenca gli archi disponibili,
+      `imposta_campagna(id)` ricarica capitoli/indice e ha **salvataggio separato per
+      campagna** (`user://campagna_<id>.json` — Ventimiglia e Terra di Mezzo procedono in
+      parallelo senza calpestarsi). Il cambio pubblica `"campagna:cambiata"` su
+      `GameState`, e `world_view.gd` lo intercetta per allineare da solo il Set di mappe
+      giusto (menu a tendina campagna accanto al menu Set nella toolbar del Mondo cucito).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

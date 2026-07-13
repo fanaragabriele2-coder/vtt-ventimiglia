@@ -1,0 +1,151 @@
+{
+	"_comment": "Campagna 'Terra di Mezzo' — modalita' ambientata strutturalmente e storicamente nella Guerra dell'Anello, coerente col bestiario di Terra di Mezzo (data/monsters.json). Si gioca sul Set '🧙 Terra di Mezzo' (assets/maps_terra_di_mezzo, stessi tile del Mondo cucito con nomi di Terra di Mezzo). Il CampaignDirector innesca ogni capitolo all'arrivo del party nel luogo indicato — stessa pipeline della campagna di Ventimiglia. Saruman il Bianco e il Drago delle Montagne Grigie restano nel bestiario come incontri OPZIONALI per il Master, fuori dall'arco fisso.",
+	"titolo": "L'Ultima Alleanza si Spezza",
+	"introduzione": "Un forestiero incappucciato bussa di notte al Puledro Impennato: 'Non e' il tempo di viaggiare soli. Gli Spettri dell'Anello sono usciti da Minas Morgul, e cercano qualcosa di piccolo che il vostro gruppo porta con se'.' Non c'e' tempo per radunare eserciti: solo un pugno di viandanti puo' ancora scegliere la strada. Raggiungete Brea.",
+	"epilogo": "Sul Monte Fato la fiamma si richiude su se stessa, e in un istante l'Occhio di Sauron — che ardeva su ogni landa da Barad-dur a Minas Tirith — si spegne come una candela nel vento. Le torri crollano, gli eserciti d'Orchi si sciolgono in fuga, e sotto i Cancelli Neri il vostro pugno di eroi resta in piedi tra i nemici che non hanno piu' un padrone. Non avete portato l'Anello: avete tenuto aperta la strada per chi lo ha fatto. La Terra di Mezzo ricorda.",
+	"capitoli": [
+		{
+			"id": "brea",
+			"titolo": "Capitolo 1 — Il Puledro Impennato",
+			"luogo": "Brea",
+			"obiettivo": "Raggiungete Brea: un ramingo cerca chi porta un fardello pericoloso.",
+			"arrivo": "Fumo di pipa e sguardi bassi nella sala comune. In un angolo, un uomo dal mantello verde-scuro vi osserva da prima che entraste: 'So chi siete e cosa portate. Il Guado di Bruinen e' l'unica strada verso un rifugio sicuro — ma i Nazgul l'hanno gia' fiutata.'",
+			"incontro": [],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": ["healingPotion"],
+				"gold": 5
+			}
+		},
+		{
+			"id": "guado",
+			"titolo": "Capitolo 2 — La corsa al Guado di Bruinen",
+			"luogo": "Guado di Bruinen",
+			"obiettivo": "Correte al Guado prima che i Cavalieri Neri vi taglino la strada.",
+			"arrivo": "Zoccoli neri battono la riva come tuoni. Dagli alberi scendono ombre incappucciate — non uomini, ma cio' che resta di re dimenticati, mandati a stanare la vostra preda. Il fiume ruggisce alle vostre spalle: se lo raggiungete, la corrente e' dalla vostra parte.",
+			"incontro": [
+				{ "name": "Khamûl lo Stregone Orientale", "count": 1 },
+				{ "name": "Ren lo Sconvolto", "count": 1 }
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": ["r-lama-ramingo"],
+				"gold": 20
+			}
+		},
+		{
+			"id": "bosco-atro",
+			"titolo": "Capitolo 3 — Ombre nel Bosco Atro",
+			"luogo": "Bosco Atro",
+			"obiettivo": "Un sentiero segreto attraversa il Bosco Atro: seguitelo, ma non da soli.",
+			"arrivo": "Gli alberi qui ricordano un'era piu' antica e piu' oscura. Uomini Selvaggi dipinti di guado vi sbarrano la pista, spinti dalle promesse di Saruman — e con loro razziatori goblin scesi dalle Montagne Nebbiose in cerca di bottino facile.",
+			"incontro": [
+				{ "name": "Uomo Selvaggio di Dunland", "count": 3 },
+				{ "name": "Goblin di Moria", "count": 2 }
+			],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": ["r-foglia-lorien"],
+				"gold": 15
+			}
+		},
+		{
+			"id": "moria-cancello",
+			"titolo": "Capitolo 4 — Il Cancello Ovest di Moria",
+			"luogo": "Cancello Ovest di Moria",
+			"obiettivo": "Le Porte di Durin si aprono solo a chi pronuncia la parola giusta — ma qualcosa vive nello stagno davanti al cancello.",
+			"arrivo": "Le rune d'argento si accendono sulla pietra al chiaro di luna, disegnando l'arco delle Porte di Durin. Ma l'acqua stagnante davanti al cancello si increspa senza vento: tentacoli scuri emergono a cercare la porta appena aperta e chi vi sta davanti.",
+			"incontro": [
+				{ "name": "Guardiano nell'Acqua", "count": 1 }
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": ["r-cuoio-rinforzato"],
+				"gold": 25
+			}
+		},
+		{
+			"id": "moria-ponte",
+			"titolo": "Capitolo 5 — Il Ponte di Khazad-dûm",
+			"luogo": "Cancello Ovest di Moria",
+			"obiettivo": "Nelle profondita' delle miniere qualcosa di antico si e' svegliato al tamburo dei goblin. Raggiungete il ponte e attraversatelo.",
+			"arrivo": "Un ruggito di fuoco e ombra scuote le gallerie sottostanti. Sul ponte stretto di Khazad-dum, orde di goblin vi si fanno incontro mentre una sagoma alata di fiamma e tenebra risale dall'abisso — un Balrog di Morgoth, servo di un male piu' antico di Sauron stesso.",
+			"incontro": [
+				{ "name": "Goblin di Moria", "count": 4 },
+				{ "name": "Balrog di Morgoth", "count": 1 }
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": ["e-cotta-mithril"],
+				"gold": 40
+			}
+		},
+		{
+			"id": "rohan",
+			"titolo": "Capitolo 6 — Il sussurro a Edoras",
+			"luogo": "Campi di Rohan",
+			"obiettivo": "Nelle sale dorate di Edoras una lingua di veleno consiglia il re. Smascherate Grima prima che consegni Rohan a Saruman.",
+			"arrivo": "Il vento dei Campi di Rohan porta odore di ferro e tradimento. Grima Vermilinguo vi intercetta con un sorriso storto e una scorta di orchi forgiati a Isengard: 'Il re non riceve stranieri... ne' chi si intromette negli affari di Saruman il Bianco.'",
+			"incontro": [
+				{ "name": "Grima Vermilinguo", "count": 1 },
+				{ "name": "Orco di Isengard", "count": 2 }
+			],
+			"intensita": "equo",
+			"ricompensa": {
+				"items": ["e-arco-galadhrim"],
+				"gold": 30
+			}
+		},
+		{
+			"id": "pelennor",
+			"titolo": "Capitolo 7 — I Campi del Pelennor",
+			"luogo": "Campi del Pelennor",
+			"obiettivo": "Le armate di Mordor dilagano sotto le mura di Minas Tirith. Reggete la linea sui Campi del Pelennor.",
+			"arrivo": "Fuoco e grida coprono la pianura dorata. Uruk-hai avanzano in falange dietro le frecce degli arcieri di Harad, e sopra il campo cala un'ombra alata: il Re Stregone di Angmar, Signore dei Nazgul, scende in persona a reclamare la vittoria di Sauron.",
+			"incontro": [
+				{ "name": "Uruk-hai", "count": 2 },
+				{ "name": "Arciere Haradrim", "count": 2 },
+				{ "name": "Capitano Uruk-hai", "count": 1 },
+				{ "name": "Il Re Stregone di Angmar", "count": 1 }
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": ["l-corazza-forte"],
+				"gold": 60
+			}
+		},
+		{
+			"id": "cirith-ungol",
+			"titolo": "Capitolo 8 — La Tana di Shelob",
+			"luogo": "Cirith Ungol",
+			"obiettivo": "L'unica via non presidiata verso Mordor passa per il passo di Cirith Ungol — e per la sua padrona.",
+			"arrivo": "La galleria puzza di veleno rappreso e di ragnatele vecchie quanto la montagna. Dall'oscurita' emergono zampe piu' spesse di un tronco: Shelob, l'ultima figlia di Ungoliant, difende il suo passo — e con lei, gli orchi della torre che la servono per un pasto lasciato in dono.",
+			"incontro": [
+				{ "name": "Shelob", "count": 1 },
+				{ "name": "Orco di Isengard", "count": 2 }
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": ["l-spada-ramingo-ricomposta"],
+				"gold": 50
+			}
+		},
+		{
+			"id": "cancelli-neri",
+			"titolo": "Capitolo 9 — I Cancelli Neri",
+			"luogo": "Cancelli Neri",
+			"obiettivo": "Fate rumore ai Cancelli Neri: tenete l'Occhio di Sauron puntato su di voi, non sulla Montagna del Fato.",
+			"arrivo": "Il Morannon si spalanca e ne escono piu' nemici di quanti la speranza osi contare. Dalle mura scende un cavaliere che non porta piu' nome, solo un titolo — la Bocca di Sauron — scortato da troll delle caverne e corsari di Umbar. In alto, sopra le torri, l'Occhio Rosso non batte mai ciglio.",
+			"incontro": [
+				{ "name": "La Bocca di Sauron", "count": 1 },
+				{ "name": "Troll delle Caverne", "count": 2 },
+				{ "name": "Corsaro di Umbar", "count": 2 }
+			],
+			"intensita": "difficile",
+			"ricompensa": {
+				"items": ["l-stella-serena"],
+				"gold": 100
+			}
+		}
+	]
+}
