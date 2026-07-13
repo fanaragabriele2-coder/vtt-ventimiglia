@@ -43,6 +43,7 @@ AmbienceManager="*res://scripts/autoload/ambience_manager.gd"
 DiceServer="*res://scripts/network/dice_server.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 CampaignDirector="*res://scripts/autoload/campaign_director.gd"
+CombatSfx="*res://scripts/autoload/combat_sfx.gd"
 
 [audio]
 

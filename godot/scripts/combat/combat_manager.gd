@@ -576,6 +576,77 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	return result
 
 
+# --- Tiri salvezza e incantesimi ad AREA (Palla di Fuoco) ---
+
+## Tiro salvezza di un combattente su una caratteristica ("dex", "con"...). Per i PG usa la
+## scheda vera (mod + competenza se proficiente); per i PNG un proxy onesto: DES dal bonus di
+## iniziativa, il resto dal bonus d'attacco - 2 (robustezza fisica approssimata).
+func saving_throw(combatant_id: String, ability: String, dc: int) -> Dictionary:
+	var bonus: int = 0
+	var char_id: String = character_id_di(combatant_id)
+	if not char_id.is_empty():
+		var pg: CharacterData = CharacterManager.get_character_by_id(char_id)
+		if pg:
+			bonus = pg.saving_throw_modifier(ability)
+	else:
+		var c: Dictionary = get_combatant(combatant_id)
+		bonus = int(c.get("initiativeBonus", 0)) if ability == "dex" \
+			else maxi(0, int(c.get("attackBonus", 2)) - 2)
+	var tiro: int = roll_d20_with_mode("normal")["chosen"]
+	return {
+		"combatant": combatant_id, "ability": ability, "dc": dc,
+		"roll": tiro, "total": tiro + bonus, "success": tiro + bonus >= dc,
+	}
+
+
+## PALLA DI FUOCO del mago (5e semplificata): esplosione centrata sulla cella del bersaglio,
+## raggio in celle (Chebyshev), tiro salvezza su DES per TUTTI i combattenti nell'area —
+## alleati compresi: il fuoco amico e' D&D vero. Danno pieno se fallito, META' se riuscito.
+## Lascia una superficie di FUOCO sull'area (brucia nei round successivi: SurfacesManager).
+## dc e formula arrivano dal chiamante (l'HUD li deriva dalla scheda del mago).
+func palla_di_fuoco(caster_id: String, centro: Vector2i, raggio: int, formula: String, dc: int) -> Dictionary:
+	var caster: Dictionary = get_combatant(caster_id)
+	if caster.is_empty():
+		return { "ok": false }
+	var colpiti: Array[Dictionary] = []
+	for c: Dictionary in _combatants:
+		if bool(c["defeated"]):
+			continue
+		var cid: String = String(c["id"])
+		var cella: Variant = get_combatant_cell(cid)
+		if cella == null:
+			continue
+		if maxi(absi((cella as Vector2i).x - centro.x), absi((cella as Vector2i).y - centro.y)) > raggio:
+			continue
+		var salvezza: Dictionary = saving_throw(cid, "dex", dc)
+		var danno: Dictionary = roll_damage_formula(formula, false)
+		var subito: int = int(danno["total"])
+		if bool(salvezza["success"]):
+			@warning_ignore("integer_division")
+			subito = subito / 2  # meta' danno (arrotondato in giu'), regola 5e
+		apply_damage_to_combatant(cid, subito, caster_id)
+		colpiti.append({
+			"id": cid, "name": String(c["name"]), "salvato": bool(salvezza["success"]),
+			"tiro": int(salvezza["total"]), "danno": subito,
+		})
+		if not _active:
+			break  # l'esplosione ha CHIUSO lo scontro (vittoria/TPK): stop, niente altri bersagli
+	# L'area resta in fiamme: chi ci sta dentro nei prossimi round si scotta (Modulo 27).
+	SurfacesManager.crea_superficie("fuoco", centro.x, centro.y, raggio)
+	var righe: PackedStringArray = []
+	for hit: Dictionary in colpiti:
+		righe.append("%s %s (%d): %d danni" % [
+			String(hit["name"]), "salva" if bool(hit["salvato"]) else "FALLISCE",
+			int(hit["tiro"]), int(hit["danno"]),
+		])
+	GameState.announce("🔥 %s scaglia una PALLA DI FUOCO (CD %d)! %s" % [
+		String(caster["name"]), dc,
+		" · ".join(righe) if not righe.is_empty() else "L'area brucia, ma nessuno era nel raggio.",
+	])
+	_last_event = "Palla di fuoco di " + String(caster["name"])
+	return { "ok": true, "colpiti": colpiti, "centro": centro, "raggio": raggio }
+
+
 # --- Spinta (porting del Modulo 26): prova contrapposta Atletica vs Atletica/Acrobazia ---
 
 ## L'attaccante spinge il bersaglio: Atletica (FOR) contro la migliore tra Atletica e Acrobazia

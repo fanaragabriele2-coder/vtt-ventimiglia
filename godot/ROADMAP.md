@@ -173,12 +173,25 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       pck incorporato, filtri risorse giusti) + guida `ESPORTA_WINDOWS.md`. Giocare con un
       doppio click, senza editor.
 
-### 🎯 Ancora da fare (in ordine di impatto)
-1. **SFX di combattimento**: dadi, lame, arco — gli stinger che mancano all'AmbienceManager
-2. **Tiri salvezza e aree**: palla di fuoco → tiro DES + superficie di fuoco (già pronta)
-3. **IA tattica avanzata**: i nemici cercano il fiancheggiamento e l'altura
-4. **Multiplayer Supabase** e ruoli Master/giocatore
-5. **Asset "veri" dell'utente**: render Blender (props/miniature) e pacchetti Forgotten
+### ✅ Secondo giro "capolavoro" (luglio 2026)
+- [x] **SFX di combattimento SINTETIZZATI** (9 stinger inclusi, zero licenze): dadi
+      all'iniziativa, thud di mischia, whoosh del mancato, freccia per i tiri a distanza,
+      squillo del CRITICO, carillon di cura, tonfo del nemico a terra, fanfara di
+      vittoria, sweep di magia. Autoload `CombatSfx` con pool di 4 player: i suoni si
+      sovrappongono senza tagliarsi, agganciato ai signal (nessun modulo sa che esiste).
+- [x] **Tiri salvezza + PALLA DI FUOCO del Mago**: `saving_throw` dalla scheda vera per i
+      PG (proxy onesto per i PNG), pulsante 🔥 che compare SOLO al turno del Mago —
+      esplosione raggio 2 celle centrata sul bersaglio, tiro DES (CD = 8 + competenza +
+      INT) per TUTTI nel raggio, alleati compresi (il fuoco amico è D&D vero), metà danno
+      a chi salva, e l'area resta IN FIAMME (superficie di fuoco nei round successivi).
+- [x] **IA fiancheggiante**: il nemico da mischia che può chiudere il turno in mischia
+      sceglie la cella adiacente che crea FIANCHEGGIAMENTO con un alleato ("ti aggira e
+      ti prende ai fianchi!") invece di mettersi in fila indiana.
+
+### 🎯 Ancora da fare
+1. **IA e altura**: i nemici cercano anche il terreno sopraelevato
+2. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
+3. **Asset "veri" dell'utente**: render Blender (props/miniature) e pacchetti Forgotten
    Adventures in `user://` — la pipeline è già tutta in piedi
 
 ---

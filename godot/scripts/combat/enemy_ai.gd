@@ -112,13 +112,24 @@ func _agisci_nemico(cur: Dictionary) -> void:
 
 
 ## Nemico da mischia: avanza (evitando le celle occupate) e colpisce se arriva adiacente.
+## TATTICA: se puo' arrivare in mischia questo turno, tra le celle adiacenti al bersaglio
+## preferisce quella che crea un FIANCHEGGIAMENTO con un alleato (vantaggio al tiro) —
+## i nemici ora vi GIRANO ATTORNO invece di mettersi in fila indiana.
 func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector2i, pc_cell: Vector2i) -> void:
 	var dist: int = chebyshev(npc_cell, pc_cell)
 	if dist > 1:
-		var dest: Variant = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
+		var dest: Variant = null
+		var fiancheggia: bool = false
+		if dist - 1 <= PORTATA_MOVIMENTO:
+			var scelta: Dictionary = _cella_mischia_migliore(String(cur["id"]), npc_cell, pc_cell)
+			dest = scelta.get("cella")
+			fiancheggia = bool(scelta.get("fiancheggia", false))
+		if dest == null:
+			dest = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
 		if dest != null:
 			CombatManager.set_combatant_cell(String(cur["id"]), dest)
-			GameState.announce("👣 %s avanza verso %s." % [String(cur["name"]), String(bersaglio["name"])])
+			GameState.announce(("⚔ %s aggira %s e lo prende ai fianchi!" if fiancheggia
+				else "👣 %s avanza verso %s.") % [String(cur["name"]), String(bersaglio["name"])])
 		npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
 		dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else 999
 	if dist <= 1:
@@ -171,6 +182,40 @@ func _cella_libera_verso(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i) 
 		if not occupate.has(dest):
 			return dest
 	return null
+
+
+## La migliore cella ADIACENTE al bersaglio raggiungibile in questo turno: se una crea
+## fiancheggiamento con un alleato gia' in mischia, vince quella; altrimenti la prima libera.
+## Ritorna { "cella": Vector2i|null, "fiancheggia": bool }.
+func _cella_mischia_migliore(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i) -> Dictionary:
+	var occupate: Dictionary = {}
+	var alleati_in_mischia: Array[Vector2i] = []
+	for c: Dictionary in CombatManager.get_state()["combatants"]:
+		var cid: String = String(c["id"])
+		if cid == npc_id or bool(c["defeated"]):
+			continue
+		var cella: Variant = CombatManager.get_combatant_cell(cid)
+		if cella == null:
+			continue
+		occupate[cella] = true
+		if String(c["kind"]) == "npc" and chebyshev(cella, pc_cell) == 1:
+			alleati_in_mischia.append(cella)
+	var ripiego: Variant = null
+	for dx: int in range(-1, 2):
+		for dy: int in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var cand := Vector2i(pc_cell.x + dx, pc_cell.y + dy)
+			if cand.x < 0 or cand.x > GRIGLIA_MAX_X or cand.y < 0 or cand.y > GRIGLIA_MAX_Y:
+				continue
+			if occupate.has(cand) or chebyshev(npc_cell, cand) > PORTATA_MOVIMENTO:
+				continue
+			for alleato: Vector2i in alleati_in_mischia:
+				if FlankingSystem.sta_fiancheggiando(pc_cell, cand, alleato):
+					return { "cella": cand, "fiancheggia": true }
+			if ripiego == null:
+				ripiego = cand
+	return { "cella": ripiego, "fiancheggia": false }
 
 
 ## Cella di FUGA per l'arciere: si allontana dal bersaglio (direzione opposta) di un passo di

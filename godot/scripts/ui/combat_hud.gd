@@ -13,6 +13,7 @@ var _last_event: Label
 var _attack_button: Button
 var _shove_button: Button
 var _bonus_button: Button
+var _fireball_button: Button
 var _bonus_popup: PopupPanel
 var _cards: Dictionary = {}   # combatant_id -> PanelContainer (per l'evidenziazione di turno)
 var _current_id: String = ""
@@ -93,6 +94,14 @@ func _build_ui() -> void:
 	actions.add_child(_shove_button)
 	_bonus_button = _make_action("⚡ Bonus", Color(0.42, 0.32, 0.08), _on_bonus_pressed)
 	actions.add_child(_bonus_button)
+	# Palla di Fuoco: SOLO per il Mago (il pulsante compare al suo turno). Esplosione ad area
+	# centrata sul bersaglio selezionato, tiro DES per tutti nel raggio — alleati compresi.
+	_fireball_button = _make_action("🔥 Palla di Fuoco", Color(0.55, 0.28, 0.05), _on_fireball_pressed)
+	_fireball_button.visible = false
+	_fireball_button.tooltip_text = "Esplosione ad AREA (raggio 2 celle) centrata sul bersaglio: " \
+		+ "tiro salvezza DES per TUTTI nel raggio, alleati compresi. Meta' danno a chi salva. " \
+		+ "L'area resta in fiamme."
+	actions.add_child(_fireball_button)
 	actions.add_child(_make_action("⏭ Termina turno", Color(0.16, 0.31, 0.16), _on_end_turn_pressed))
 
 	_build_bonus_popup()
@@ -285,6 +294,36 @@ func _on_shove_pressed() -> void:
 	InventoryManager.spend_action_resource("action")
 
 
+## Palla di Fuoco del Mago: CD e danno derivati dalla SUA scheda (CD = 8 + competenza + mod
+## INT; 5d6 di fuoco), centrata sulla cella del bersaglio selezionato, raggio 2 celle.
+func _on_fireball_pressed() -> void:
+	if not _puo_agire():
+		return
+	var target: String = _selected_target_id()
+	if target.is_empty():
+		_last_event.text = "Scegli il bersaglio al centro dell'esplosione."
+		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: la Palla di Fuoco e' l'azione del turno."
+		return
+	if not CombatManager.in_attack_range(_actor_id(), target):
+		_last_event.text = "Troppo lontano per la Palla di Fuoco (gittata %d celle)." \
+			% CombatManager.attack_range_of(_actor_id())
+		return
+	var centro: Variant = CombatManager.get_combatant_cell(target)
+	if centro == null:
+		_last_event.text = "Il bersaglio non ha una posizione sulla griglia."
+		return
+	var mago: CharacterData = CharacterManager.get_character_by_id(
+		CombatManager.character_id_di(_actor_id()))
+	var dc: int = 13
+	if mago != null:
+		dc = 8 + mago.proficiency_bonus + mago.modifier_of("int")
+	CombatSfx.suona("magia")
+	CombatManager.palla_di_fuoco(_actor_id(), centro, 2, "5d6", dc)
+	InventoryManager.spend_action_resource("action")
+
+
 func _on_action_economy_changed(_economy: Dictionary) -> void:
 	_refresh_action_buttons()
 
@@ -309,6 +348,14 @@ func _refresh_action_buttons() -> void:
 	_attack_button.disabled = not ha_azione
 	_shove_button.disabled = not ha_azione
 	_bonus_button.disabled = not ha_bonus
+	# La Palla di Fuoco compare SOLO al turno di un Mago (e si spegne senza azione).
+	var e_mago: bool = false
+	if turno_pc:
+		var pg: CharacterData = CharacterManager.get_character_by_id(
+			CombatManager.character_id_di(_current_id))
+		e_mago = pg != null and pg.class_name_label.to_lower() == "mago"
+	_fireball_button.visible = e_mago
+	_fireball_button.disabled = not ha_azione
 
 
 func _on_end_turn_pressed() -> void:
