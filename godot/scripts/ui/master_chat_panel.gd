@@ -129,7 +129,9 @@ func _build_ui() -> void:
 	log_sb.content_margin_bottom = 8
 	_log.add_theme_stylebox_override("normal", log_sb)
 	root.add_child(_log)
-	_append_system("Benvenuti a Ventimiglia. Impostate l'IP del Master e scrivete la vostra azione.")
+	# Generico: la campagna si sceglie DOPO (CampaignSelectScreen) — l'intro vera arriva subito
+	# dopo in chat da CampaignDirector, gia' ambientata nel mondo giusto.
+	_append_system("Benvenuti al tavolo. Impostate l'IP del Master e scrivete la vostra azione.")
 
 	# --- Riga di invio ---
 	var send_row := HBoxContainer.new()

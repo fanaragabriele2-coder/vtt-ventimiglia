@@ -127,11 +127,16 @@ func _save_config() -> void:
 # --- Costruzione del prompt (system + contesto party + istruzioni <<DATI>>) ---
 
 func _build_system_prompt() -> String:
+	var esempio: Dictionary = _bestiario_esempio()
+	var id_esempio: String = String(esempio.get("id", "goblin"))
+	var nome_esempio: String = String(esempio.get("name", "dei nemici")).to_lower()
 	return "\n".join([
-		"Sei il Dungeon Master di una partita di D&D 5e ambientata a Ventimiglia.",
+		"Sei il Dungeon Master di una partita di D&D 5e ambientata in %s."
+			% CampaignDirector.ambientazione_attuale(),
 		"Narra in italiano, in seconda persona plurale, in modo evocativo ma conciso.",
 		"",
-		"SCHEDE DEI PERSONAGGI DEL PARTY (gia note, tienine conto — HP, CA e caratteristiche REALI, NON chiedere presentazioni):",
+		"SCHEDE DEI PERSONAGGI DEL PARTY (gia note, tienine conto — HP, CA e caratteristiche"
+			+ " REALI, NON chiedere presentazioni):",
 		CharacterManager.party_context_text(),
 		"",
 		"DIARIO DI CAMPAGNA (eventi chiave accaduti finora — la tua memoria a lungo termine):",
@@ -141,11 +146,12 @@ func _build_system_prompt() -> String:
 		_posizioni_context_text(),
 		"",
 		"Se e SOLO se serve segnalare un dato di gioco (tiro, comparsa nemici, danno...), aggiungi",
-		"SUBITO DOPO la narrazione, su una riga a parte, ESATTAMENTE questo separatore: " + SEPARATORE_DATI_MASTER,
+		"SUBITO DOPO la narrazione, su una riga a parte, ESATTAMENTE questo separatore: "
+			+ SEPARATORE_DATI_MASTER,
 		"e dopo di esso un array JSON di comandi, es:",
 		SEPARATORE_DATI_MASTER,
-		'[{"command":"addNpc","id":"goblin","count":2},{"command":"startCombat"}]',
-		'Per spostare il party in un luogo di Ventimiglia: {"command":"moveTo","to":"Porto Turistico"}.',
+		'[{"command":"addNpc","id":"%s","count":2},{"command":"startCombat"}]' % id_esempio,
+		'Per spostare il party in un luogo della mappa: {"command":"moveTo","to":"<nome del luogo>"}.',
 		"(Se descrivi lo spostamento a parole, il gioco lo riconosce e muove il party da solo.)",
 		"",
 		"REGOLE DEL COMBATTIMENTO (IMPORTANTISSIME, rispettale sempre):",
@@ -155,13 +161,36 @@ func _build_system_prompt() -> String:
 		"- NON descrivere gli attacchi dei personaggi, NON tirare dadi, NON dire chi colpisce o",
 		"  quanti danni fa, NON far vincere o perdere nessuno: a questo pensano i giocatori con i",
 		"  loro pulsanti (Attacca/Bonus/Termina turno) e i dadi del gioco. Aspetta e basta.",
-		"- Usa SOLO nemici di questo bestiario (id fra parentesi): Goblin (goblin), Bandito (bandit),",
-		"  Scheletro (skeleton), Lupo (wolf), Orco (orc), Cultista (cultist), Zombie (zombie),",
-		"  Hobgoblin (hobgoblin). Per un nemico generico ('ombre', 'briganti', 'non-morti') scegli",
-		"  l'id piu' simile. Esempio di inizio scontro corretto:",
-		'"Dalle tenebre sbucano tre goblin ringhianti!" ' + SEPARATORE_DATI_MASTER
-			+ ' [{"command":"addNpc","id":"goblin","count":3},{"command":"startCombat"}]',
+		"- Usa SOLO nemici di questo bestiario (id fra parentesi): " + _bestiario_context_text()
+			+ ". Per un nemico generico scegli l'id piu' simile. Esempio di inizio scontro corretto:",
+		('"Dalle tenebre sbucano %s ringhianti!" ' % nome_esempio) + SEPARATORE_DATI_MASTER
+			+ ' [{"command":"addNpc","id":"%s","count":3},{"command":"startCombat"}]' % id_esempio,
 	])
+
+
+## Elenco "Nome (id), Nome (id), ..." dei mostri della campagna ATTIVA (CampaignDirector.
+## bestiario_attuale() filtra il tag "set" di data/monsters.json): il Master IA non deve MAI
+## poter proporre mostri di un'altra ambientazione (era il bug "Terra di Mezzo narrata come
+## Ventimiglia" — il vecchio elenco era fisso agli 8 mostri originali).
+func _bestiario_context_text() -> String:
+	var set_attivo: String = CampaignDirector.bestiario_attuale()
+	var voci: PackedStringArray = []
+	for m: Dictionary in CombatManager.get_monster_catalog():
+		if String(m.get("set", "ventimiglia")) == set_attivo:
+			voci.append("%s (%s)" % [String(m["name"]), String(m["id"])])
+	return ", ".join(voci) if not voci.is_empty() else "Goblin (goblin)"
+
+
+## Un mostro rappresentativo (il piu' debole) del bestiario attivo, per gli esempi del prompt.
+func _bestiario_esempio() -> Dictionary:
+	var set_attivo: String = CampaignDirector.bestiario_attuale()
+	var migliore: Dictionary = {}
+	for m: Dictionary in CombatManager.get_monster_catalog():
+		if String(m.get("set", "ventimiglia")) != set_attivo:
+			continue
+		if migliore.is_empty() or int(m.get("hitPoints", 999)) < int(migliore.get("hitPoints", 999)):
+			migliore = m
+	return migliore
 
 
 ## Snapshot delle posizioni per il Master: luogo del party sull'overworld + celle e HP dei
@@ -170,7 +199,7 @@ func _posizioni_context_text() -> String:
 	var righe: PackedStringArray = []
 	var luogo: Variant = GameState.get_party_location()
 	if luogo is Dictionary and (luogo as Dictionary).has("name"):
-		righe.append("- Party (Ventimiglia): " + String((luogo as Dictionary)["name"]))
+		righe.append("- Party: " + String((luogo as Dictionary)["name"]))
 	var stato: Dictionary = CombatManager.get_state()
 	for c: Dictionary in stato["combatants"]:
 		var cella: Variant = CombatManager.get_combatant_cell(String(c["id"]))
@@ -188,7 +217,8 @@ func _posizioni_context_text() -> String:
 ## combattenti, cronaca recente): il modello non deve inventare nulla che il motore gia' sa.
 func _build_system_prompt_json() -> String:
 	return "\n".join([
-		"Sei il Dungeon Master di un GDR ambientato a Ventimiglia (D&D 5e semplificato).",
+		("Sei il Dungeon Master di un GDR ambientato in %s (D&D 5e semplificato)."
+			% CampaignDirector.ambientazione_attuale()),
 		"Il giocatore scrive in linguaggio naturale. Rispondi SOLO con un oggetto JSON valido,",
 		"senza alcun testo prima o dopo e senza blocchi di codice, ESATTAMENTE in questo schema:",
 		'{"narrazione":"...","opzioni":["...","..."],"richiede_dado":false,"dado":"","scopo_dado":""}',

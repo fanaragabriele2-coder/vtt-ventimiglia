@@ -87,6 +87,13 @@ func _carica_pois() -> void:
 
 
 func _on_master_complete(narration: String, commands: Array) -> void:
+	# Guardia 0: questo bridge conosce SOLO i POI reali di Ventimiglia — fuori da quella
+	# campagna una parola generica della narrazione ("il ponte", "la torre", "la porta"...)
+	# potrebbe combaciare per caso con un alias e teletrasportare il party su un POI reale
+	# mentre si gioca un'altra ambientazione (era parte del bug "Master che sembra sempre
+	# raccontare Ventimiglia").
+	if CampaignDirector.campagna_attuale_id() != "ventimiglia":
+		return
 	# Guardia 1: il Master ha gia' spostato il party via comando strutturato (moveTo & co.):
 	# quello passa da AIBridge._dispatch_command -> viaggia_a_nome, non serve leggere la prosa.
 	for c: Variant in commands:

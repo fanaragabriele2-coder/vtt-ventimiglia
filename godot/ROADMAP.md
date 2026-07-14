@@ -257,6 +257,30 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       distanza/kiting per quei nemici). Sparisce alla sconfitta del singolo nemico o a fine
       scontro; puramente visivo, la posizione di gioco autorevole resta la mappa tattica.
 
+### ✅ FIX: il Master IA ora e' davvero campagna-consapevole (luglio 2026)
+- [x] **Bug**: scegliendo Terra di Mezzo, il Master IA (AIBridge) continuava a narrare
+      Ventimiglia — il suo system prompt aveva "ambientata a Ventimiglia" e la whitelist
+      mostri FISSA agli 8 originali scritti nel codice, del tutto ignari di CampaignDirector.
+- [x] **`CampaignDirector.ambientazione_attuale()` / `bestiario_attuale()`**: ogni voce di
+      `CAMPAGNE` porta ora una descrizione di ambientazione e il tag "set" del suo bestiario.
+      `data/monsters.json` etichetta ogni mostro con `"set": "ventimiglia"` o
+      `"set": "terra_di_mezzo"`.
+- [x] **`AIBridge`**: il system prompt (prosa e Modalita' Storia) usa l'ambientazione della
+      campagna ATTIVA e costruisce la whitelist mostri/esempi al volo filtrando per "set" —
+      niente piu' testo fisso.
+- [x] **`ChatCombatBridge`**: la rete di sicurezza che riconosce mostri nella prosa del Master
+      ora ha un bestiario/sinonimi/default SEPARATO per campagna (bestiario Terra di Mezzo
+      completo, Nazgul con nomi accentati inclusi).
+- [x] **`ChatTravelBridge`**: il rilevamento "il Master ha narrato uno spostamento" verso i POI
+      REALI di Ventimiglia (Porto Turistico, Torre dell'Orologio...) ora e' attivo SOLO durante
+      la campagna Ventimiglia — altrimenti una parola generica della prosa Terra di Mezzo
+      ("il ponte", "la torre") poteva teletrasportare per sbaglio il party su un POI reale.
+- [x] **`CampaignMemory`**: il diario di campagna (memoria a lungo termine del Master) e' ora
+      SEPARATO per campagna (`imposta_campagna`, chiamato da CampaignDirector) — gli eventi di
+      Ventimiglia non finiscono piu' nel contesto del Master mentre si gioca in Terra di Mezzo.
+- [x] Rimosso anche il banner statico "Benvenuti a Ventimiglia" della Chat Master (ora generico:
+      l'intro vera arriva subito dopo, dalla campagna scelta).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

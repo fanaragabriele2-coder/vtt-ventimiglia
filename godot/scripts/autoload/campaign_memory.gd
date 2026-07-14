@@ -1,17 +1,22 @@
 extends Node
-## CampaignMemory (Autoload) — porting-lite dei Moduli 29/32 JS: il DIARIO DI CAMPAGNA del Master IA.
+## CampaignMemory (Autoload) — porting-lite dei Moduli 29/32 JS: il DIARIO DI CAMPAGNA del
+## Master IA.
 ##
 ## Lo storico breve della conversazione (AIBridge._history) scorre via in fretta: qui si registrano
 ## SOLO gli eventi chiave della campagna — vittorie e sconfitte, level-up, viaggi, discese nei
 ## dungeon — e AIBridge li inietta nel system prompt a ogni chiamata. Cosi' il Master "ricorda"
 ## che cosa e' successo anche a distanza di ore di gioco, senza trascinarsi dietro tutta la chat.
 ##
-## Alimentato dai signal dei manager (nessun polling, nessuna dipendenza inversa); persistito nel
-## salvataggio da SaveManager.
+## SEPARATO PER CAMPAGNA: un diario per id (CampaignDirector.imposta_campagna chiama
+## imposta_campagna qui) — passare da Ventimiglia alla Terra di Mezzo non deve far raccontare
+## al Master eventi dell'altro mondo. Alimentato dai signal dei manager (nessun polling, nessuna
+## dipendenza inversa); persistito nel salvataggio da SaveManager (tutti i diari insieme).
 
 const MASSIMO_EVENTI: int = 40
+const CAMPAGNA_DEFAULT: String = "ventimiglia"
 
-var _eventi: Array[String] = []
+var _campagna_attiva: String = CAMPAGNA_DEFAULT
+var _diari: Dictionary = {}   # campagna_id -> Array[String]
 
 
 func _ready() -> void:
@@ -22,39 +27,73 @@ func _ready() -> void:
 	EventBus.dungeon_generated.connect(_on_dungeon_generated)
 
 
-## Aggiunge un evento al diario (anche a mano: missioni, colpi di scena decisi dal Master umano).
+## Cambia il diario attivo (chiamato da CampaignDirector.imposta_campagna): da qui in poi
+## registra()/contesto_testo() leggono/scrivono SOLO nel diario di questa campagna.
+func imposta_campagna(id: String) -> void:
+	_campagna_attiva = id if not id.is_empty() else CAMPAGNA_DEFAULT
+	if not _diari.has(_campagna_attiva):
+		_diari[_campagna_attiva] = [] as Array[String]
+
+
+func _eventi_attivi() -> Array:
+	if not _diari.has(_campagna_attiva):
+		_diari[_campagna_attiva] = [] as Array[String]
+	return _diari[_campagna_attiva]
+
+
+## Aggiunge un evento al diario della campagna ATTIVA (anche a mano: missioni, colpi di scena
+## decisi dal Master umano).
 func registra(evento: String) -> void:
 	var testo: String = evento.strip_edges()
 	if testo.is_empty():
 		return
-	_eventi.append(testo)
-	if _eventi.size() > MASSIMO_EVENTI:
-		_eventi = _eventi.slice(_eventi.size() - MASSIMO_EVENTI)
+	var eventi: Array = _eventi_attivi()
+	eventi.append(testo)
+	if eventi.size() > MASSIMO_EVENTI:
+		_diari[_campagna_attiva] = eventi.slice(eventi.size() - MASSIMO_EVENTI)
 
 
-## Il diario in forma di testo per il system prompt del Master IA.
+## Il diario della campagna ATTIVA in forma di testo per il system prompt del Master IA.
 func contesto_testo() -> String:
-	if _eventi.is_empty():
+	var eventi: Array = _eventi_attivi()
+	if eventi.is_empty():
 		return "- (la campagna e' appena iniziata: nessun evento registrato)"
 	var righe: PackedStringArray = []
-	for e: String in _eventi:
-		righe.append("- " + e)
+	for e: Variant in eventi:
+		righe.append("- " + String(e))
 	return "\n".join(righe)
 
 
-func get_save_state() -> Array:
-	return _eventi.duplicate()
+## Tutti i diari (una chiave per campagna), per il salvataggio.
+func get_save_state() -> Dictionary:
+	var out: Dictionary = {}
+	for id: String in _diari.keys():
+		out[id] = (_diari[id] as Array).duplicate()
+	return out
 
 
-func hydrate_save_state(eventi: Array) -> void:
-	_eventi.clear()
-	for e: Variant in eventi:
-		if e is String:
-			_eventi.append(e)
+## Retrocompatibile: un vecchio salvataggio con un Array piatto (diario unico pre-multi-campagna)
+## diventa il diario di CAMPAGNA_DEFAULT; un salvataggio nuovo (Dictionary id -> eventi) si
+## ripristina cosi' com'e'.
+func hydrate_save_state(stato: Variant) -> void:
+	_diari.clear()
+	if stato is Dictionary:
+		for id: String in (stato as Dictionary).keys():
+			var lista: Array[String] = []
+			for e: Variant in (stato as Dictionary)[id]:
+				if e is String:
+					lista.append(e)
+			_diari[id] = lista
+	elif stato is Array:
+		var lista: Array[String] = []
+		for e: Variant in stato:
+			if e is String:
+				lista.append(e)
+		_diari[CAMPAGNA_DEFAULT] = lista
 
 
 func reset() -> void:
-	_eventi.clear()
+	_diari[_campagna_attiva] = [] as Array[String]
 
 
 # --- Ascoltatori degli eventi chiave ---

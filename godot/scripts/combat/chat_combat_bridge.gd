@@ -14,8 +14,11 @@ extends Node
 
 const MAX_PER_TIPO: int = 8
 
-# Bestiario riconoscibile nella prosa (nomi del catalogo monsters.json + plurali italiani).
-const BESTIARIO: Array[Dictionary] = [
+# Bestiario riconoscibile nella prosa (nomi del catalogo monsters.json + plurali italiani),
+# UNO per campagna (CampaignDirector.bestiario_attuale() sceglie quale usare): il Master IA di
+# Ventimiglia non deve far scattare un Uruk-hai, e viceversa (era il bug "Master che racconta
+# Ventimiglia mentre si gioca in Terra di Mezzo" — prima esisteva una sola lista fissa).
+const BESTIARIO_VENTIMIGLIA: Array[Dictionary] = [
 	{ "nome": "Goblin", "singolare": "goblin", "plurale": "goblin" },
 	{ "nome": "Bandito", "singolare": "bandito", "plurale": "banditi" },
 	{ "nome": "Scheletro", "singolare": "scheletro", "plurale": "scheletri" },
@@ -26,6 +29,40 @@ const BESTIARIO: Array[Dictionary] = [
 	{ "nome": "Hobgoblin", "singolare": "hobgoblin", "plurale": "hobgoblin" },
 ]
 
+const BESTIARIO_TERRA_DI_MEZZO: Array[Dictionary] = [
+	{ "nome": "Goblin di Moria", "singolare": "goblin di moria", "plurale": "goblin di moria" },
+	{ "nome": "Uomo Selvaggio di Dunland", "singolare": "uomo selvaggio",
+		"plurale": "uomini selvaggi" },
+	{ "nome": "Orco di Isengard", "singolare": "orco di isengard", "plurale": "orchi di isengard" },
+	{ "nome": "Corsaro di Umbar", "singolare": "corsaro di umbar", "plurale": "corsari di umbar" },
+	{ "nome": "Uruk-hai", "singolare": "uruk-hai", "plurale": "uruk-hai" },
+	{ "nome": "Arciere Haradrim", "singolare": "arciere haradrim", "plurale": "arcieri haradrim" },
+	{ "nome": "Capitano Uruk-hai", "singolare": "capitano uruk-hai",
+		"plurale": "capitani uruk-hai" },
+	{ "nome": "Spettro della Palude", "singolare": "spettro della palude",
+		"plurale": "spettri della palude" },
+	{ "nome": "Troll delle Caverne", "singolare": "troll delle caverne",
+		"plurale": "troll delle caverne" },
+	{ "nome": "Grima Vermilinguo", "singolare": "grima", "plurale": "grima" },
+	{ "nome": "Guardiano nell'Acqua", "singolare": "guardiano nell'acqua",
+		"plurale": "guardiani nell'acqua" },
+	{ "nome": "Khamûl lo Stregone Orientale", "singolare": "khamûl", "plurale": "khamûl" },
+	{ "nome": "Akhorahil", "singolare": "akhorahil", "plurale": "akhorahil" },
+	{ "nome": "Ren lo Sconvolto", "singolare": "ren lo sconvolto", "plurale": "ren lo sconvolto" },
+	{ "nome": "Adûnaphel la Silente", "singolare": "adûnaphel", "plurale": "adûnaphel" },
+	{ "nome": "Uvatha il Cavaliere", "singolare": "uvatha", "plurale": "uvatha" },
+	{ "nome": "Hoarmurath di Dir", "singolare": "hoarmurath", "plurale": "hoarmurath" },
+	{ "nome": "Dwar di Waw", "singolare": "dwar", "plurale": "dwar" },
+	{ "nome": "Ji Indur Sventamorte", "singolare": "ji indur", "plurale": "ji indur" },
+	{ "nome": "Saruman il Bianco", "singolare": "saruman", "plurale": "saruman" },
+	{ "nome": "La Bocca di Sauron", "singolare": "bocca di sauron", "plurale": "bocca di sauron" },
+	{ "nome": "Il Re Stregone di Angmar", "singolare": "re stregone", "plurale": "re stregone" },
+	{ "nome": "Drago delle Montagne Grigie", "singolare": "drago delle montagne grigie",
+		"plurale": "drago delle montagne grigie" },
+	{ "nome": "Shelob", "singolare": "shelob", "plurale": "shelob" },
+	{ "nome": "Balrog di Morgoth", "singolare": "balrog", "plurale": "balrog" },
+]
+
 # Parole che segnalano che lo scontro sta INIZIANDO ora (non una semplice menzione di un goblin).
 const PAROLE_COMBATTIMENTO: String = (
 	"(?i)(combattiment|attacc|assal|agguato|imboscata|iniziativa|battaglia|scontro|vi circondano|"
@@ -34,8 +71,8 @@ const PAROLE_COMBATTIMENTO: String = (
 
 # Nemici GENERICI: se il Master narra uno scontro nominando creature non del bestiario ("ombre",
 # "briganti", "non-morti"), le si mappa sul mostro piu' simile — cosi' il combattimento a turni
-# parte DAVVERO invece di svolgersi solo a parole in chat.
-const GENERICI: Array[Dictionary] = [
+# parte DAVVERO invece di svolgersi solo a parole in chat. Anche questi UNO per campagna.
+const GENERICI_VENTIMIGLIA: Array[Dictionary] = [
 	{ "nome": "Bandito", "singolare": "brigante", "plurale": "briganti" },
 	{ "nome": "Bandito", "singolare": "predone", "plurale": "predoni" },
 	{ "nome": "Bandito", "singolare": "furfante", "plurale": "furfanti" },
@@ -45,13 +82,27 @@ const GENERICI: Array[Dictionary] = [
 	{ "nome": "Lupo", "singolare": "belva", "plurale": "belve" },
 ]
 
+const GENERICI_TERRA_DI_MEZZO: Array[Dictionary] = [
+	{ "nome": "Goblin di Moria", "singolare": "goblin", "plurale": "goblin" },
+	{ "nome": "Orco di Isengard", "singolare": "orco", "plurale": "orchi" },
+	{ "nome": "Troll delle Caverne", "singolare": "troll", "plurale": "troll" },
+	{ "nome": "Arciere Haradrim", "singolare": "haradrim", "plurale": "haradrim" },
+	{ "nome": "Corsaro di Umbar", "singolare": "corsaro", "plurale": "corsari" },
+	{ "nome": "Spettro della Palude", "singolare": "ombra", "plurale": "ombre" },
+	{ "nome": "Spettro della Palude", "singolare": "non-morto", "plurale": "non-morti" },
+	{ "nome": "Khamûl lo Stregone Orientale", "singolare": "nazgul", "plurale": "nazgul" },
+	{ "nome": "Khamûl lo Stregone Orientale", "singolare": "cavaliere nero",
+		"plurale": "cavalieri neri" },
+]
+
 # Ultima spiaggia: uno scontro annunciato con un termine puramente generico ("i nemici vi
 # circondano", "delle creature vi assalgono") fa comparire comunque un manipolo di default.
 const PAROLE_NEMICI_GENERICI: String = (
 	"(?i)\\b(nemic[oi]|avversari[oi]?|creatur[ae]|mostr[oi]|figur[ae]|sagom[ae]|bestie|"
 	+ "assalitori|aggressori)\\b"
 )
-const DEFAULT_GENERICO: String = "Bandito"
+const DEFAULT_GENERICO_VENTIMIGLIA: String = "Bandito"
+const DEFAULT_GENERICO_TERRA_DI_MEZZO: String = "Orco di Isengard"
 const DEFAULT_GENERICO_QUANTITA: int = 2
 
 const NUMERI: Dictionary = {
@@ -88,8 +139,30 @@ func _on_master_complete(narration: String, commands: Array) -> void:
 	var descrizioni: PackedStringArray = []
 	for voce: Dictionary in lista:
 		descrizioni.append("%dx %s" % [int(voce["count"]), String(voce["name"])])
-	GameState.announce("⚔ La narrazione del Master annunciava uno scontro senza comandi di spawn: nemici evocati (%s)." % ", ".join(descrizioni))
+	GameState.announce(
+		"⚔ La narrazione del Master annunciava uno scontro senza comandi di spawn: nemici"
+		+ " evocati (%s)." % ", ".join(descrizioni))
 	EncounterBalancer.spawn_bilanciato(lista)
+
+
+## Bestiario/sinonimi/default della campagna ATTIVA (CampaignDirector.bestiario_attuale()):
+## il rilevamento dalla prosa deve riconoscere SOLO i mostri del mondo che si sta giocando.
+func _bestiario_attivo() -> Array[Dictionary]:
+	if CampaignDirector.bestiario_attuale() == "terra_di_mezzo":
+		return BESTIARIO_TERRA_DI_MEZZO
+	return BESTIARIO_VENTIMIGLIA
+
+
+func _generici_attivi() -> Array[Dictionary]:
+	if CampaignDirector.bestiario_attuale() == "terra_di_mezzo":
+		return GENERICI_TERRA_DI_MEZZO
+	return GENERICI_VENTIMIGLIA
+
+
+func _default_generico_attivo() -> String:
+	if CampaignDirector.bestiario_attuale() == "terra_di_mezzo":
+		return DEFAULT_GENERICO_TERRA_DI_MEZZO
+	return DEFAULT_GENERICO_VENTIMIGLIA
 
 
 ## Analizza la narrazione: se annuncia uno scontro con creature note ritorna [{name, count}, ...],
@@ -99,14 +172,14 @@ func rileva_nemici_da_testo(testo: String) -> Array[Dictionary]:
 	if testo.strip_edges().is_empty() or _re_combattimento.search(testo) == null:
 		return out
 	# 1) creature del bestiario nominate esplicitamente.
-	for voce: Dictionary in BESTIARIO:
+	for voce: Dictionary in _bestiario_attivo():
 		var n: int = conta_creatura(testo, voce)
 		if n > 0:
 			out.append({ "name": voce["nome"], "count": n })
 	if not out.is_empty():
 		return out
 	# 2) nessuna creatura nota: prova i sinonimi generici mappati sul bestiario ("ombre" -> Scheletro).
-	for voce: Dictionary in GENERICI:
+	for voce: Dictionary in _generici_attivi():
 		var n: int = conta_creatura(testo, voce)
 		if n > 0:
 			out.append({ "name": voce["nome"], "count": n })
@@ -116,7 +189,7 @@ func rileva_nemici_da_testo(testo: String) -> Array[Dictionary]:
 	var re_generico := RegEx.new()
 	re_generico.compile(PAROLE_NEMICI_GENERICI)
 	if re_generico.search(testo) != null:
-		out.append({ "name": DEFAULT_GENERICO, "count": DEFAULT_GENERICO_QUANTITA })
+		out.append({ "name": _default_generico_attivo(), "count": DEFAULT_GENERICO_QUANTITA })
 	return out
 
 
@@ -143,7 +216,9 @@ func conta_creatura(testo: String, voce: Dictionary) -> int:
 		return mini(MAX_PER_TIPO, massimo)
 
 	var re_numero := RegEx.new()
-	re_numero.compile("(?i)\\b(\\d{1,2}|un|uno|una|due|tre|quattro|cinque|sei|sette|otto)\\s+(?:%s|%s)\\b" % [singolare, plurale])
+	re_numero.compile(
+		"(?i)\\b(\\d{1,2}|un|uno|una|due|tre|quattro|cinque|sei|sette|otto)\\s+(?:%s|%s)\\b"
+		% [singolare, plurale])
 	var m2: RegExMatch = re_numero.search(testo)
 	if m2 != null:
 		var parola: String = m2.get_string(1).to_lower()

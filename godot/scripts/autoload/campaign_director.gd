@@ -22,18 +22,28 @@ extends Node
 
 ## Campagne selezionabili: id (per il salvataggio), titolo/descrizione per la UI (schermata di
 ## scelta pre-personaggio compresa), file dati, cartella del Set di mappe da attivare quando
-## questa campagna diventa quella attiva ("" = Mondo cucito).
+## questa campagna diventa quella attiva ("" = Mondo cucito). "ambientazione" e "bestiario" sono
+## per il Master IA (AIBridge/ChatCombatBridge): la prima entra nel system prompt al posto del
+## vecchio "ambientata a Ventimiglia" fisso, il secondo e' il tag "set" di data/monsters.json che
+## filtra quali mostri il Master puo' proporre/riconoscere per QUESTA campagna.
 const CAMPAGNE: Array[Dictionary] = [
 	{
 		"id": "ventimiglia", "titolo": "🏰 L'Ombra sul Confine",
 		"descrizione": "Ventimiglia e il suo confine: sparizioni notturne, un culto sepolto "
 			+ "nella Palude Grigia. Ambientazione originale, il Master conosce ogni luogo a memoria.",
+		"ambientazione": "Ventimiglia (Liguria) e il suo confine: una D&D 5e ambientata li',"
+			+ " con un culto antico sepolto nella Palude Grigia.",
+		"bestiario": "ventimiglia",
 		"path": "res://data/campagna_ventimiglia.json", "cartella": "",
 	},
 	{
 		"id": "terra_di_mezzo", "titolo": "🧙 L'Ultima Alleanza si Spezza",
 		"descrizione": "La Guerra dell'Anello: da Brea al Guado di Bruinen, da Moria ai Campi "
 			+ "del Pelennor, fino ai Cancelli Neri. Nazgul, Balrog, Shelob e il Re Stregone.",
+		"ambientazione": "la Terra di Mezzo de Il Signore degli Anelli, durante la Guerra "
+			+ "dell'Anello: da Brea al Guado di Bruinen, da Moria ai Campi del Pelennor, fino"
+			+ " ai Cancelli Neri di Mordor.",
+		"bestiario": "terra_di_mezzo",
 		"path": "res://data/campagna_terra_di_mezzo.json",
 		"cartella": "res://assets/maps_terra_di_mezzo",
 	},
@@ -64,6 +74,27 @@ func campagna_attuale_id() -> String:
 	return _campagna_id
 
 
+## La voce di CAMPAGNE della campagna attiva ({} se _campagna_id non corrisponde a nessuna —
+## non dovrebbe succedere dopo _ready, ma i chiamanti restano difensivi).
+func campagna_attuale() -> Dictionary:
+	for c: Dictionary in CAMPAGNE:
+		if String(c["id"]) == _campagna_id:
+			return c
+	return {}
+
+
+## Ambientazione in prosa della campagna attiva, per il system prompt del Master IA
+## (AIBridge): sostituisce il vecchio "ambientata a Ventimiglia" fisso.
+func ambientazione_attuale() -> String:
+	return String(campagna_attuale().get("ambientazione", "un mondo fantasy D&D 5e"))
+
+
+## Tag "set" di data/monsters.json per la campagna attiva: filtra quali mostri il Master IA
+## puo' proporre/riconoscere (AIBridge/ChatCombatBridge).
+func bestiario_attuale() -> String:
+	return String(campagna_attuale().get("bestiario", "ventimiglia"))
+
+
 ## Cambia la campagna attiva: ricarica i capitoli dal suo file dati, azzera lo scontro in corso
 ## e carica il progresso SEPARATO di quella campagna. Pubblica "campagna:cambiata" (payload:
 ## { id, titolo, cartella }) cosi' la vista del Mondo cucito puo' allineare il Set di mappe.
@@ -91,6 +122,9 @@ func imposta_campagna(id: String, annuncia: bool = true) -> bool:
 	_indice = 0
 	_in_scontro = false
 	_carica_progresso()
+	# Il diario di campagna (contesto del Master IA) e' SEPARATO per campagna: passare da
+	# Ventimiglia alla Terra di Mezzo non deve far raccontare al Master eventi dell'altro mondo.
+	CampaignMemory.imposta_campagna(id)
 	GameState.publish("campagna:cambiata", {
 		"id": id, "titolo": String(voce["titolo"]), "cartella": String(voce.get("cartella", "")),
 	})
