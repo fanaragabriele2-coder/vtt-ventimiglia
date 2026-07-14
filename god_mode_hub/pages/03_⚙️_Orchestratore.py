@@ -42,6 +42,11 @@ OUTPUT_CONTRACT = """\
 3. Le pagine WIKI vanno in blocchi ```markdown con prima riga
    `<!-- wiki/concepts/nome_pagina.md -->` (cartelle valide: sources/, concepts/, entities/).
 4. File completi, mai diff o frammenti con "...".
+5. Niente citazioni o riferimenti tra parentesi quadre (es. [1], [2]) DENTRO i
+   blocchi di codice o wiki. Se il tuo strumento le aggiunge in automatico
+   (tipico di Perplexity in modalità Ricerca), rimuovile dal codice prima di
+   rispondere: dentro un file .js/.py/.md rompono la sintassi o sporcano il
+   testo. Vanno bene solo nel testo libero fuori dai blocchi, se proprio servono.
 """
 
 
@@ -89,10 +94,27 @@ def _build_mega_prompt(
 
 st.title("⚙️ Orchestratore")
 st.caption(
-    "Mega-prompt → chat web di Claude/Gemini (abbonamento Pro, niente API) → "
-    "risposta nella Drop Zone → `.js/.css/.html` salvati nel progetto VTT reale, "
-    "`.dart/.py` in `codebase/`, pagine wiki in `wiki/`."
+    "Mega-prompt → chat web di Claude, Gemini o Perplexity (abbonamento Pro, "
+    "niente API) → risposta nella Drop Zone → `.js/.css/.html` salvati nel "
+    "progetto VTT reale, `.dart/.py` in `codebase/`, pagine wiki in `wiki/`."
 )
+
+PERPLEXITY_TIP = (
+    "💡 **Su Perplexity**: se hai la modalità **Ricerca/Search web** attiva, "
+    "il modello tende a inserire citazioni `[1]`, `[2]` anche dentro il codice. "
+    "Il contratto di output qui sotto lo vieta esplicitamente, ma è più "
+    "affidabile disattivare la Ricerca (o usare **Focus → Scrittura**) e "
+    "scegliere il modello che preferisci nel selettore in alto a sinistra "
+    "della chat (es. GPT, Claude, Sonar) prima di incollare il mega-prompt."
+)
+target = st.radio(
+    "Destinazione del mega-prompt",
+    options=["Claude", "Gemini", "Perplexity", "Altro"],
+    horizontal=True,
+    help="Solo per mostrarti il suggerimento giusto qui sotto: il mega-prompt è identico per tutti.",
+)
+if target == "Perplexity":
+    st.info(PERPLEXITY_TIP, icon="🔎")
 
 tab_prompt, tab_drop = st.tabs(["📝 Mega-Prompt", "📥 Drop Zone"])
 
@@ -152,9 +174,9 @@ with tab_prompt:
 # ---------------------------------------------------------------------------
 with tab_drop:
     st.markdown(
-        "Incolla qui la **risposta completa** di Claude/Gemini. Il parser estrae "
-        "i code block (`.js`, `.css`, `.html`, `.dart`, `.py`, …) e le pagine "
-        "wiki (```markdown) e li salva nei posti giusti — i blocchi "
+        "Incolla qui la **risposta completa** di Claude, Gemini o Perplexity. "
+        "Il parser estrae i code block (`.js`, `.css`, `.html`, `.dart`, `.py`, …) "
+        "e le pagine wiki (```markdown) e li salva nei posti giusti — i blocchi "
         "`.js/.css/.html` **direttamente nel progetto VTT reale** "
         f"(`{VTT_PROJECT_DIR.name}/`), revisionabili con `git diff` prima di committare."
     )
@@ -231,7 +253,7 @@ with st.sidebar:
     st.header("⚙️ Orchestratore")
     st.markdown(
         "1. Genera il mega-prompt\n"
-        "2. Incollalo in Claude/Gemini **web**\n"
+        "2. Incollalo in Claude, Gemini o Perplexity **web**\n"
         "3. Incolla la risposta nella Drop Zone\n"
         "4. Controlla i percorsi e salva"
     )

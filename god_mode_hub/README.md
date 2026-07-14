@@ -97,7 +97,7 @@ manca senza mai rompersi (RAG → fallback full-text, SD offline → avviso, ecc
 |---|---|
 | 🏠 **Home** | dashboard: contatori contenuti/asset, attività recente, azioni rapide |
 | 🧠 **Secondo Cervello** | **Tab RAG**: query semantiche (ChromaDB + all-MiniLM-L6-v2) sul **progetto VTT reale** (`index.html`, `css/`, `js/`, `tools/` — questo stesso repo) e su `codebase/` (futuro Flutter); fallback full-text automatico se ChromaDB non è installato; **Tab Wiki**: ricerca FTS5+RRF su `wiki/`+`raw/`, compilazione fonti `raw/ → wiki/sources/`, linting (link orfani, contraddizioni euristiche) |
-| ⚙️ **Orchestratore** | genera **mega-prompt** (task + contesto RAG/Wiki + contratto di output), download `.md`; **Drop Zone**: incolli la risposta di Claude/Gemini, il parser estrae code block e pagine wiki — i blocchi `.js`/`.css`/`.html` finiscono **direttamente nel progetto VTT reale**, i `.dart`/`.py` in `codebase/` (Flutter futuro), i `.md` in `wiki/`, con percorsi dedotti ed editabili prima del salvataggio |
+| ⚙️ **Orchestratore** | genera **mega-prompt** (task + contesto RAG/Wiki + contratto di output), download `.md`; **Drop Zone**: incolli la risposta di Claude, Gemini o Perplexity, il parser estrae code block e pagine wiki — i blocchi `.js`/`.css`/`.html` finiscono **direttamente nel progetto VTT reale**, i `.dart`/`.py` in `codebase/` (Flutter futuro), i `.md` in `wiki/`, con percorsi dedotti ed editabili prima del salvataggio |
 | 🎨 **Asset Forge** | prompt → token top-down (SD, ControlNet opzionale) → `.glb` con TripoSR → download; galleria dei token |
 | 👤 **Generatore Personaggi** | nome+descrizione → concept full-body (posa A, sfondo bianco: ottimale per Image-to-3D) → `.glb` con TripoSR o TRELLIS.2; roster |
 | 🎬 **Animazioni** | sprite sheet 2D frame-per-frame (seed deterministici), GIF (Pillow) e MP4 (ffmpeg); coda locale per il rigging 3D (roadmap UniRig/Blender) |
@@ -137,7 +137,7 @@ vtt-ventimiglia/                ← radice del repo = progetto VTT reale
 3. In ⚙️ Orchestratore scrivi il task: l'Hub allega gli snippet reali del VTT
    (via RAG) e le pagine wiki pertinenti, e impone il **contratto di output**
    (ogni blocco con percorso file in prima riga).
-4. Incolla il mega-prompt in Claude/Gemini web, poi la risposta nella Drop
+4. Incolla il mega-prompt in Claude, Gemini o Perplexity web, poi la risposta nella Drop
    Zone: `.js`/`.css`/`.html` finiscono **direttamente nel progetto VTT
    reale** (revisiona con `git diff` prima di committare!), `.dart`/`.py` in
    `codebase/`, `.md` in `wiki/` — con reindicizzazione automatica.
