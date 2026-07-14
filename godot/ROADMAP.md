@@ -382,6 +382,25 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       Nessun doppione con la rete di sicurezza `ChatCombatBridge` (che interviene solo quando
       il Master NON emette comandi di spawn).
 
+### ✅ Campagna a RACCONTO ramificato con boss e prove di dado (luglio 2026)
+- [x] **"Il Fardello dell'Ombra"** (`data/storia_terra_di_mezzo.json`): un'avventura-libro di
+      **26 nodi, 9 boss fight** del Signore degli Anelli (Khamul, Guardiano nell'Acqua, Balrog,
+      Grima+Orchi, Saruman, Capitano Uruk-hai+Uruk-hai+Arcieri, Re Stregone, Shelob, Bocca di
+      Sauron+Troll+Corsari) e **10 prove di dado** (Furtivita', Persuasione, Arcano, Atletica,
+      Percezione, Intuizione, Intimidire, Tempra). Grafo VALIDATO (tutti i riferimenti/mostri/
+      item esistono, tutto raggiungibile, nessun vicolo cieco) e SIMULATO: 200 partite casuali
+      arrivano tutte al finale, ~7 boss e ~4 prove a partita, ricompense mai doppie.
+- [x] **`StoryDirector`** (autoload): regge nodi, opzioni, prove (1d20 + miglior modificatore
+      del party vs CD → successo/fallimento portano a nodi diversi), boss fight (spawn
+      bilanciato sulla mappa, alla vittoria si prosegue, a party sconfitto si puo' riprovare),
+      ricompense (pipeline loot, mai doppie) e persistenza (`user://storia_terra_di_mezzo.json`).
+- [x] **`CampaignStoryPanel`** (sostituisce la vecchia Storia-IA sul toggle **📖 Storia**):
+      narrazione + pulsanti-opzione (le prove aprono il **vassoio dadi 3D**) + una riga di
+      **testo LIBERO** in cui il giocatore puo' scrivere quello che vuole (agganciato all'opzione
+      piu' simile per parole). I boss compaiono sulla mappa cucita coi loro token e la loro lore;
+      vinto lo scontro il racconto prosegue da solo. Tutto **offline**, senza dipendere dal
+      Master IA/Groq. Rimosso il vecchio `nlp_ui_controller.gd` (superato).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

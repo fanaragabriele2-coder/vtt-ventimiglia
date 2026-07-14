@@ -19,7 +19,7 @@ var _storia_btn: Button
 var _musica_btn: Button
 var _master_tools: MasterToolsPanel
 var _chat_panel: MasterChatPanel
-var _nlp_panel: NlpUiController
+var _story_panel: CampaignStoryPanel
 var _token_dialog: FileDialog
 
 
@@ -116,11 +116,13 @@ func _build_layout() -> void:
 	_chat_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_chat_panel.custom_minimum_size = Vector2(320, 0)
 	columns.add_child(_chat_panel)
-	_nlp_panel = NlpUiController.new()
-	_nlp_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_nlp_panel.custom_minimum_size = Vector2(320, 0)
-	_nlp_panel.visible = false
-	columns.add_child(_nlp_panel)
+	# "📖 Storia" apre il RACCONTO ramificato autoriale (StoryDirector): narrazione, opzioni,
+	# prove di dado e boss fight LOTR — funziona offline, senza dipendere dal Master IA/Groq.
+	_story_panel = CampaignStoryPanel.new()
+	_story_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_story_panel.custom_minimum_size = Vector2(320, 0)
+	_story_panel.visible = false
+	columns.add_child(_story_panel)
 
 	# Barra di stato in fondo a tutta la finestra (fuori dalle 3 colonne, come il session panel
 	# del monolite): turno/combattimento/party/IA nemica a colpo d'occhio.
@@ -262,11 +264,11 @@ func _toggle_enemy_ai() -> void:
 	_ai_toggle_btn.text = "🐺 IA Nemica: ON" if EnemyAI.is_enabled() else "🐺 IA Nemica: OFF"
 
 
-## Scambia il pannello destro: Chat Master classica <-> Modalita' Storia (UI guidata dal JSON
-## dell'LLM: opzioni cliccabili e dadi di movimento).
+## Scambia il pannello destro: Chat Master classica <-> RACCONTO ramificato (StoryDirector):
+## narrazione + opzioni cliccabili + prove di dado + boss fight, con testo libero.
 func _toggle_storia() -> void:
-	var storia_attiva: bool = not _nlp_panel.visible
-	_nlp_panel.visible = storia_attiva
+	var storia_attiva: bool = not _story_panel.visible
+	_story_panel.visible = storia_attiva
 	_chat_panel.visible = not storia_attiva
 	_storia_btn.text = "💬 Chat" if storia_attiva else "📖 Storia"
 

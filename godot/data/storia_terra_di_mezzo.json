@@ -1,0 +1,184 @@
+{
+	"_comment": "Campagna a RACCONTO ramificato 'Il Fardello dell'Ombra' — modalita' Storia guidata (StoryDirector). Ogni nodo ha una narrazione e delle OPZIONI: alcune portano dritte a un altro nodo, altre sono PROVE (tiro 1d20 + miglior modificatore del party contro una CD: successo e fallimento vanno a nodi diversi). Alcuni nodi sono COMBATTIMENTI contro i boss del Signore degli Anelli (spawn bilanciato sul party: restano potenti ma affrontabili); vinto lo scontro si va a 'dopo_vittoria'. Il giocatore puo' sempre anche SCRIVERE liberamente: il testo viene agganciato all'opzione piu' simile. 'abilita': str|dex|con|int|wis|cha.",
+	"titolo": "Il Fardello dell'Ombra",
+	"nodo_iniziale": "prologo",
+	"nodi": {
+		"prologo": {
+			"testo": "Il Puledro Impennato di Brea ronza di voci basse. Un forestiero dal mantello verde vi fissa da prima che entraste: porta con se' un fardello che l'Occhio di Sauron brama, e ha bisogno di una scorta fino al Guado di Bruinen. Ma tre uomini in nero, al banco, non hanno toccato la loro birra da un'ora.",
+			"opzioni": [
+				{ "testo": "Avvicinati e origlia gli uomini in nero senza farti notare", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 12, "successo": "bree_origliato", "fallimento": "bree_scoperto" } },
+				{ "testo": "Siediti col ramingo e convincilo a fidarsi subito di voi", "prova": { "etichetta": "Persuasione", "abilita": "cha", "cd": 12, "successo": "bree_origliato", "fallimento": "bree_scoperto" } },
+				{ "testo": "Non perdere tempo: uscite dal retro e puntate al Guado", "vai_a": "guado" }
+			]
+		},
+		"bree_origliato": {
+			"testo": "Colto un sussurro: 'I Nazgul sanno del Guado. Khamul li' vi aspetta.' Sapere e' meta' della salvezza — il ramingo vi affida una lama e un consiglio: raggiungete il fiume prima dell'alba.",
+			"ricompensa": { "items": ["r-lama-ramingo"], "gold": 10 },
+			"opzioni": [
+				{ "testo": "Al Guado, con la guardia alta", "vai_a": "guado" }
+			]
+		},
+		"bree_scoperto": {
+			"testo": "Uno degli incappucciati volta lentamente il capo verso di voi: siete stati notati. Non c'e' piu' tempo per l'astuzia — il ramingo rovescia un tavolo e grida di correre al Guado.",
+			"opzioni": [
+				{ "testo": "Correte nella notte verso il Guado di Bruinen", "vai_a": "guado" }
+			]
+		},
+		"guado": {
+			"testo": "L'acqua di Bruinen scorre nera sotto la luna. Sull'altra riva, zoccoli senza cavaliere battono la ghiaia: i Cavalieri Neri hanno fiutato il fardello. Il fiume, pero', risponde all'antica magia degli Elfi.",
+			"opzioni": [
+				{ "testo": "Guada a nuoto il fiume in piena, tenendo alto il fardello", "prova": { "etichetta": "Atletica", "abilita": "str", "cd": 13, "successo": "moria_ingresso", "fallimento": "boss_khamul" } },
+				{ "testo": "Invoca la piena del Bruinen contro i Nazgul", "prova": { "etichetta": "Arcano", "abilita": "int", "cd": 14, "successo": "guado_piena", "fallimento": "boss_khamul" } },
+				{ "testo": "Affronta a viso aperto cio' che sale dall'acqua", "vai_a": "boss_khamul" }
+			]
+		},
+		"guado_piena": {
+			"testo": "Pronunciate le parole giuste e il fiume si erge in cavalli di schiuma: la corrente travolge gli Spettri, che stridono e si dissolvono. La via a est e' libera — verso le Porte di Durin.",
+			"ricompensa": { "items": ["r-foglia-lorien"], "gold": 15 },
+			"opzioni": [
+				{ "testo": "Proseguite verso il Cancello Ovest di Moria", "vai_a": "moria_ingresso" }
+			]
+		},
+		"boss_khamul": {
+			"testo": "Dalle tenebre scivola una figura incappucciata piu' fredda della notte: Khamul, secondo dei Nove, cala su di voi. Reggete, o il fardello e' perduto!",
+			"combattimento": [ { "name": "Khamûl lo Stregone Orientale", "count": 1 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "moria_ingresso",
+			"ricompensa": { "items": ["r-lama-ramingo"], "gold": 20 }
+		},
+		"moria_ingresso": {
+			"testo": "Le Porte di Durin luccicano d'argento sulla parete di Moria, chiuse. Davanti, uno stagno immoto riflette una luna che non c'e'. Sotto la superficie, qualcosa di molto grande si muove piano.",
+			"opzioni": [
+				{ "testo": "Ricorda la parola elfica che apre le Porte", "prova": { "etichetta": "Arcano", "abilita": "int", "cd": 13, "successo": "moria_ponte_intro", "fallimento": "boss_guardiano" } },
+				{ "testo": "Scruta l'acqua prima di avvicinarti al portale", "prova": { "etichetta": "Percezione", "abilita": "wis", "cd": 12, "successo": "moria_ponte_intro", "fallimento": "boss_guardiano" } },
+				{ "testo": "Forza le porte di spalla, alla svelta", "vai_a": "boss_guardiano" }
+			]
+		},
+		"boss_guardiano": {
+			"testo": "Lo stagno esplode: tentacoli piu' spessi di tronchi afferrano l'aria e le porte. Il Guardiano nell'Acqua difende la soglia di Moria — spezzate la sua presa e correte dentro!",
+			"combattimento": [ { "name": "Guardiano nell'Acqua", "count": 1 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "moria_ponte_intro",
+			"ricompensa": { "items": ["r-cuoio-rinforzato"], "gold": 25 }
+		},
+		"moria_ponte_intro": {
+			"testo": "Dentro, il buio di Khazad-dum inghiotte le torce. Tamburi profondi salgono dalle radici della montagna, e un bagliore rosso si avvicina lungo le scale. Il ponte stretto e' l'unica via oltre l'abisso.",
+			"opzioni": [
+				{ "testo": "Attraversate il ponte mentre l'ombra di fuoco vi raggiunge", "vai_a": "boss_balrog" }
+			]
+		},
+		"boss_balrog": {
+			"testo": "Sul ponte si erge una sagoma di fiamma e tenebra, ali di fumo spalancate: un Balrog di Morgoth, demone del mondo antico. Non si puo' fuggire — solo resistere abbastanza da passare.",
+			"combattimento": [ { "name": "Balrog di Morgoth", "count": 1 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "rohan",
+			"ricompensa": { "items": ["e-cotta-mithril"], "gold": 45 }
+		},
+		"rohan": {
+			"testo": "Riemersi a est, i Campi di Rohan vi accolgono col vento. A Edoras il re siede curvo su un trono d'oro, e al suo orecchio sussurra un uomo pallido dagli occhi obliqui: Grima Vermilinguo, la lingua che avvelena un regno.",
+			"opzioni": [
+				{ "testo": "Smaschera le menzogne di Grima davanti alla corte", "prova": { "etichetta": "Intuizione", "abilita": "wis", "cd": 13, "successo": "boss_grima", "fallimento": "rohan_scacciati" } },
+				{ "testo": "Incute timore a Grima finche' non tradisce se stesso", "prova": { "etichetta": "Intimidire", "abilita": "cha", "cd": 13, "successo": "boss_grima", "fallimento": "rohan_scacciati" } },
+				{ "testo": "Trascina Grima fuori dalla sala con la forza", "vai_a": "boss_grima" }
+			]
+		},
+		"rohan_scacciati": {
+			"testo": "Grima stride che siete assassini, e le guardie stregate vi circondano. Non resta che aprirvi la strada combattendo la sua scorta di Isengard.",
+			"opzioni": [
+				{ "testo": "Combattete per uscire da Edoras", "vai_a": "boss_grima" }
+			]
+		},
+		"boss_grima": {
+			"testo": "Grima sguscia indietro e schiocca le dita: dai portici sbucano orchi forgiati a Isengard. 'Uccideteli!' sibila, gia' pronto a fuggire alla prima ferita.",
+			"combattimento": [ { "name": "Grima Vermilinguo", "count": 1 }, { "name": "Orco di Isengard", "count": 2 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "bivio_isengard",
+			"ricompensa": { "items": ["e-arco-galadhrim"], "gold": 30 }
+		},
+		"bivio_isengard": {
+			"testo": "Rohan e' salva, ma a nord la torre di Orthanc fuma: Saruman il Bianco raduna eserciti. A sud, oltre i monti, le armate di Mordor marciano su Minas Tirith. Dovete scegliere dove pesa di piu' la vostra spada.",
+			"opzioni": [
+				{ "testo": "Salite a Isengard a spezzare il potere di Saruman", "vai_a": "boss_saruman" },
+				{ "testo": "Correte a sud, verso i Campi del Pelennor", "vai_a": "pelennor" }
+			]
+		},
+		"boss_saruman": {
+			"testo": "Ai piedi di Orthanc, Saruman vi parla dall'alto: la sua Voce e' miele e catene, e chiede solo che vi inginocchiate. Resistere al suo incantesimo e' meta' della battaglia.",
+			"combattimento": [ { "name": "Saruman il Bianco", "count": 1 }, { "name": "Uomo Selvaggio di Dunland", "count": 2 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "pelennor",
+			"ricompensa": { "items": ["r-pozione-maggiore"], "gold": 40 }
+		},
+		"pelennor": {
+			"testo": "I Campi del Pelennor sono un mare di fuoco e ferro sotto le mura di Minas Tirith. Una falange di Uruk-hai avanza dietro le frecce degli Haradrim, guidata da un capitano dall'elmo cornuto.",
+			"opzioni": [
+				{ "testo": "Spezzate la falange prima che raggiunga le mura", "vai_a": "boss_pelennor" }
+			]
+		},
+		"boss_pelennor": {
+			"testo": "Il capitano Uruk-hai punta la vostra insegna e carica, gli arcieri del Sud incoccano. Reggete la linea sul Pelennor!",
+			"combattimento": [ { "name": "Capitano Uruk-hai", "count": 1 }, { "name": "Uruk-hai", "count": 2 }, { "name": "Arciere Haradrim", "count": 2 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "re_stregone_arriva",
+			"ricompensa": { "items": ["l-corazza-forte"], "gold": 55 }
+		},
+		"re_stregone_arriva": {
+			"testo": "Un'ombra alata oscura il sole: dal cielo scende il Re Stregone di Angmar, Signore dei Nazgul, e un gelo di tomba si posa sul campo. La sua sola presenza vuole spezzarvi il cuore prima della spada.",
+			"opzioni": [
+				{ "testo": "Reggete il terrore e affrontatelo", "prova": { "etichetta": "Tempra", "abilita": "wis", "cd": 15, "successo": "boss_re_stregone", "fallimento": "re_stregone_terrore" } },
+				{ "testo": "Nessun uomo puo' ucciderlo: sfidatelo comunque", "vai_a": "boss_re_stregone" }
+			]
+		},
+		"re_stregone_terrore": {
+			"testo": "Il gelo vi morde le ginocchia e per un istante la mano trema. Ma dietro di voi c'e' la citta' degli uomini: stringete i denti e vi rialzate, anche se il cuore urla di fuggire.",
+			"opzioni": [
+				{ "testo": "Affrontate il Re Stregone malgrado la paura", "vai_a": "boss_re_stregone" }
+			]
+		},
+		"boss_re_stregone": {
+			"testo": "'Nessun uomo vivente puo' fermarmi', tuona la corona vuota. Provategli che si sbaglia.",
+			"combattimento": [ { "name": "Il Re Stregone di Angmar", "count": 1 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "cirith",
+			"ricompensa": { "items": ["e-talismano-rocca"], "gold": 70 }
+		},
+		"cirith": {
+			"testo": "Con Mordor sguarnito, l'unica via oltre le sue mura passa per il valico di Cirith Ungol. La galleria puzza di veleno rappreso e di ragnatele vecchie quanto la montagna; qualcosa, nel buio, vi ha gia' sentiti.",
+			"opzioni": [
+				{ "testo": "Attraversate la tana in silenzio, senza svegliarla", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 14, "successo": "cirith_passati", "fallimento": "boss_shelob" } },
+				{ "testo": "Bruciate le ragnatele con una torcia e passate di forza", "vai_a": "boss_shelob" }
+			]
+		},
+		"cirith_passati": {
+			"testo": "Passo dopo passo, trattenete il respiro tra le uova e le ossa. La cosa nel buio si agita ma non attacca: siete sgusciati oltre. Alla luce fioca, un tesoro dimenticato luccica tra i bozzoli.",
+			"ricompensa": { "items": ["l-spada-ramingo-ricomposta"], "gold": 50 },
+			"opzioni": [
+				{ "testo": "Uscite dal valico, verso i Cancelli Neri", "vai_a": "cancelli" }
+			]
+		},
+		"boss_shelob": {
+			"testo": "Zampe piu' spesse di un tronco scattano dall'oscurita': Shelob, ultima figlia di Ungoliant, cala su di voi col suo pungiglione. Non c'e' spazio per fuggire nella galleria — solo per combattere.",
+			"combattimento": [ { "name": "Shelob", "count": 1 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "cancelli",
+			"ricompensa": { "items": ["l-spada-ramingo-ricomposta"], "gold": 50 }
+		},
+		"cancelli": {
+			"testo": "Davanti a voi il Morannon: i Cancelli Neri di Mordor si spalancano e ne esce piu' male di quanto la speranza osi contare. Da un carro nero scende un cavaliere senza volto — la Bocca di Sauron — scortato da troll e corsari. Dovete solo fare rumore abbastanza da tenere l'Occhio puntato QUI.",
+			"opzioni": [
+				{ "testo": "Sfidate l'araldo di Sauron sotto le mura di Mordor", "vai_a": "boss_bocca" }
+			]
+		},
+		"boss_bocca": {
+			"testo": "La Bocca di Sauron ride sotto l'elmo cieco e alza la mano: i troll caricano, i corsari sguainano. Questa e' l'ultima linea — che l'Occhio guardi voi, e non la Montagna.",
+			"combattimento": [ { "name": "La Bocca di Sauron", "count": 1 }, { "name": "Troll delle Caverne", "count": 1 }, { "name": "Corsaro di Umbar", "count": 2 } ],
+			"intensita": "difficile",
+			"dopo_vittoria": "finale",
+			"ricompensa": { "items": ["l-stella-serena"], "gold": 120 }
+		},
+		"finale": {
+			"testo": "Mentre l'ultimo nemico cade, lontano sul Monte Fato la fiamma si richiude su se stessa. In un istante l'Occhio di Sauron — che ardeva su ogni landa da Barad-dur a Minas Tirith — si spegne come una candela nel vento. Le torri crollano, gli eserciti si sciolgono in fuga, e il vostro pugno di eroi resta in piedi tra i nemici senza piu' un padrone. Non avete portato l'Anello: avete tenuto aperta la strada per chi lo ha fatto. La Terra di Mezzo ricorda.",
+			"fine": true
+		}
+	}
+}
