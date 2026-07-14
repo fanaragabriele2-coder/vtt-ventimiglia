@@ -48,21 +48,22 @@ func alterna() -> void:
 
 # --- Azioni ---
 
-func _mappa_tattica() -> TacticalMap:
-	return get_tree().get_first_node_in_group("tactical_map") as TacticalMap
+## Il Mondo cucito e' l'unica mappa: la nebbia manuale del Master agisce sulla sua WorldFog.
+func _mondo() -> WorldBuilder:
+	return get_tree().get_first_node_in_group("world_builder") as WorldBuilder
 
 
 func _svela_nebbia() -> void:
-	var mappa: TacticalMap = _mappa_tattica()
-	if mappa:
-		mappa.svela_tutta_la_nebbia()
-		GameState.announce("🛠 Il Master svela tutta la mappa tattica.")
+	var mondo: WorldBuilder = _mondo()
+	if mondo:
+		mondo.svela_tutta_la_nebbia()
+		GameState.announce("🛠 Il Master svela tutta la mappa.")
 
 
 func _rinnebbia() -> void:
-	var mappa: TacticalMap = _mappa_tattica()
-	if mappa:
-		mappa.rinnebbia_tutto()
+	var mondo: WorldBuilder = _mondo()
+	if mondo:
+		mondo.rinnebbia_tutto()
 		GameState.announce("🛠 Il Master rimette la nebbia di guerra.")
 
 

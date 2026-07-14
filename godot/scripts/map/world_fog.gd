@@ -80,6 +80,25 @@ func rivela(punto_mondo: Vector2) -> void:
 	_da_salvare = true
 
 
+## Strumento del Master: svela TUTTO il mondo in un colpo (alpha a zero ovunque).
+func svela_tutto() -> void:
+	if _img == null:
+		return
+	_img.fill(Color(COLORE_COLTRE.r, COLORE_COLTRE.g, COLORE_COLTRE.b, 0.0))
+	_tex.update(_img)
+	_da_salvare = true
+
+
+## Strumento del Master: rimette la coltre OVUNQUE (l'esplorato si azzera; chi chiama puo' poi
+## rivelare attorno ai token del party, com'era a inizio esplorazione).
+func rinnebbia_tutto() -> void:
+	if _img == null:
+		return
+	_img.fill(Color(COLORE_COLTRE.r, COLORE_COLTRE.g, COLORE_COLTRE.b, ALPHA_COPERTO))
+	_tex.update(_img)
+	_da_salvare = true
+
+
 ## Scrive la maschera su disco (chiamata all'uscita dalla scena; economica: e' un PNG 192px).
 func salva() -> void:
 	if _img != null and _da_salvare:

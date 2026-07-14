@@ -13,7 +13,9 @@ extends Node
 
 const PORTATA_MOVIMENTO: int = 6   # celle percorribili in un turno (~9 m con celle da 1,5 m)
 const PAUSA_AZIONE_SEC: float = 0.5
-# Bordi della griglia tattica (coerenti con TacticalMap.GRID_COLS/ROWS): l'arciere non arretra fuori.
+# Bordo MINIMO della zona di manovra. Sul Mondo cucito la griglia non ha bordi fissi: il limite
+# vero lo calcola _limite_massimo() dalle celle dei combattenti in scena (+margine di un turno),
+# cosi' l'IA manovra ovunque si stia combattendo sulla mappa, senza costanti legate a una griglia.
 const GRIGLIA_MAX_X: int = 25
 const GRIGLIA_MAX_Y: int = 17
 
@@ -194,6 +196,19 @@ func _cella_libera_verso(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i) 
 	return null
 
 
+## Bordo massimo della zona di manovra: sul Mondo cucito lo scontro puo' avvenire OVUNQUE,
+## quindi il limite si ricava dalle celle dei combattenti in scena + un turno di movimento di
+## margine (mai sotto il minimo storico della griglia, cosi' i vecchi salvataggi non cambiano).
+func _limite_massimo() -> Vector2i:
+	var lim := Vector2i(GRIGLIA_MAX_X, GRIGLIA_MAX_Y)
+	for c: Dictionary in CombatManager.get_state()["combatants"]:
+		var cella: Variant = CombatManager.get_combatant_cell(String(c["id"]))
+		if cella is Vector2i:
+			lim.x = maxi(lim.x, (cella as Vector2i).x + PORTATA_MOVIMENTO)
+			lim.y = maxi(lim.y, (cella as Vector2i).y + PORTATA_MOVIMENTO)
+	return lim
+
+
 ## Le celle occupate dagli ALTRI combattenti vivi (per non calpestarsi): helper condiviso
 ## da tutte le manovre dell'IA (avanzata, fuga, fiancheggiamento, altura).
 func _celle_occupate(escluso_id: String) -> Dictionary:
@@ -223,6 +238,7 @@ func _cella_mischia_migliore(npc_id: String, npc_cell: Vector2i, pc_cell: Vector
 		if cella != null and chebyshev(cella, pc_cell) == 1:
 			alleati_in_mischia.append(cella)
 	var quota_bersaglio: int = ElevationManager.quota_di(pc_cell.x, pc_cell.y)
+	var lim: Vector2i = _limite_massimo()
 	var ripiego: Variant = null
 	var ripiego_altura: Variant = null
 	for dx: int in range(-1, 2):
@@ -230,7 +246,7 @@ func _cella_mischia_migliore(npc_id: String, npc_cell: Vector2i, pc_cell: Vector
 			if dx == 0 and dy == 0:
 				continue
 			var cand := Vector2i(pc_cell.x + dx, pc_cell.y + dy)
-			if cand.x < 0 or cand.x > GRIGLIA_MAX_X or cand.y < 0 or cand.y > GRIGLIA_MAX_Y:
+			if cand.x < 0 or cand.x > lim.x or cand.y < 0 or cand.y > lim.y:
 				continue
 			if occupate.has(cand) or chebyshev(npc_cell, cand) > PORTATA_MOVIMENTO:
 				continue
@@ -254,13 +270,14 @@ func _cella_mischia_migliore(npc_id: String, npc_cell: Vector2i, pc_cell: Vector
 func _cella_altura_a_tiro(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i, gittata: int) -> Variant:
 	var occupate: Dictionary = _celle_occupate(npc_id)
 	var mia_quota: int = ElevationManager.quota_di(npc_cell.x, npc_cell.y)
+	var lim: Vector2i = _limite_massimo()
 	var migliore: Variant = null
 	var migliore_quota: int = mia_quota
 	var migliore_passi: int = 999
 	for chiave: String in ElevationManager.celle_dipinte():
 		var parti: PackedStringArray = chiave.split(",")
 		var cella := Vector2i(int(parti[0]), int(parti[1]))
-		if cella.x < 0 or cella.x > GRIGLIA_MAX_X or cella.y < 0 or cella.y > GRIGLIA_MAX_Y:
+		if cella.x < 0 or cella.x > lim.x or cella.y < 0 or cella.y > lim.y:
 			continue
 		var quota: int = ElevationManager.quota_di(cella.x, cella.y)
 		if quota <= mia_quota or occupate.has(cella):
@@ -282,6 +299,7 @@ func _cella_altura_a_tiro(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i,
 ## movimento, restando dentro la griglia e su una cella libera. null se non puo' arretrare.
 func _cella_libera_lontano(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i, gittata: int) -> Variant:
 	var occupate: Dictionary = _celle_occupate(npc_id)
+	var lim: Vector2i = _limite_massimo()
 	var dir_x: int = signi(npc_cell.x - pc_cell.x)
 	var dir_y: int = signi(npc_cell.y - pc_cell.y)
 	if dir_x == 0 and dir_y == 0:
@@ -289,8 +307,8 @@ func _cella_libera_lontano(npc_id: String, npc_cell: Vector2i, pc_cell: Vector2i
 	# Prova a indietreggiare piu' che puoi, poi ripiega su passi piu' corti; mai oltre la gittata.
 	for passi: int in range(mini(PORTATA_MOVIMENTO, gittata - 1), 0, -1):
 		var dest := Vector2i(
-			clampi(npc_cell.x + dir_x * passi, 0, GRIGLIA_MAX_X),
-			clampi(npc_cell.y + dir_y * passi, 0, GRIGLIA_MAX_Y)
+			clampi(npc_cell.x + dir_x * passi, 0, lim.x),
+			clampi(npc_cell.y + dir_y * passi, 0, lim.y)
 		)
 		if dest != npc_cell and not occupate.has(dest):
 			return dest

@@ -27,15 +27,9 @@ extends Node
 ## vecchio "ambientata a Ventimiglia" fisso, il secondo e' il tag "set" di data/monsters.json che
 ## filtra quali mostri il Master puo' proporre/riconoscere per QUESTA campagna.
 const CAMPAGNE: Array[Dictionary] = [
-	{
-		"id": "ventimiglia", "titolo": "🏰 L'Ombra sul Confine",
-		"descrizione": "Ventimiglia e il suo confine: sparizioni notturne, un culto sepolto "
-			+ "nella Palude Grigia. Ambientazione originale, il Master conosce ogni luogo a memoria.",
-		"ambientazione": "Ventimiglia (Liguria) e il suo confine: una D&D 5e ambientata li',"
-			+ " con un culto antico sepolto nella Palude Grigia.",
-		"bestiario": "ventimiglia",
-		"path": "res://data/campagna_ventimiglia.json", "cartella": "",
-	},
+	# La Terra di Mezzo e' PRIMA: e' la campagna di default all'avvio — il Mondo cucito parte
+	# gia' come mappa interattiva del Signore degli Anelli (la scelta resta comunque all'utente
+	# nella schermata iniziale).
 	{
 		"id": "terra_di_mezzo", "titolo": "🧙 L'Ultima Alleanza si Spezza",
 		"descrizione": "La Guerra dell'Anello: da Brea al Guado di Bruinen, da Moria ai Campi "
@@ -46,6 +40,15 @@ const CAMPAGNE: Array[Dictionary] = [
 		"bestiario": "terra_di_mezzo",
 		"path": "res://data/campagna_terra_di_mezzo.json",
 		"cartella": "res://assets/maps_terra_di_mezzo",
+	},
+	{
+		"id": "ventimiglia", "titolo": "🏰 L'Ombra sul Confine",
+		"descrizione": "Ventimiglia e il suo confine: sparizioni notturne, un culto sepolto "
+			+ "nella Palude Grigia. Ambientazione originale, il Master conosce ogni luogo a memoria.",
+		"ambientazione": "Ventimiglia (Liguria) e il suo confine: una D&D 5e ambientata li',"
+			+ " con un culto antico sepolto nella Palude Grigia.",
+		"bestiario": "ventimiglia",
+		"path": "res://data/campagna_ventimiglia.json", "cartella": "",
 	},
 ]
 

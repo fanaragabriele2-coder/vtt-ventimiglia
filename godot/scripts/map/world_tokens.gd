@@ -19,6 +19,9 @@ const RAGGIO_SCHERMO_MIN: float = 14.0
 const ZOOM_NOME: float = 0.30    # sotto questo zoom i nomi spariscono (sarebbero coriandoli)
 const DURATA_SCATTO: float = 0.28
 const PC_PREFISSO: String = "pc-"
+# Scala di combattimento del Mondo cucito: 1 cella = 128 px = 1,5 m (stessa del righello e dei
+# nemici evocati). E' FISSA e indipendente dalla griglia visiva (che puo' essere 64/128/256).
+const PX_PER_CELLA: float = 128.0
 const PALETTE: Array[Color] = [
 	Color(0.85, 0.68, 0.25), Color(0.30, 0.65, 0.62), Color(0.75, 0.30, 0.28),
 	Color(0.55, 0.42, 0.75), Color(0.80, 0.50, 0.22), Color(0.42, 0.62, 0.32),
@@ -44,7 +47,27 @@ func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
 	_ricostruisci_roster()
 	CharacterManager.party_changed.connect(func(_p: Array[CharacterData]) -> void:
 		_ricostruisci_roster())
+	# Il Mondo cucito e' L'UNICA mappa: le posizioni di combattimento (gittata, fiancheggiamento,
+	# IA, Palla di Fuoco) vengono da QUI. All'inizio di ogni scontro si pubblicano le celle di
+	# tutto il party; poi ogni trascinamento/viaggio le tiene aggiornate.
+	CombatManager.combat_started.connect(_pubblica_tutte_le_celle)
 	set_process(true)
+
+
+## Cella di combattimento di una posizione del mondo (scala fissa: 128 px = 1,5 m).
+func _cella_di(pos: Vector2) -> Vector2i:
+	var locale: Vector2 = pos - _rect.position
+	return Vector2i(
+		maxi(0, floori(locale.x / PX_PER_CELLA)), maxi(0, floori(locale.y / PX_PER_CELLA)))
+
+
+func _pubblica_cella(id_personaggio: String, pos: Vector2) -> void:
+	CombatManager.set_combatant_cell(PC_PREFISSO + id_personaggio, _cella_di(pos))
+
+
+func _pubblica_tutte_le_celle() -> void:
+	for g: Dictionary in _gettoni:
+		_pubblica_cella(String(g["id"]), g["pos"] as Vector2)
 
 
 ## Posizioni correnti (per la rivelazione iniziale della nebbia).
@@ -119,6 +142,7 @@ func _muovi_gettone(pos: Vector2, indice: int) -> void:
 func _fine_viaggio() -> void:
 	for g: Dictionary in _gettoni:
 		token_spostato.emit(String(g["id"]), g["pos"] as Vector2)
+		_pubblica_cella(String(g["id"]), g["pos"] as Vector2)
 	_salva()
 
 
@@ -216,6 +240,7 @@ func _rilascia(punto: Vector2) -> void:
 		)
 	_gettoni[_trascinato]["pos"] = pos
 	token_spostato.emit(String(_gettoni[_trascinato]["id"]), pos)
+	_pubblica_cella(String(_gettoni[_trascinato]["id"]), pos)
 	_trascinato = -1
 	_salva()
 	queue_redraw()

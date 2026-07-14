@@ -56,10 +56,12 @@ var _current_turn_index: int = -1
 var _next_npc_number: int = 1
 var _last_event: String = ""
 
-# Posizione sulla griglia di ogni combattente (combattente_id -> cella). Vive QUI, non nella UI
-# (TacticalMap), cosi' la logica di gioco (fiancheggiamento, elevazione, IA nemici) puo' leggerla
-# senza dipendere da un nodo di scena. TacticalMap la scrive quando un token si muove (click o IA)
-# e vi si aggancia per riflettere gli spostamenti che ha causato il gioco (es. l'IA nemica).
+# Posizione sulla griglia di ogni combattente (combattente_id -> cella, 1 cella = 1,5 m =
+# 128 px del Mondo cucito). Vive QUI, non nella UI, cosi' la logica di gioco (fiancheggiamento,
+# elevazione, IA nemici) puo' leggerla senza dipendere da un nodo di scena. La scrivono i token
+# del Mondo cucito (WorldTokens per i PG al trascinamento/viaggio/inizio scontro,
+# WorldEnemyTokens per i PNG allo spawn), e WorldEnemyTokens vi si aggancia per riflettere gli
+# spostamenti causati dal gioco (es. l'IA nemica che avanza o fugge).
 var _positions: Dictionary = {}
 
 

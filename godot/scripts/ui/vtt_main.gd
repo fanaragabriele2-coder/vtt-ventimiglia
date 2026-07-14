@@ -1,18 +1,17 @@
 extends Control
 ## VTTMain — scena radice. Costruisce il layout a 3 colonne del monolite (Scheda PG · Mappa+Combat ·
 ## Chat Master) e una toolbar in alto. Ogni pannello si aggancia da solo ai signal dei manager: qui
-## si fa solo la composizione + qualche pulsante globale (evoca nemici, cambio vista, ecc.).
+## si fa solo la composizione + qualche pulsante globale (evoca nemici, strumenti, ecc.).
+##
+## UNA SOLA MAPPA: il centro e' il Mondo cucito (WorldView) — la mappa interattiva della campagna
+## (Terra di Mezzo o Ventimiglia, a seconda della scelta). Le vecchie viste separate (mappa
+## tattica astratta, overworld cittadino, Dungeon Nexus) sono state rimosse: TUTTO — esplorazione,
+## arrivi della campagna, spawn dei nemici a distanza reale, combattimento animato — vive sulla
+## stessa mappa cucita.
 ##
 ## E' la scena principale del progetto (project.godot -> run/main_scene = res://main.tscn).
 
-var _tactical_map: TacticalMap
-var _overworld_map: OverworldMap
-var _nexus_view: NexusView
 var _world_view: WorldView
-var _view_tactical_btn: Button
-var _view_overworld_btn: Button
-var _view_nexus_btn: Button
-var _view_world_btn: Button
 var _ai_toggle_btn: Button
 var _voce_btn: Button
 var _dadi_telefono_btn: Button
@@ -21,7 +20,6 @@ var _musica_btn: Button
 var _master_tools: MasterToolsPanel
 var _chat_panel: MasterChatPanel
 var _nlp_panel: NlpUiController
-var _background_dialog: FileDialog
 
 
 func _ready() -> void:
@@ -98,35 +96,10 @@ func _build_layout() -> void:
 	center.add_theme_constant_override("separation", 8)
 	columns.add_child(center)
 
-	center.add_child(_build_view_toggle())
-
-	# Le due viste convivono nello stesso spazio: solo una e' visibile (un Container salta i figli
-	# nascosti, quindi la visibile riempie tutto). Il toggle scambia la visibilita'.
-	_tactical_map = TacticalMap.new()
-	_tactical_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center.add_child(_tactical_map)
-
-	_overworld_map = OverworldMap.new()
-	_overworld_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_overworld_map.visible = false
-	# Quando il party viaggia sull'overworld, annuncialo nella chat (fonte unica: GameState).
-	_overworld_map.party_traveled.connect(_on_party_traveled)
-	# Un'imboscata casuale durante la camminata: si passa subito alla mappa tattica per combattere.
-	_overworld_map.encounter_triggered.connect(_show_tactical)
-	center.add_child(_overworld_map)
-
-	# Terza vista: il Nexus Map Engine (dungeon procedurali illuminati). Nascosto finche' non lo
-	# si sceglie dal toggle, cosi' il SubViewport non consuma risorse quando non serve.
-	_nexus_view = NexusView.new()
-	_nexus_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_nexus_view.visible = false
-	center.add_child(_nexus_view)
-
-	# Quarta vista: il Mondo cucito (WorldBuilder, direttiva OMEGA) — le battlemap dell'utente
-	# in assets/maps unite in un open-world con coerenza visiva e culling VRAM.
+	# LA mappa: il Mondo cucito (WorldBuilder, direttiva OMEGA) — le battlemap della campagna
+	# unite in un open-world con coerenza visiva e culling VRAM. Sempre visibile: e' l'unica.
 	_world_view = WorldView.new()
 	_world_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_world_view.visible = false
 	center.add_child(_world_view)
 
 	var combat_hud := CombatHUD.new()
@@ -202,8 +175,8 @@ func _build_toolbar() -> PanelContainer:
 
 	# Handler con nome (i lambda multi-linea come argomento sono fragili in GDScript: meglio metodi).
 	# Separatori verticali raggruppano i comandi per funzione (combattimento · IA/audio · sistema).
-	row.add_child(_toolbar_button("⚔ Evoca 2 Goblin", _spawn_goblins))
-	row.add_child(_toolbar_button("💀 Evoca Orco", _spawn_orc))
+	row.add_child(_toolbar_button("⚔ Evoca avanguardia", _spawn_avanguardia))
+	row.add_child(_toolbar_button("💀 Evoca bruto", _spawn_bruto))
 	row.add_child(_toolbar_button("🏳 Fine scontro", _end_combat))
 	row.add_child(_separatore_toolbar())
 	_ai_toggle_btn = _toolbar_button("🐺 IA Nemica: ON", _toggle_enemy_ai)
@@ -218,7 +191,6 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_dadi_telefono_btn)
 	row.add_child(_toolbar_button("🛠 Strumenti", _toggle_strumenti_master))
 	row.add_child(_separatore_toolbar())
-	row.add_child(_toolbar_button("🖼 Sfondo mappa", _choose_map_background))
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
 	row.add_child(_toolbar_button("💾 Salva", _save_game))
 	row.add_child(_toolbar_button("📂 Carica", _load_game))
@@ -248,29 +220,6 @@ func _save_game() -> void:
 
 func _load_game() -> void:
 	SaveManager.load_game()
-
-
-## Apre un selettore file per scegliere un'immagine locale (una mappa salvata da Pinterest, Google
-## Immagini, un proprio disegno...) come sfondo della griglia tattica. Nessuno scraping/rete: e'
-## l'utente a scegliere un file gia' sul proprio computer (regola di traduzione: niente segreti o
-## accessi non autorizzati a servizi terzi incorporati nel gioco).
-func _choose_map_background() -> void:
-	if _background_dialog == null:
-		_background_dialog = FileDialog.new()
-		_background_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-		_background_dialog.access = FileDialog.ACCESS_FILESYSTEM
-		_background_dialog.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Immagini"])
-		_background_dialog.size = Vector2i(720, 480)
-		_background_dialog.file_selected.connect(_on_map_background_selected)
-		add_child(_background_dialog)
-	_background_dialog.popup_centered()
-
-
-func _on_map_background_selected(path: String) -> void:
-	if _tactical_map.load_background_image(path):
-		GameState.announce("Sfondo mappa caricato: " + path.get_file())
-	else:
-		GameState.announce("Impossibile caricare l'immagine scelta come sfondo mappa.")
 
 
 func _toggle_enemy_ai() -> void:
@@ -315,14 +264,42 @@ func _toggle_fullscreen() -> void:
 	)
 
 
-func _spawn_goblins() -> void:
+## I pulsanti Evoca pescano dal bestiario della CAMPAGNA ATTIVA: l'avanguardia e' il mostro
+## piu' debole (in coppia), il bruto il piu' robusto sotto CR 3 — cosi' in Terra di Mezzo si
+## evocano Goblin di Moria e Uruk-hai, a Ventimiglia Goblin e Orchi, senza nomi fissi nel codice.
+func _spawn_avanguardia() -> void:
 	# Encounter Balancer (Modulo 37): la quantita'/statistiche si scalano sul party REALE, non sono
-	# fisse — con un party forte potrebbero comparire piu' goblin, con uno debole/ferito meno.
-	EncounterBalancer.spawn_bilanciato([{ "name": "Goblin", "count": 2 }])
+	# fisse — con un party forte potrebbero comparire piu' nemici, con uno debole/ferito meno.
+	var nome: String = _nome_dal_bestiario(true)
+	if not nome.is_empty():
+		EncounterBalancer.spawn_bilanciato([{ "name": nome, "count": 2 }])
 
 
-func _spawn_orc() -> void:
-	EncounterBalancer.spawn_bilanciato([{ "name": "Orco", "count": 1 }])
+func _spawn_bruto() -> void:
+	var nome: String = _nome_dal_bestiario(false)
+	if not nome.is_empty():
+		EncounterBalancer.spawn_bilanciato([{ "name": nome, "count": 1 }])
+
+
+## Nome di un mostro del set attivo: `debole`=true il piu' fragile, false il piu' tosto tra i
+## gregari (HP piu' alti ma niente boss: si resta sotto i 35 HP, gli scontri rapidi non
+## meritano un Balrog).
+func _nome_dal_bestiario(debole: bool) -> String:
+	var set_attivo: String = CampaignDirector.bestiario_attuale()
+	var scelto: Dictionary = {}
+	for m: Dictionary in CombatManager.get_monster_catalog():
+		if String(m.get("set", "ventimiglia")) != set_attivo:
+			continue
+		var hp: int = int(m.get("hitPoints", 1))
+		if not debole and hp > 35:
+			continue
+		if scelto.is_empty():
+			scelto = m
+			continue
+		var hp_scelto: int = int(scelto.get("hitPoints", 1))
+		if (debole and hp < hp_scelto) or (not debole and hp > hp_scelto):
+			scelto = m
+	return String(scelto.get("name", ""))
 
 
 func _end_combat() -> void:
@@ -335,58 +312,3 @@ func _toolbar_button(text: String, handler: Callable) -> Button:
 	b.custom_minimum_size = Vector2(0, 44)
 	b.pressed.connect(handler)
 	return b
-
-
-# --- Toggle a 3 vie: mappa tattica · overworld Ventimiglia · dungeon Nexus ---
-
-func _build_view_toggle() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	_view_tactical_btn = _toolbar_button("🗺 Mappa tattica", _show_tactical)
-	_view_overworld_btn = _toolbar_button("🌍 Ventimiglia", _show_overworld)
-	_view_nexus_btn = _toolbar_button("🏰 Dungeon Nexus", _show_nexus)
-	_view_world_btn = _toolbar_button("🧩 Mondo cucito", _show_world)
-	row.add_child(_view_tactical_btn)
-	row.add_child(_view_overworld_btn)
-	row.add_child(_view_nexus_btn)
-	row.add_child(_view_world_btn)
-	_update_toggle_state("tactical")
-	return row
-
-
-func _show_tactical() -> void:
-	_apply_view("tactical")
-
-
-func _show_overworld() -> void:
-	_apply_view("overworld")
-
-
-func _show_nexus() -> void:
-	_apply_view("nexus")
-
-
-func _show_world() -> void:
-	_apply_view("world")
-
-
-func _apply_view(quale: String) -> void:
-	_tactical_map.visible = quale == "tactical"
-	_overworld_map.visible = quale == "overworld"
-	_nexus_view.visible = quale == "nexus"
-	_world_view.visible = quale == "world"
-	_update_toggle_state(quale)
-
-
-func _update_toggle_state(attiva: String) -> void:
-	# Il pulsante della vista attiva e' disabilitato (gia' selezionato).
-	_view_tactical_btn.disabled = attiva == "tactical"
-	_view_overworld_btn.disabled = attiva == "overworld"
-	_view_nexus_btn.disabled = attiva == "nexus"
-	_view_world_btn.disabled = attiva == "world"
-
-
-func _on_party_traveled(poi_name: String, _poi: Dictionary) -> void:
-	# La narrazione dell'arrivo passa gia' da GameState.announce (OverworldMap la emette anche in
-	# chat); qui basta il log di debug per chi guarda l'output dell'editor.
-	print("[Overworld] Il party e' giunto a %s" % poi_name)

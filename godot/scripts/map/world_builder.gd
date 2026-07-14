@@ -90,6 +90,7 @@ var _rect_mappa: Rect2
 
 
 func _ready() -> void:
+	add_to_group("world_builder")  # il cassetto Strumenti del Master trova il mondo da qui
 	_costruisci_ambiente()
 	_assicura_cartella_utente()
 	var chunks: Array[Sprite2D] = _cuci_mappe()
@@ -315,6 +316,23 @@ func attiva_nebbia(valore: bool) -> void:
 		return
 	_nebbia.imposta_attiva(valore)
 	if valore and _tokens != null:
+		for pos: Vector2 in _tokens.posizioni():
+			_nebbia.rivela(pos)
+
+
+## Strumento del Master: svela l'intero mondo (nebbia via ovunque, resta accesa ma trasparente).
+func svela_tutta_la_nebbia() -> void:
+	if _nebbia != null:
+		_nebbia.svela_tutto()
+
+
+## Strumento del Master: rimette la coltre ovunque e riscopre solo attorno ai token del party
+## (non toglie la vista al gruppo, la "resetta" — come faceva la vecchia mappa tattica).
+func rinnebbia_tutto() -> void:
+	if _nebbia == null:
+		return
+	_nebbia.rinnebbia_tutto()
+	if _tokens != null:
 		for pos: Vector2 in _tokens.posizioni():
 			_nebbia.rivela(pos)
 

@@ -320,6 +320,29 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
 - [x] Pulsante **"🎭 Cartella token"** nella toolbar del Mondo cucito: apre `user://tokens` in un
       click (creandola se manca), cosi' trascinarci dentro i ritratti e' immediato.
 
+### ✅ UNA SOLA MAPPA: il Mondo cucito e' tutto il gioco (luglio 2026)
+- [x] **Rimosse le altre viste**: Mappa tattica astratta, overworld di Ventimiglia e Dungeon
+      Nexus non esistono piu' (file eliminati: `tactical_map.gd`, `overworld_map.gd`,
+      `nexus_view.gd`, `map_manager.gd`, `dungeon_generator.gd`) — via anche il toggle a 4 vie
+      e il pulsante "Sfondo mappa". Il centro e' SEMPRE il Mondo cucito: la mappa interattiva
+      della campagna (Terra di Mezzo di default, prima voce di `CAMPAGNE`).
+- [x] **Il combattimento e' AUTOREVOLE sulla mappa cucita** (1 cella = 128 px = 1,5 m, la
+      stessa scala del righello): le celle di CombatManager (gittata, fiancheggiamento,
+      elevazione, IA, Palla di Fuoco) ora le scrivono i token del mondo —
+      `WorldTokens` pubblica le celle dei PG (rilascio del trascinamento, fine viaggio narrato,
+      inizio scontro), `WorldEnemyTokens` registra la cella allo spawn (snap al centro cella) e
+      SEGUE `combatant_position_changed`: avanzate, fughe e fiancheggiamenti dell'IA nemica si
+      VEDONO sulla mappa vera. Alla sconfitta la cella si libera.
+- [x] **IA senza bordi fissi**: i limiti di manovra (26×18 della vecchia griglia) ora si
+      calcolano dalle celle dei combattenti in scena + un turno di margine
+      (`_limite_massimo()`): si combatte ovunque sulla mappa, anche a cella (24, 22) sotto
+      Brea. Matematica verificata con simulazione Python (andata-ritorno celle, spawn mischia
+      ~3 celle, arciere sempre a tiro, limiti dinamici).
+- [x] **Nebbia del Master sul mondo**: svela/rinnebbia del cassetto Strumenti agiscono sulla
+      `WorldFog` del Mondo cucito (`svela_tutto`/`rinnebbia_tutto`; il rinnebbia riscopre
+      subito attorno ai token del party). I pulsanti "Evoca" pescano dal bestiario della
+      campagna attiva (avanguardia = il piu' fragile ×2, bruto = il gregario piu' tosto).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

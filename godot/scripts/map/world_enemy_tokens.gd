@@ -33,6 +33,9 @@ func configura(rect_mondo: Rect2, camera: Camera2D, party: WorldTokens) -> void:
 	CombatManager.combatant_defeated.connect(_su_combattente_sconfitto)
 	CombatManager.combatant_removed.connect(_su_combattente_rimosso)
 	CombatManager.combat_ended.connect(_su_fine_scontro)
+	# Il Mondo cucito e' L'UNICA mappa: quando l'IA muove un nemico (set_combatant_cell), il suo
+	# token DEVE muoversi qui — avanzate, fughe e fiancheggiamenti si vedono sulla mappa vera.
+	CombatManager.combatant_position_changed.connect(_su_cella_cambiata)
 	set_process(true)
 
 
@@ -63,14 +66,44 @@ func _su_combattente_aggiunto(combattente: Dictionary) -> void:
 	var centro: Vector2 = _party.centro_gruppo() if _party != null else _rect.get_center()
 	var angolo: float = randf() * TAU
 	var offset: Vector2 = Vector2.from_angle(angolo) * distanza_celle * PX_PER_CELLA
-	var pos: Vector2 = _dentro_mappa(centro + offset)
-	_nemici[id] = { "nome": String(combattente.get("name", "?")), "pos": pos }
+	# Lo spawn e' SNAPPATO al centro della sua cella: cosi' token e cella di combattimento
+	# coincidono da subito (il gestore di combatant_position_changed rilegge lo stesso punto).
+	var cella: Vector2i = _cella_di(_dentro_mappa(centro + offset))
+	_nemici[id] = { "nome": String(combattente.get("name", "?")), "pos": _centro_cella(cella) }
+	CombatManager.set_combatant_cell(id, cella)
+	queue_redraw()
+
+
+## Cella di combattimento di una posizione del mondo (scala fissa: 128 px = 1,5 m — la stessa
+## dei token del party) e viceversa il centro-mondo di una cella.
+func _cella_di(pos: Vector2) -> Vector2i:
+	var locale: Vector2 = pos - _rect.position
+	return Vector2i(
+		maxi(0, floori(locale.x / PX_PER_CELLA)), maxi(0, floori(locale.y / PX_PER_CELLA)))
+
+
+func _centro_cella(cella: Vector2i) -> Vector2:
+	return _dentro_mappa(_rect.position
+		+ Vector2((float(cella.x) + 0.5) * PX_PER_CELLA, (float(cella.y) + 0.5) * PX_PER_CELLA))
+
+
+## L'IA (o il gioco) ha spostato un combattente: se e' uno dei nostri nemici, il token segue.
+func _su_cella_cambiata(combatant_id: String, cella: Vector2i) -> void:
+	if not _nemici.has(combatant_id):
+		return
+	var dest: Vector2 = _centro_cella(cella)
+	if ((_nemici[combatant_id]["pos"] as Vector2)).distance_to(dest) < 0.5:
+		return  # gia' li' (es. la cella appena registrata da noi allo spawn)
+	_nemici[combatant_id]["pos"] = dest
 	queue_redraw()
 
 
 func _su_combattente_sconfitto(combatant_id: String, _source_id: String) -> void:
 	_scatti.erase(combatant_id)
 	if _nemici.erase(combatant_id):
+		# La cella del caduto si libera (prima lo faceva la mappa tattica, ora rimossa):
+		# fiancheggiamento e movimenti non devono piu' scansare un morto.
+		CombatManager.clear_combatant_cell(combatant_id)
 		queue_redraw()
 
 
