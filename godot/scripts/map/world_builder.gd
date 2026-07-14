@@ -62,7 +62,8 @@ void fragment() {
 ## Se impostata PRIMA che il nodo entri nell'albero (WorldView la scrive subito dopo il .new(),
 ## prima di add_child), il builder carica SOLO da questa cartella — ignora user://maps e il
 ## fallback assets/maps. E' il selettore "Set" della toolbar (Mondo/Castello/Banca): ogni set
-## bundled (assets/maps_castello, assets/maps_banca...) e' autosufficiente e ha il suo etichette.json.
+## bundled (assets/maps_castello, assets/maps_banca...) e' autosufficiente e ha il suo
+## etichette.json.
 var cartella_forzata: String = ""
 
 var _motore: MapEngineOptimized
@@ -74,6 +75,7 @@ var _minimappa: ImageTexture
 var _atmosfera: WorldAtmosphere
 var _tween_ora: Tween
 var _tokens: WorldTokens
+var _nemici_mondo: WorldEnemyTokens
 var _righello: WorldRuler
 var _etichette: WorldLabels
 var _nebbia: WorldFog
@@ -131,6 +133,12 @@ func _ready() -> void:
 	add_child(_tokens)
 	_tokens.configura(_rect_mappa, _camera)
 	_tokens.token_spostato.connect(_su_token_spostato)
+	# Token dei NEMICI evocati in combattimento (Encounter Balancer): appaiono a distanza reale
+	# dal party, stesso livello dei token del party cosi' condividono lo stesso piano visivo.
+	_nemici_mondo = WorldEnemyTokens.new()
+	_nemici_mondo.z_index = 3
+	add_child(_nemici_mondo)
+	_nemici_mondo.configura(_rect_mappa, _camera, _tokens)
 	_righello = WorldRuler.new()
 	_righello.z_index = 4
 	add_child(_righello)

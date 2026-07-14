@@ -27,12 +27,24 @@ var _background_dialog: FileDialog
 func _ready() -> void:
 	_apply_background()
 	_build_layout()
-	_show_character_creation()
+	_show_campaign_select()
 
 
-## All'avvio, prima di qualunque altra cosa: crea il party (Modulo 14). Il layout di gioco e'
-## gia' costruito sotto (con il PG "Eroe Locale" di default), ma la creazione lo sostituisce
-## SUBITO che si preme "Inizia l'avventura" — coerente col comportamento del monolite.
+## PRIMA di ogni altra cosa, anche prima della scheda del personaggio: si sceglie la campagna
+## (Ventimiglia o Terra di Mezzo). CampaignDirector.imposta_campagna gia' allinea da solo il
+## Set di mappe giusto; qui si passa solo alla creazione del party.
+func _show_campaign_select() -> void:
+	var screen := CampaignSelectScreen.new()
+	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	screen.campagna_scelta.connect(func() -> void:
+		screen.queue_free()
+		_show_character_creation())
+	add_child(screen)
+
+
+## Crea il party (Modulo 14). Il layout di gioco e' gia' costruito sotto (con il PG "Eroe
+## Locale" di default), ma la creazione lo sostituisce SUBITO che si preme "Inizia
+## l'avventura" — coerente col comportamento del monolite.
 func _show_character_creation() -> void:
 	var screen := CharacterCreationScreen.new()
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)

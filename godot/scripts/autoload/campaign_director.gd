@@ -20,16 +20,22 @@ extends Node
 ## Le ricompense passano dalla STESSA pipeline del loot (ProgressionManager.collect_loot:
 ## oggetti items/armeria + oro, annuncio incluso).
 
-## Campagne selezionabili: id (per il salvataggio), titolo per la UI, file dati, cartella del
-## Set di mappe da attivare quando questa campagna diventa quella attiva ("" = Mondo cucito).
+## Campagne selezionabili: id (per il salvataggio), titolo/descrizione per la UI (schermata di
+## scelta pre-personaggio compresa), file dati, cartella del Set di mappe da attivare quando
+## questa campagna diventa quella attiva ("" = Mondo cucito).
 const CAMPAGNE: Array[Dictionary] = [
 	{
 		"id": "ventimiglia", "titolo": "🏰 L'Ombra sul Confine",
+		"descrizione": "Ventimiglia e il suo confine: sparizioni notturne, un culto sepolto "
+			+ "nella Palude Grigia. Ambientazione originale, il Master conosce ogni luogo a memoria.",
 		"path": "res://data/campagna_ventimiglia.json", "cartella": "",
 	},
 	{
 		"id": "terra_di_mezzo", "titolo": "🧙 L'Ultima Alleanza si Spezza",
-		"path": "res://data/campagna_terra_di_mezzo.json", "cartella": "res://assets/maps_terra_di_mezzo",
+		"descrizione": "La Guerra dell'Anello: da Brea al Guado di Bruinen, da Moria ai Campi "
+			+ "del Pelennor, fino ai Cancelli Neri. Nazgul, Balrog, Shelob e il Re Stregone.",
+		"path": "res://data/campagna_terra_di_mezzo.json",
+		"cartella": "res://assets/maps_terra_di_mezzo",
 	},
 ]
 

@@ -243,6 +243,20 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       `GameState`, e `world_view.gd` lo intercetta per allineare da solo il Set di mappe
       giusto (menu a tendina campagna accanto al menu Set nella toolbar del Mondo cucito).
 
+### ✅ Scelta campagna all'avvio + nemici a distanza reale sul Mondo cucito (luglio 2026)
+- [x] **`CampaignSelectScreen`**: prima schermata all'avvio (prima ANCHE della creazione del
+      personaggio) — una card per campagna (oggi Ventimiglia/Terra di Mezzo, ogni futura
+      campagna in `CampaignDirector.CAMPAGNE` compare qui da sola). La scelta chiama
+      `imposta_campagna` (allinea gia' Set di mappe e salvataggio) e poi passa alla creazione
+      del party, invariata.
+- [x] **`WorldEnemyTokens`**: quando l'Encounter Balancer evoca un PNG, il suo gettone compare
+      ANCHE sul Mondo cucito (non solo nella griglia tattica astratta), a distanza reale dal
+      party — stessa scala del righello (1 cella = 1,5 m): mischia a ~3 celle, tiro alla
+      propria gittata (`attackRange` del bestiario, fino a 18 celle per l'Arciere Haradrim, 14
+      per Saruman, 8 per il Drago — aggiunto il campo dove mancava, attiva anche la vera IA a
+      distanza/kiting per quei nemici). Sparisce alla sconfitta del singolo nemico o a fine
+      scontro; puramente visivo, la posizione di gioco autorevole resta la mappa tattica.
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

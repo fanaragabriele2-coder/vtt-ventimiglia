@@ -52,6 +52,17 @@ func posizioni() -> Array[Vector2]:
 	return out
 
 
+## Centro del gruppo (media delle posizioni): l'ancora da cui i nemici evocati calcolano la
+## loro distanza reale (WorldEnemyTokens). Col party vuoto, il centro della mappa.
+func centro_gruppo() -> Vector2:
+	if _gettoni.is_empty():
+		return _rect.get_center()
+	var somma: Vector2 = Vector2.ZERO
+	for g: Dictionary in _gettoni:
+		somma += g["pos"] as Vector2
+	return somma / float(_gettoni.size())
+
+
 ## VIAGGIO NARRATO: tutto il party PLANA verso il punto (2.2s, disposto in cerchio all'arrivo).
 ## Un nuovo viaggio interrompe il precedente. All'arrivo: salvataggio + token_spostato per
 ## ogni PG (cosi' la nebbia si dirada a destinazione).
