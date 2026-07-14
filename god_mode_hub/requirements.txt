@@ -10,8 +10,15 @@ mdextractor>=0.1.0
 requests>=2.31
 Pillow>=10.0
 
+# Opzionale: automazione browser per Stable Diffusion SENZA --api (vedi
+# utils/sd_browser.py). Se non installato l'Hub funziona lo stesso: manca
+# solo il metodo "Automazione browser" in Asset Forge/Generatore Personaggi.
+# Dopo pip install serve anche: python -m playwright install chromium
+playwright>=1.40
+
 # --- Backend esterni (NON pip, vedi README) -------------------------------
-# Stable Diffusion : Stability Matrix / A1111-Forge con --api sulla porta 7860
+# Stable Diffusion : Stability Matrix / A1111-Forge, con o senza --api
+#                    (senza --api: usa l'automazione browser, vedi sopra)
 # TripoSR          : repo clonato a parte, puntato dalla env var TRIPOSR_DIR
 #                    (usa il suo venv: env var TRIPOSR_PYTHON)
 # TRELLIS.2        : servizio HTTP locale opzionale, env var TRELLIS_URL

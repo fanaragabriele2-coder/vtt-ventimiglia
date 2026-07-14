@@ -59,6 +59,31 @@ ancora più rapido.
 *(Opzionale, per il vincolo top-down nei token) installa l'estensione
 `sd-webui-controlnet` da Stability Matrix → Extensions, se non è già presente.*
 
+#### 1bis. Alternativa: generare SENZA `--api` (automazione browser)
+
+Se non vuoi/puoi aggiungere `--api` al tuo launcher (es. `Avvia_StableDiffusion.bat`
+personalizzato), l'Hub può pilotare direttamente la UI grafica Gradio che il
+launcher apre già — scrive il prompt e clicca "Generate" come faresti tu a
+mano, senza chiamare nessun endpoint REST. Setup una tantum, **nessuna
+modifica al tuo script di avvio**:
+
+```powershell
+cd god_mode_hub
+.\.venv\Scripts\python.exe -m pip install playwright
+.\.venv\Scripts\python.exe -m playwright install chromium
+```
+
+In 🎨 Asset Forge / 👤 Generatore Personaggi apparirà un selettore **"Metodo
+di generazione"** con l'opzione *"Automazione browser (nessun --api)"`.
+Limiti da conoscere:
+- più lenta della API (apre una pagina web ogni generazione);
+- usa gli steps/CFG/size/seed **già impostati nella tua WebUI**, non quelli
+  nei parametri dell'Hub (ControlNet richiede comunque l'API);
+- i selettori puntano agli `elem_id` standard di A1111/Forge
+  (`#txt2img_prompt`, `#txt2img_generate`, `#txt2img_gallery`): se il tuo
+  tema/fork li ha diversi, usa **"🔍 Diagnostica → Selettori browser →
+  Testa selettori browser"** per verificarlo prima di generare.
+
 #### 2. Installare/riparare TripoSR (Image-to-3D) — automatico
 
 **Doppio click su `tools\FIX_TRIPOSR.bat`** (o lancialo dal terminale). Lo

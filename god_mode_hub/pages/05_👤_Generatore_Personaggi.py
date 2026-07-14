@@ -15,7 +15,7 @@ if str(_HUB_ROOT) not in sys.path:
 st.set_page_config(page_title="Generatore Personaggi — God-Mode Hub", page_icon="👤", layout="wide")
 
 from utils import CHARACTERS_DIR, ensure_dirs, human_size, slugify  # noqa: E402
-from utils import sd_api, triposr_helpers  # noqa: E402
+from utils import sd_api, sd_browser, triposr_helpers  # noqa: E402
 
 ensure_dirs()
 
@@ -28,6 +28,41 @@ st.caption(
 
 sd_url, sd_online = sd_api.find_webui()
 backends = triposr_helpers.backend_status()
+playwright_ready = sd_browser.is_playwright_installed()
+browser_usable = sd_url is not None and playwright_ready
+
+if sd_online:
+    st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}` (API di generazione attiva)")
+elif sd_url is not None:
+    st.warning(
+        f"🟠 WebUI trovata su `{sd_url}` ma manca il flag `--api` "
+        "(`/sdapi/v1/txt2img` assente). Non serve toccare il launcher: scegli "
+        "**'Automazione browser'** qui sotto per generare comunque.",
+        icon="👤",
+    )
+else:
+    st.error(
+        "🔴 Stable Diffusion non raggiungibile: avvia la WebUI per generare.",
+        icon="👤",
+    )
+
+method_options = []
+if sd_online:
+    method_options.append("API (veloce)")
+if sd_url is not None:
+    method_options.append("Automazione browser (nessun --api)")
+gen_method = st.radio(
+    "Metodo di generazione", options=method_options or ["Nessuno disponibile"],
+    horizontal=True, disabled=not method_options,
+    help="Automazione browser: usa gli altri parametri già impostati nella WebUI, non steps/cfg/seed qui sotto.",
+) if method_options else None
+using_browser = gen_method == "Automazione browser (nessun --api)"
+if using_browser and not playwright_ready:
+    st.info(
+        "Serve Playwright: `python -m pip install playwright` poi "
+        "`python -m playwright install chromium` (una tantum, nel venv dell'Hub).",
+        icon="🧩",
+    )
 
 # ---------------------------------------------------------------------------
 # Input personaggio
@@ -50,6 +85,12 @@ description = st.text_area(
 )
 
 with st.expander("⚙️ Parametri generazione 2D"):
+    if using_browser:
+        st.caption(
+            "⚠️ Con l'automazione browser questi parametri **non vengono "
+            "inviati** (né la dimensione ritratto 768×1152): la generazione "
+            "usa ciò che è già impostato nella tua WebUI."
+        )
     p_col1, p_col2, p_col3 = st.columns(3)
     steps = p_col1.slider("Steps", 10, 60, 30)
     cfg = p_col2.slider("CFG scale", 1.0, 15.0, 7.0, 0.5)
@@ -59,39 +100,29 @@ with st.expander("⚙️ Parametri generazione 2D"):
         "che dà i risultati migliori nella ricostruzione 3D."
     )
 
-if sd_online:
-    st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}` (API di generazione attiva)")
-elif sd_url is not None:
-    st.warning(
-        f"🟠 WebUI trovata su `{sd_url}` ma manca il flag `--api` "
-        "(`/sdapi/v1/txt2img` assente). Aggiungi `--api` al tuo "
-        "`Avvia_StableDiffusion.bat` e riavvia Stable Diffusion.",
-        icon="👤",
-    )
-else:
-    st.error(
-        "🔴 Stable Diffusion non raggiungibile: avvia la WebUI per generare.",
-        icon="👤",
-    )
-
 # ---------------------------------------------------------------------------
 # Step 1 — 2D
 # ---------------------------------------------------------------------------
-ready = bool(name.strip() and description.strip() and sd_online)
+can_generate = (using_browser and browser_usable) or (not using_browser and sd_online)
+ready = bool(name.strip() and description.strip() and can_generate)
 if st.button("🎨 Genera concept 2D", type="primary", disabled=not ready):
     prompt, negative = sd_api.build_character_prompt(name.strip(), description.strip())
-    with st.spinner("Generazione concept con Stable Diffusion…"):
+    spinner_msg = "Automazione browser al lavoro…" if using_browser else "Generazione concept con Stable Diffusion…"
+    with st.spinner(spinner_msg):
         try:
-            png = sd_api.txt2img(
-                prompt,
-                negative_prompt=negative,
-                steps=steps,
-                width=768,
-                height=1152,  # ritratto full-body
-                cfg_scale=cfg,
-                seed=int(seed),
-            )
-        except sd_api.SDApiError as exc:
+            if using_browser:
+                png = sd_browser.txt2img_via_browser(sd_url, prompt, negative_prompt=negative)
+            else:
+                png = sd_api.txt2img(
+                    prompt,
+                    negative_prompt=negative,
+                    steps=steps,
+                    width=768,
+                    height=1152,  # ritratto full-body
+                    cfg_scale=cfg,
+                    seed=int(seed),
+                )
+        except (sd_api.SDApiError, sd_browser.SDBrowserError) as exc:
             st.error(str(exc))
         else:
             slug = slugify(name)
@@ -182,6 +213,7 @@ with st.sidebar:
     st.header("👤 Generatore Personaggi")
     st.markdown(
         f"- SD API: {'🟢 online' if sd_online else '🔴 offline'}\n"
+        f"- SD browser: {'🟢 disponibile' if browser_usable else '🔴 non disponibile'}\n"
         f"- TripoSR: {'🟢' if backends['triposr'] else '🔴'}\n"
         f"- TRELLIS.2: {'🟢' if backends['trellis'] else '⚪ opzionale'}\n"
         f"- Output: `asset_forge/characters/`"
