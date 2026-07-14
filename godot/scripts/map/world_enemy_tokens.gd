@@ -15,11 +15,13 @@ const RAGGIO_MONDO: float = 44.0
 const RAGGIO_SCHERMO_MIN: float = 12.0
 const ZOOM_NOME: float = 0.30
 const COLORE: Color = Color(0.62, 0.16, 0.14)
+const DURATA_SCATTO: float = 0.28
 
 var _rect: Rect2
 var _camera: Camera2D
 var _party: WorldTokens
 var _nemici: Dictionary = {}   # combatant_id -> { "nome": String, "pos": Vector2 }
+var _scatti: Dictionary = {}   # combatant_id -> { "t": float, "dir": Vector2 } (affondo d'attacco)
 var _ultimo_zoom: float = 0.0
 
 
@@ -32,6 +34,20 @@ func configura(rect_mondo: Rect2, camera: Camera2D, party: WorldTokens) -> void:
 	CombatManager.combatant_removed.connect(_su_combattente_rimosso)
 	CombatManager.combat_ended.connect(_su_fine_scontro)
 	set_process(true)
+
+
+## Posizione MONDO del token di questo nemico (per WorldCombatFX), null se non e' in scena.
+func posizione_di(combatant_id: String) -> Variant:
+	if _nemici.has(combatant_id):
+		return _nemici[combatant_id]["pos"] as Vector2
+	return null
+
+
+## Affondo d'attacco: il token scatta verso `direzione` e torna (lo anima WorldCombatFX).
+func applica_scatto(combatant_id: String, direzione: Vector2) -> void:
+	if _nemici.has(combatant_id):
+		_scatti[combatant_id] = { "t": 0.0, "dir": direzione }
+		queue_redraw()
 
 
 func _su_combattente_aggiunto(combattente: Dictionary) -> void:
@@ -53,16 +69,19 @@ func _su_combattente_aggiunto(combattente: Dictionary) -> void:
 
 
 func _su_combattente_sconfitto(combatant_id: String, _source_id: String) -> void:
+	_scatti.erase(combatant_id)
 	if _nemici.erase(combatant_id):
 		queue_redraw()
 
 
 func _su_combattente_rimosso(combatant_id: String) -> void:
+	_scatti.erase(combatant_id)
 	if _nemici.erase(combatant_id):
 		queue_redraw()
 
 
 func _su_fine_scontro() -> void:
+	_scatti.clear()
 	if _nemici.is_empty():
 		return
 	_nemici.clear()
@@ -75,14 +94,29 @@ func _dentro_mappa(p: Vector2) -> Vector2:
 	return p.clamp(_rect.position, _rect.end)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _camera != null and not is_equal_approx(_camera.zoom.x, _ultimo_zoom):
 		_ultimo_zoom = _camera.zoom.x
+		queue_redraw()
+	if not _scatti.is_empty():
+		for id: String in _scatti.keys():
+			_scatti[id]["t"] = float(_scatti[id]["t"]) + delta
+		for id: String in _scatti.keys().filter(func(k: String) -> bool:
+				return float(_scatti[k]["t"]) >= DURATA_SCATTO):
+			_scatti.erase(id)
 		queue_redraw()
 
 
 func _raggio() -> float:
 	return maxf(RAGGIO_MONDO, RAGGIO_SCHERMO_MIN / maxf(_camera.zoom.x, 0.01))
+
+
+## Spostamento corrente dell'affondo per un token (fuori e ritorno), Vector2.ZERO se non scatta.
+func _offset_scatto(combatant_id: String, r: float) -> Vector2:
+	if not _scatti.has(combatant_id):
+		return Vector2.ZERO
+	var p: float = clampf(float(_scatti[combatant_id]["t"]) / DURATA_SCATTO, 0.0, 1.0)
+	return (_scatti[combatant_id]["dir"] as Vector2) * sin(p * PI) * r * 0.9
 
 
 func _draw() -> void:
@@ -92,7 +126,7 @@ func _draw() -> void:
 	var r: float = _raggio()
 	for id: String in _nemici.keys():
 		var voce: Dictionary = _nemici[id]
-		var pos: Vector2 = voce["pos"]
+		var pos: Vector2 = (voce["pos"] as Vector2) + _offset_scatto(id, r)
 		var nome: String = String(voce["nome"])
 		var tex: Texture2D = TokenArt.per_nome(nome)
 		if tex != null:

@@ -294,6 +294,32 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       orientale"...) sono mappati ai file — verificato con una simulazione Python di tutta la
       pipeline di normalizzazione: tutti e 25 risolvono al file giusto, nessuno mancante.
 
+### ✅ Animazione del combattimento sul Mondo cucito (luglio 2026)
+- [x] **`WorldCombatFX`**: nuovo overlay che da' VITA al colpo sulla mappa dove stanno i token,
+      finora fermi durante lo scontro. Ascolta i signal di CombatManager e disegna:
+      - MISCHIA → l'attaccante SCATTA verso il bersaglio e torna (affondo, `applica_scatto` sul
+        token vero, sia party che nemico);
+      - DISTANZA (gittata > 1: arcieri/maghi) → un PROIETTILE vola dall'attaccante al bersaglio;
+      - IMPATTO → anello che si espande + scintille sul bersaglio;
+      - NUMERI → danno "-N" (rosso), "CRIT! -N" (giallo), cura "+N" (verde) che salgono e sfumano;
+      - MANCATO → "✗" grigio.
+- [x] **Ordine dei signal gestito con cura**: dentro `resolve_attack`, `combatant_damaged` (ed
+      eventualmente `combatant_defeated`, che RIMUOVE il token) arrivano PRIMA di
+      `attack_resolved`. Percio' la posizione del bersaglio si cattura al danno (token ancora
+      presente → anche il COLPO DI GRAZIA mostra numero/scintilla/affondo) e il numero si crea
+      in differita leggendo il flag di critico impostato subito dopo (il "CRIT!" e' corretto a
+      prescindere dall'ordine). Tracciate a mente tutte le casistiche (mischia, distanza, cura,
+      mancato, colpo mortale, attaccante fuori mappa, Palla di Fuoco).
+- [x] Tutto in scala-schermo (leggibile a ogni zoom); l'overlay si spegne da solo quando non ci
+      sono effetti attivi (`set_process(false)`).
+
+### ✅ I TUOI token dipinti, senza toccare il codice (luglio 2026)
+- [x] `assets/tokens/README.md` con la tabella COMPLETA nome-mostro → file (`<id>.png`) e le
+      regole di priorita': `user://tokens/<id>.png` (i tuoi) vince su tutto. Basta rinominare i
+      ritratti della tua Asset Library e metterli li'.
+- [x] Pulsante **"🎭 Cartella token"** nella toolbar del Mondo cucito: apre `user://tokens` in un
+      click (creandola se manca), cosi' trascinarci dentro i ritratti e' immediato.
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

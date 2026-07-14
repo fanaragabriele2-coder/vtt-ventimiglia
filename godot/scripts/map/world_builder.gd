@@ -76,6 +76,7 @@ var _atmosfera: WorldAtmosphere
 var _tween_ora: Tween
 var _tokens: WorldTokens
 var _nemici_mondo: WorldEnemyTokens
+var _combat_fx: WorldCombatFX
 var _righello: WorldRuler
 var _etichette: WorldLabels
 var _nebbia: WorldFog
@@ -139,6 +140,11 @@ func _ready() -> void:
 	_nemici_mondo.z_index = 3
 	add_child(_nemici_mondo)
 	_nemici_mondo.configura(_rect_mappa, _camera, _tokens)
+	# Animazione del combattimento (affondi, proiettili, impatti, numeri di danno) SOPRA i token.
+	_combat_fx = WorldCombatFX.new()
+	_combat_fx.z_index = 5
+	add_child(_combat_fx)
+	_combat_fx.configura(_camera, _tokens, _nemici_mondo)
 	_righello = WorldRuler.new()
 	_righello.z_index = 4
 	add_child(_righello)

@@ -172,6 +172,15 @@ func _build_toolbar() -> void:
 	apri_cartella.pressed.connect(_su_apri_cartella)
 	row.add_child(apri_cartella)
 
+	var apri_token := Button.new()
+	apri_token.text = "🎭 Cartella token"
+	apri_token.tooltip_text = "Apre user://tokens: metti qui i TUOI ritratti (PNG con nome " \
+		+ "<id>.png, es. balrog.png) e sostituiscono i distintivi inclusi. Vedi il README " \
+		+ "in assets/tokens per la lista completa dei nomi file."
+	apri_token.custom_minimum_size = Vector2(0, 34)
+	apri_token.pressed.connect(_su_apri_token)
+	row.add_child(apri_token)
+
 	var rigenera := Button.new()
 	rigenera.text = "🔄 Ricarica mappe"
 	rigenera.tooltip_text = "Rilegge la cartella dopo aver aggiunto/tolto immagini."
@@ -291,6 +300,16 @@ func _on_ora_pressed(nome: String) -> void:
 
 func _su_apri_cartella() -> void:
 	_builder.apri_cartella_mappe()
+
+
+## Apre user://tokens nel file manager (creandola se manca): e' la cartella dove l'utente mette
+## i propri ritratti dipinti dei nemici/eroi (<id>.png), che vincono sui distintivi inclusi.
+func _su_apri_token() -> void:
+	if not DirAccess.dir_exists_absolute("user://tokens"):
+		DirAccess.make_dir_recursive_absolute("user://tokens")
+	OS.shell_show_in_file_manager(ProjectSettings.globalize_path("user://tokens"))
+	GameState.announce("🎭 Cartella token aperta. Metti qui i tuoi ritratti (es. balrog.png, "
+		+ "uruk-hai.png): la lista completa dei nomi file e' nel README in assets/tokens.")
 
 
 func _su_inquadra() -> void:

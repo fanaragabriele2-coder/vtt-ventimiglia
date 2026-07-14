@@ -17,6 +17,8 @@ const SALVATAGGIO: String = "user://world_tokens.json"
 const RAGGIO_MONDO: float = 52.0
 const RAGGIO_SCHERMO_MIN: float = 14.0
 const ZOOM_NOME: float = 0.30    # sotto questo zoom i nomi spariscono (sarebbero coriandoli)
+const DURATA_SCATTO: float = 0.28
+const PC_PREFISSO: String = "pc-"
 const PALETTE: Array[Color] = [
 	Color(0.85, 0.68, 0.25), Color(0.30, 0.65, 0.62), Color(0.75, 0.30, 0.28),
 	Color(0.55, 0.42, 0.75), Color(0.80, 0.50, 0.22), Color(0.42, 0.62, 0.32),
@@ -33,6 +35,7 @@ var _gettoni: Array[Dictionary] = []   # { "id", "nome", "colore": Color, "pos":
 var _trascinato: int = -1
 var _ultimo_zoom: float = 0.0
 var _tween_viaggio: Tween
+var _scatti: Dictionary = {}   # id personaggio -> { "t": float, "dir": Vector2 } (affondo)
 
 
 func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
@@ -61,6 +64,33 @@ func centro_gruppo() -> Vector2:
 	for g: Dictionary in _gettoni:
 		somma += g["pos"] as Vector2
 	return somma / float(_gettoni.size())
+
+
+## Posizione MONDO del token di un membro del party (id combattente "pc-<id>"), null se assente.
+func posizione_di(combatant_id: String) -> Variant:
+	var cid: String = combatant_id.trim_prefix(PC_PREFISSO)
+	for g: Dictionary in _gettoni:
+		if String(g["id"]) == cid:
+			return g["pos"] as Vector2
+	return null
+
+
+## Affondo d'attacco: il token del PG scatta verso `direzione` e torna (lo anima WorldCombatFX).
+func applica_scatto(combatant_id: String, direzione: Vector2) -> void:
+	var cid: String = combatant_id.trim_prefix(PC_PREFISSO)
+	for g: Dictionary in _gettoni:
+		if String(g["id"]) == cid:
+			_scatti[cid] = { "t": 0.0, "dir": direzione }
+			queue_redraw()
+			return
+
+
+## Spostamento corrente dell'affondo per un token (fuori e ritorno), Vector2.ZERO se non scatta.
+func _offset_scatto(id: String, r: float) -> Vector2:
+	if not _scatti.has(id):
+		return Vector2.ZERO
+	var p: float = clampf(float(_scatti[id]["t"]) / DURATA_SCATTO, 0.0, 1.0)
+	return (_scatti[id]["dir"] as Vector2) * sin(p * PI) * r * 0.9
 
 
 ## VIAGGIO NARRATO: tutto il party PLANA verso il punto (2.2s, disposto in cerchio all'arrivo).
@@ -92,10 +122,17 @@ func _fine_viaggio() -> void:
 	_salva()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# I token scalano con lo zoom (clamp su schermo): al cambio zoom serve un redraw.
 	if _camera != null and not is_equal_approx(_camera.zoom.x, _ultimo_zoom):
 		_ultimo_zoom = _camera.zoom.x
+		queue_redraw()
+	if not _scatti.is_empty():
+		for id: String in _scatti.keys():
+			_scatti[id]["t"] = float(_scatti[id]["t"]) + delta
+		for id: String in _scatti.keys().filter(func(k: String) -> bool:
+				return float(_scatti[k]["t"]) >= DURATA_SCATTO):
+			_scatti.erase(id)
 		queue_redraw()
 
 
@@ -126,7 +163,7 @@ func _draw() -> void:
 	var r: float = _raggio()
 	for i: int in range(_gettoni.size()):
 		var g: Dictionary = _gettoni[i]
-		var pos: Vector2 = g["pos"]
+		var pos: Vector2 = (g["pos"] as Vector2) + _offset_scatto(String(g["id"]), r)
 		var colore: Color = g["colore"]
 		# ARTE del token se esiste (ritratto col nome del PG, o arte della sua classe);
 		# altrimenti il gettone disegnato con l'iniziale.
