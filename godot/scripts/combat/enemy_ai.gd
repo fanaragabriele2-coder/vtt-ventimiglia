@@ -13,6 +13,8 @@ extends Node
 
 const PORTATA_MOVIMENTO: int = 6   # celle percorribili in un turno (~9 m con celle da 1,5 m)
 const PAUSA_AZIONE_SEC: float = 0.5
+# Sotto questa frazione di HP un CODARDO smette di combattere e scappa (goblin, Grima...).
+const SOGLIA_FUGA_CODARDO: float = 0.35
 # Bordo MINIMO della zona di manovra. Sul Mondo cucito la griglia non ha bordi fissi: il limite
 # vero lo calcola _limite_massimo() dalle celle dei combattenti in scena (+margine di un turno),
 # cosi' l'IA manovra ovunque si stia combattendo sulla mappa, senza costanti legate a una griglia.
@@ -90,9 +92,41 @@ func bersaglio_piu_vicino(stato: Dictionary, npc_id: String) -> Dictionary:
 	return migliore if not migliore.is_empty() else candidati[0]
 
 
+## Il COMPORTAMENTO del mostro dal bestiario (via catalogId messo da add_npc): e' la sua storia
+## che decide come combatte — un goblin non ragiona come un Nazgul (data/monsters.json, "lore").
+func _comportamento_di(cur: Dictionary) -> String:
+	var catalog_id: String = String(cur.get("catalogId", ""))
+	if catalog_id.is_empty():
+		return "standard"
+	for m: Dictionary in CombatManager.get_monster_catalog():
+		if String(m["id"]) == catalog_id:
+			return String(m.get("comportamento", "standard"))
+	return "standard"
+
+
+## Bersaglio secondo il carattere: il CACCIATORE (lupi, Shelob, il drago) punta il PG con MENO
+## HP; il TERRORE (i Nazgul) punta il PIU' FORTE, per spezzare il coraggio degli altri; tutti
+## gli altri attaccano il piu' vicino.
+func _bersaglio_per_comportamento(comp: String, stato: Dictionary, npc_id: String) -> Dictionary:
+	if comp != "cacciatore" and comp != "terrore":
+		return bersaglio_piu_vicino(stato, npc_id)
+	var candidati: Array[Dictionary] = _pg_vivi(stato)
+	if candidati.is_empty():
+		return {}
+	var migliore: Dictionary = candidati[0]
+	for pc: Dictionary in candidati:
+		var hp: int = int(pc["hitPoints"])
+		var hp_migliore: int = int(migliore["hitPoints"])
+		if (comp == "cacciatore" and hp < hp_migliore) \
+				or (comp == "terrore" and hp > hp_migliore):
+			migliore = pc
+	return migliore
+
+
 func _agisci_nemico(cur: Dictionary) -> void:
 	var stato: Dictionary = CombatManager.get_state()
-	var bersaglio: Dictionary = bersaglio_piu_vicino(stato, String(cur["id"]))
+	var comp: String = _comportamento_di(cur)
+	var bersaglio: Dictionary = _bersaglio_per_comportamento(comp, stato, String(cur["id"]))
 	if bersaglio.is_empty():
 		CombatManager.next_turn()
 		return
@@ -101,11 +135,31 @@ func _agisci_nemico(cur: Dictionary) -> void:
 	var pc_cell: Variant = CombatManager.get_combatant_cell(String(bersaglio["id"]))
 	var gittata: int = CombatManager.attack_range_of(String(cur["id"]))
 
+	# CODARDO ferito (goblin, Grima): la sua storia dice che scappa — fugge invece di combattere.
+	if comp == "codardo" and npc_cell != null and pc_cell != null \
+			and float(cur["hitPoints"]) < float(cur["maxHitPoints"]) * SOGLIA_FUGA_CODARDO:
+		var fuga: Variant = _cella_libera_lontano(
+			String(cur["id"]), npc_cell, pc_cell, PORTATA_MOVIMENTO + 1)
+		if fuga != null:
+			CombatManager.set_combatant_cell(String(cur["id"]), fuga)
+			GameState.announce("🏃 %s, ferito, perde il coraggio e scappa via da %s!"
+				% [String(cur["name"]), String(bersaglio["name"])])
+			CombatManager.next_turn()
+			return
+
+	# GUARDIANO (il Guardiano nell'Acqua): difende il suo posto, NON insegue chi sta lontano.
+	if comp == "guardiano" and npc_cell != null and pc_cell != null \
+			and chebyshev(npc_cell, pc_cell) > gittata + 1:
+		GameState.announce("🗿 %s non abbandona il suo posto: attende nell'ombra."
+			% String(cur["name"]))
+		CombatManager.next_turn()
+		return
+
 	if npc_cell != null and pc_cell != null:
 		if gittata > 1:
 			_agisci_a_distanza(cur, bersaglio, npc_cell, pc_cell, gittata)
 		else:
-			_agisci_in_mischia(cur, bersaglio, npc_cell, pc_cell)
+			_agisci_in_mischia(cur, bersaglio, npc_cell, pc_cell, comp)
 	else:
 		# Nessuna posizione nota (nessun token piazzato): il PNG attacca comunque.
 		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
@@ -117,12 +171,15 @@ func _agisci_nemico(cur: Dictionary) -> void:
 ## TATTICA: se puo' arrivare in mischia questo turno, tra le celle adiacenti al bersaglio
 ## preferisce quella che crea un FIANCHEGGIAMENTO con un alleato (vantaggio al tiro) —
 ## i nemici ora vi GIRANO ATTORNO invece di mettersi in fila indiana.
-func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector2i, pc_cell: Vector2i) -> void:
+## Il BERSERKER (orchi, Uruk-hai, troll, Balrog...) invece non fa finezze: la sua storia dice
+## che carica dritto sul bersaglio, senza cercare fianchi ne' alture.
+func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector2i,
+		pc_cell: Vector2i, comp: String = "standard") -> void:
 	var dist: int = chebyshev(npc_cell, pc_cell)
 	if dist > 1:
 		var dest: Variant = null
 		var fiancheggia: bool = false
-		if dist - 1 <= PORTATA_MOVIMENTO:
+		if comp != "berserker" and dist - 1 <= PORTATA_MOVIMENTO:
 			var scelta: Dictionary = _cella_mischia_migliore(String(cur["id"]), npc_cell, pc_cell)
 			dest = scelta.get("cella")
 			fiancheggia = bool(scelta.get("fiancheggia", false))
@@ -135,7 +192,9 @@ func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector
 		if dest != null:
 			CombatManager.set_combatant_cell(String(cur["id"]), dest)
 			var frase: String = "👣 %s avanza verso %s."
-			if fiancheggia:
+			if comp == "berserker":
+				frase = "💢 %s carica dritto su %s, incurante di tutto!"
+			elif fiancheggia:
 				frase = "⚔ %s aggira %s e lo prende ai fianchi!"
 			elif altura:
 				frase = "⛰ %s guadagna l'altura e incombe su %s!"

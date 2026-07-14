@@ -145,6 +145,9 @@ func _build_system_prompt() -> String:
 		"POSIZIONI ATTUALI (aggiornate dal gioco, non inventarne altre):",
 		_posizioni_context_text(),
 		"",
+		"LORE DEI NEMICI IN SCENA (narra e falli agire secondo il loro carattere):",
+		_lore_nemici_context_text(),
+		"",
 		"Se e SOLO se serve segnalare un dato di gioco (tiro, comparsa nemici, danno...), aggiungi",
 		"SUBITO DOPO la narrazione, su una riga a parte, ESATTAMENTE questo separatore: "
 			+ SEPARATORE_DATI_MASTER,
@@ -179,6 +182,26 @@ func _bestiario_context_text() -> String:
 		if String(m.get("set", "ventimiglia")) == set_attivo:
 			voci.append("%s (%s)" % [String(m["name"]), String(m["id"])])
 	return ", ".join(voci) if not voci.is_empty() else "Goblin (goblin)"
+
+
+## La STORIA dei nemici vivi in scena, una riga per TIPO (via catalogId -> lore del bestiario):
+## il Master narra un Nazgul da Nazgul e un goblin da goblin. Vuota fuori dagli scontri, cosi'
+## il prompt non si gonfia (i limiti di token di Groq ringraziano).
+func _lore_nemici_context_text() -> String:
+	var visti: Dictionary = {}
+	var righe: PackedStringArray = []
+	for c: Dictionary in CombatManager.get_state()["combatants"]:
+		if String(c.get("kind", "")) != "npc" or bool(c.get("defeated", false)):
+			continue
+		var catalog_id: String = String(c.get("catalogId", ""))
+		if catalog_id.is_empty() or visti.has(catalog_id):
+			continue
+		visti[catalog_id] = true
+		for m: Dictionary in CombatManager.get_monster_catalog():
+			if String(m["id"]) == catalog_id and not String(m.get("lore", "")).is_empty():
+				righe.append("- %s: %s" % [String(m["name"]), String(m["lore"])])
+				break
+	return "\n".join(righe) if not righe.is_empty() else "- (nessun nemico in scena)"
 
 
 ## Un mostro rappresentativo (il piu' debole) del bestiario attivo, per gli esempi del prompt.

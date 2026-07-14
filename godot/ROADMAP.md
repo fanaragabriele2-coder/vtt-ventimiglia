@@ -343,6 +343,29 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       subito attorno ai token del party). I pulsanti "Evoca" pescano dal bestiario della
       campagna attiva (avanguardia = il piu' fragile ×2, bruto = il gregario piu' tosto).
 
+### ✅ Ogni nemico ha la sua storia (e combatte di conseguenza) + import token in un click (luglio 2026)
+- [x] **Lore nel bestiario**: tutti i 33 mostri di `data/monsters.json` hanno una "lore" di una
+      riga (ogni Nazgul ha la SUA storia: Khamul fiuta i forti di spirito, Dwar il Signore dei
+      Cani bracca il capobranco, Adunaphel la Silente punta il campione senza un suono...).
+      Annunciata in chat alla PRIMA comparsa del tipo in uno scontro (`CombatManager.add_npc`,
+      dedup per scontro) e data al Master IA per i soli nemici in scena
+      (`AIBridge._lore_nemici_context_text`: prompt compatto, i limiti Groq ringraziano).
+- [x] **Comportamenti guidati dalla storia** (`"comportamento"` nel bestiario, letto dall'IA
+      via `catalogId` sul combattente): **codardo** (goblin, Grima: sotto il 35% HP scappa),
+      **berserker** (orchi, Uruk-hai, troll, Balrog: carica dritto, niente fianchi ne'
+      alture), **cacciatore** (lupi, Shelob, il drago: bersaglia il PG con MENO HP),
+      **terrore** (i Nazgul: bersaglia il PIU' FORTE, per spezzare il coraggio), **guardiano**
+      (il Guardiano nell'Acqua: NON insegue, difende il suo stagno), **tattico/standard**
+      (fiancheggiamenti e kiting di sempre).
+- [x] **Import dei token dell'utente in un click**: pulsante "📥 Importa token" (selettore
+      multi-file → copia in `user://tokens` → cache azzerata) + **match FUZZY per parole** in
+      `TokenArt`: i ritratti di una libreria si agganciano ai mostri SENZA rinominare nulla —
+      radice a 6 lettere (singolari/plurali: "Corsari"≈"corsaro", "Trolls"≈"troll"), accenti
+      ridotti (Khamûl≈khamul), stopword ignorate, a parita' vince il nome file piu' corto; il
+      nome esatto `<id>.png` continua a vincere su tutto. Verificato con simulazione Python su
+      nomi file realistici della libreria dell'utente: 16/17 agganciati, zero falsi positivi
+      (Isengard NON prende il ritratto di Mordor).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

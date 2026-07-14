@@ -20,6 +20,7 @@ var _musica_btn: Button
 var _master_tools: MasterToolsPanel
 var _chat_panel: MasterChatPanel
 var _nlp_panel: NlpUiController
+var _token_dialog: FileDialog
 
 
 func _ready() -> void:
@@ -191,6 +192,7 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_dadi_telefono_btn)
 	row.add_child(_toolbar_button("🛠 Strumenti", _toggle_strumenti_master))
 	row.add_child(_separatore_toolbar())
+	row.add_child(_toolbar_button("📥 Importa token", _importa_token))
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
 	row.add_child(_toolbar_button("💾 Salva", _save_game))
 	row.add_child(_toolbar_button("📂 Carica", _load_game))
@@ -220,6 +222,39 @@ func _save_game() -> void:
 
 func _load_game() -> void:
 	SaveManager.load_game()
+
+
+## Importa i ritratti dei token dell'utente (es. la cartella "nemi" sul Desktop): selettore
+## multi-file -> copia in user://tokens -> cache azzerata. NON serve rinominare niente: il
+## match fuzzy di TokenArt aggancia "Goblin di Moria - Guerriero.png" a Goblin di Moria da solo.
+func _importa_token() -> void:
+	if _token_dialog == null:
+		_token_dialog = FileDialog.new()
+		_token_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILES
+		_token_dialog.access = FileDialog.ACCESS_FILESYSTEM
+		_token_dialog.title = "Scegli i ritratti dei token (puoi selezionarli TUTTI insieme)"
+		_token_dialog.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Immagini"])
+		_token_dialog.size = Vector2i(820, 520)
+		_token_dialog.files_selected.connect(_on_token_files_selected)
+		add_child(_token_dialog)
+	_token_dialog.popup_centered()
+
+
+func _on_token_files_selected(percorsi: PackedStringArray) -> void:
+	if not DirAccess.dir_exists_absolute("user://tokens"):
+		DirAccess.make_dir_recursive_absolute("user://tokens")
+	var destinazione_base: String = ProjectSettings.globalize_path("user://tokens")
+	var copiati: int = 0
+	for percorso: String in percorsi:
+		if DirAccess.copy_absolute(percorso, destinazione_base.path_join(percorso.get_file())) == OK:
+			copiati += 1
+	TokenArt.azzera_cache()
+	if copiati > 0:
+		GameState.announce(("🎭 %d ritratto/i importato/i: i nemici con quel nome ora usano la "
+			+ "TUA arte (match automatico sul nome file — per forzare un abbinamento rinomina "
+			+ "il file come da assets/tokens/README.md).") % copiati)
+	else:
+		GameState.announce("🎭 Nessun file importato (formati supportati: png, jpg, webp).")
 
 
 func _toggle_enemy_ai() -> void:

@@ -64,6 +64,10 @@ var _last_event: String = ""
 # spostamenti causati dal gioco (es. l'IA nemica che avanza o fugge).
 var _positions: Dictionary = {}
 
+# Tipi di mostro la cui LORE e' gia' stata raccontata in questo scontro (catalog_id -> true):
+# la storia di un nemico si annuncia UNA volta alla sua prima comparsa, non per ogni gregario.
+var _lore_annunciate: Dictionary = {}
+
 
 func _ready() -> void:
 	_monster_catalog = _load_catalog(MONSTERS_PATH, "monsters")
@@ -249,6 +253,9 @@ func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 	var combatant: Dictionary = {
 		"id": "npc-%d" % _next_npc_number,
 		"kind": "npc",
+		# L'id del catalogo resta sul combattente: l'IA vi legge il COMPORTAMENTO del mostro
+		# (codardo/berserker/...) e il Master IA la sua lore, senza rifare il match sul nome.
+		"catalogId": catalog_id,
 		"name": "%s %d" % [template["name"], same_type],
 		"armorClass": int(overrides.get("armorClass", template["armorClass"])),
 		"hitPoints": hp,
@@ -265,6 +272,12 @@ func add_npc(catalog_id: String, overrides: Dictionary = {}) -> Dictionary:
 	_next_npc_number += 1
 	_combatants.append(combatant)
 	_last_event = "PNG aggiunto: " + combatant["name"]
+	# La STORIA del nemico si racconta alla prima comparsa del suo tipo in questo scontro:
+	# ogni mostro ha la sua lore (data/monsters.json) e si presenta al tavolo come merita.
+	var lore: String = String(template.get("lore", ""))
+	if not lore.is_empty() and not _lore_annunciate.has(catalog_id):
+		_lore_annunciate[catalog_id] = true
+		GameState.announce("☠ %s — %s" % [String(template["name"]), lore])
 	combatant_added.emit(combatant)
 	return combatant
 
@@ -315,6 +328,7 @@ func end_combat() -> void:
 	# resta: e' terreno dell'arena, non un effetto.
 	ConditionsManager.reset()
 	SurfacesManager.reset()
+	_lore_annunciate.clear()  # al prossimo scontro le storie si raccontano di nuovo
 	GameState.set_combat_active(false)
 	combat_ended.emit()
 	_allinea_pc_roster()
