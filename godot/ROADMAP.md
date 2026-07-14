@@ -281,6 +281,19 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
 - [x] Rimosso anche il banner statico "Benvenuti a Ventimiglia" della Chat Master (ora generico:
       l'intro vera arriva subito dopo, dalla campagna scelta).
 
+### ✅ Token art per il bestiario Terra di Mezzo (luglio 2026)
+- [x] **Bug**: i nemici di Terra di Mezzo (Khamûl, Uruk-hai, Shelob...) comparivano sulla mappa
+      come un cerchio spoglio con la sola iniziale — il fallback di `TokenArt`/`WorldTokens`
+      quando non trova un PNG, mentre i PG e il bestiario originale mostrano un vero distintivo
+      (anello colorato, lettera in rilievo, marcatore a rombo).
+- [x] **25 nuovi PNG** in `assets/tokens/` (256×256, stesso stile grafico degli originali —
+      anello/riempimento radiale/rombo — con palette dedicata per fazione: verde goblinoide,
+      bianco/nero Isengard, ambra Harad, nero/porpora per i Nazgul, bianco avorio per Saruman,
+      fuoco per il Balrog...).
+- [x] **`TokenArt.ALIAS`** esteso: i nomi normalizzati ("goblin di moria", "khamûl lo stregone
+      orientale"...) sono mappati ai file — verificato con una simulazione Python di tutta la
+      pipeline di normalizzazione: tutti e 25 risolvono al file giusto, nessuno mancante.
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

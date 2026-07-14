@@ -18,6 +18,31 @@ const ALIAS: Dictionary = {
 	"orco": "orc", "cultista": "cultist", "zombie": "zombie", "hobgoblin": "hobgoblin",
 	"guerriero": "guerriero", "barbaro": "barbaro", "ladro": "ladro",
 	"ranger": "ranger", "mago": "mago", "chierico": "chierico",
+	# Bestiario Terra di Mezzo (i nomi normalizzati non coincidono coi file: "Goblin di Moria"
+	# -> "goblin-moria.png"). Uruk-hai/Shelob non servono alias: nome normalizzato == file.
+	"goblin di moria": "goblin-moria",
+	"uomo selvaggio di dunland": "uomo-selvaggio",
+	"orco di isengard": "orco-isengard",
+	"corsaro di umbar": "corsaro-umbar",
+	"arciere haradrim": "arciere-haradrim",
+	"capitano uruk-hai": "capitano-uruk-hai",
+	"spettro della palude": "spettro-palude",
+	"troll delle caverne": "troll-caverne",
+	"grima vermilinguo": "grima-vermilinguo",
+	"guardiano nell'acqua": "guardiano-acqua",
+	"khamûl lo stregone orientale": "nazgul-khamul",
+	"akhorahil": "nazgul-akhorahil",
+	"ren lo sconvolto": "nazgul-ren",
+	"adûnaphel la silente": "nazgul-adunaphel",
+	"uvatha il cavaliere": "nazgul-uvatha",
+	"hoarmurath di dir": "nazgul-hoarmurath",
+	"dwar di waw": "nazgul-dwar",
+	"ji indur sventamorte": "nazgul-ji-indur",
+	"saruman il bianco": "saruman-bianco",
+	"la bocca di sauron": "bocca-di-sauron",
+	"il re stregone di angmar": "re-stregoni-angmar",
+	"drago delle montagne grigie": "drago-montagne-grigie",
+	"balrog di morgoth": "balrog",
 }
 
 static var _cache: Dictionary = {}
