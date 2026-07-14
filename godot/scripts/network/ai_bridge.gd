@@ -159,8 +159,11 @@ func _build_system_prompt() -> String:
 		"",
 		"REGOLE DEL COMBATTIMENTO (IMPORTANTISSIME, rispettale sempre):",
 		"- Tu NON gestisci il combattimento: lo gestiscono il sistema a turni e i GIOCATORI.",
-		"- Quando scoppia uno scontro: descrivi in UNA o DUE frasi la comparsa dei nemici e",
-		"  FERMATI. Poi emetti i comandi per farli comparire e avviare il combattimento a turni.",
+		"- SEMPRE che dichiari un combattimento (i nemici attaccano, tendono un'imboscata, si",
+		"  parano davanti...), DEVI far comparire i loro TOKEN sulla mappa: descrivi la scena in",
+		"  UNA o DUE frasi, poi dopo " + SEPARATORE_DATI_MASTER + " emetti un comando addNpc per",
+		"  OGNI tipo di nemico e infine startCombat. Senza questi comandi i nemici NON compaiono",
+		"  sulla mappa e lo scontro non inizia: non descrivere MAI una battaglia senza emetterli.",
 		"- NON descrivere gli attacchi dei personaggi, NON tirare dadi, NON dire chi colpisce o",
 		"  quanti danni fa, NON far vincere o perdere nessuno: a questo pensano i giocatori con i",
 		"  loro pulsanti (Attacca/Bonus/Termina turno) e i dadi del gioco. Aspetta e basta.",
@@ -495,8 +498,19 @@ func _finish(user_text: String, full_reply: String) -> void:
 	_history.append({ "role": "user", "content": user_text })
 	_history.append({ "role": "assistant", "content": split["narration"] })
 	# Instrada i comandi ai sistemi.
+	var ha_evocato: bool = false
+	var ha_avviato: bool = false
 	for command: Dictionary in split["commands"]:
+		var cn: String = String(command.get("command", ""))
+		if cn == "addNpc":
+			ha_evocato = true
+		elif cn == "startCombat":
+			ha_avviato = true
 		_dispatch_command(command)
+	# Il Master ha dichiarato lo scontro evocando nemici ma ha DIMENTICATO startCombat:
+	# lo avviamo noi, cosi' "dichiarare il combattimento" fa sempre partire i turni.
+	if ha_evocato and not ha_avviato and not CombatManager.is_active():
+		CombatManager.start_combat()
 	master_complete.emit(split["narration"], split["commands"])
 
 
@@ -558,6 +572,36 @@ func _separate_narration_and_data(reply: String) -> Dictionary:
 
 # --- Esecuzione dei comandi di gioco (porting del executor del Modulo 11) ---
 
+## Risolve il riferimento a un nemico che il Master mette in addNpc (id, nome italiano, o forma
+## approssimata) nell'id REALE del bestiario della campagna ATTIVA — cosi' i suoi token compaiono
+## davvero anche se scrive "Uruk-hai", "uruk hai" o "nazgul-khamul" con qualche imprecisione. Se
+## proprio non riconosce nulla, ripiega sul gregario base del set (qualcosa DEVE comparire quando
+## il Master dichiara uno scontro), mai su un mostro di un'altra ambientazione.
+func _risolvi_id_nemico(riferimento: String) -> String:
+	var rif: String = riferimento.to_lower().strip_edges()
+	var set_attivo: String = CampaignDirector.bestiario_attuale()
+	var catalogo: Array[Dictionary] = CombatManager.get_monster_catalog()
+	if not rif.is_empty():
+		# 1) match esatto su id o nome (normalizzato) DENTRO il set attivo.
+		for m: Dictionary in catalogo:
+			if String(m.get("set", "ventimiglia")) != set_attivo:
+				continue
+			if String(m["id"]) == rif or String(m["name"]).to_lower() == rif:
+				return String(m["id"])
+		# 2) contenimento reciproco (id coi trattini come spazi, nome parziale) nel set attivo.
+		var rif_semplice: String = rif.replace("-", " ").replace("_", " ")
+		for m: Dictionary in catalogo:
+			if String(m.get("set", "ventimiglia")) != set_attivo:
+				continue
+			var id_norm: String = String(m["id"]).replace("-", " ")
+			var nome_norm: String = String(m["name"]).to_lower()
+			if id_norm.contains(rif_semplice) or rif_semplice.contains(id_norm) \
+					or nome_norm.contains(rif_semplice) or rif_semplice.contains(nome_norm):
+				return String(m["id"])
+	# 3) ripiego: il gregario piu' debole del set attivo (mai un mostro di un'altra campagna).
+	return String(_bestiario_esempio().get("id", "goblin"))
+
+
 ## Applica un comando riconosciuto ai manager. Quelli che richiedono la mappa (moveToken, revealFog,
 ## surfaces...) non sono eseguiti qui: vengono ri-emessi via command_received per il layer mappa.
 func _dispatch_command(command: Dictionary) -> void:
@@ -567,8 +611,10 @@ func _dispatch_command(command: Dictionary) -> void:
 			speak_requested.emit(String(command.get("text", "")))
 		"addNpc":
 			var count: int = maxi(1, int(command.get("count", 1)))
+			var id_nemico: String = _risolvi_id_nemico(
+				String(command.get("id", command.get("name", ""))))
 			for i: int in range(count):
-				CombatManager.add_npc(String(command.get("id", "goblin")))
+				CombatManager.add_npc(id_nemico)
 		"startCombat":
 			CombatManager.start_combat()
 		"endCombat":

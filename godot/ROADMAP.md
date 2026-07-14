@@ -366,6 +366,22 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       nomi file realistici della libreria dell'utente: 16/17 agganciati, zero falsi positivi
       (Isengard NON prende il ritratto di Mordor).
 
+### ✅ Il Master fa comparire i token dei nemici quando dichiara lo scontro (luglio 2026)
+- [x] **Prompt piu' imperativo**: ogni volta che il Master dichiara un combattimento DEVE
+      emettere `addNpc` (uno per tipo) + `startCombat` dopo `<<DATI>>` — il prompt ora dice
+      esplicitamente che senza quei comandi i nemici NON compaiono sulla mappa.
+- [x] **Risoluzione FUZZY dell'id nemico** (`AIBridge._risolvi_id_nemico`): l'`addNpc` del
+      Master viene agganciato al bestiario della campagna ATTIVA anche se scrive "Uruk-hai",
+      "uruk hai" o il nome italiano completo — match su id/nome esatto, poi contenimento
+      reciproco; se non riconosce nulla ripiega sul gregario base del set (qualcosa DEVE
+      comparire), MAI su un mostro di un'altra ambientazione. Verificato con simulazione
+      Python: id/nomi/maiuscole/spazi tutti risolti, e un id di Ventimiglia chiesto in
+      Terra di Mezzo ripiega su un mostro LOTR, non su quello sbagliato.
+- [x] **Auto-`startCombat`**: se il Master evoca i nemici ma dimentica `startCombat`, lo
+      avviamo noi — "dichiarare lo scontro" fa sempre partire i turni e comparire i token.
+      Nessun doppione con la rete di sicurezza `ChatCombatBridge` (che interviene solo quando
+      il Master NON emette comandi di spawn).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti
