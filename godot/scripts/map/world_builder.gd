@@ -81,9 +81,11 @@ var _righello: WorldRuler
 var _etichette: WorldLabels
 var _nebbia: WorldFog
 var _props: WorldProps
+var _route: WorldRoute
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 var _ultimo_luogo: String = ""   # debounce degli arrivi ai luoghi (evento world:luogo)
+var _in_viaggio_dadi: bool = false  # true durante una marcia a tiri: i token non si trascinano
 # one-shot: inquadra il mondo intero appena il viewport ha una dimensione reale.
 var _da_inquadrare: bool = false
 var _rect_mappa: Rect2
@@ -130,6 +132,11 @@ func _ready() -> void:
 	_nebbia.z_index = 2
 	add_child(_nebbia)
 	_nebbia.configura(_rect_mappa)
+	# Rotta del viaggio a dadi (linea + pennino + bandierina): sopra la nebbia, sotto i token,
+	# cosi' i gettoni del party restano sempre in primo piano sul tracciato.
+	_route = WorldRoute.new()
+	_route.z_index = 2
+	add_child(_route)
 	_tokens = WorldTokens.new()
 	_tokens.z_index = 3
 	add_child(_tokens)
@@ -154,6 +161,14 @@ func _ready() -> void:
 	# se un'etichetta del mondo ha quel nome anche i token viaggiano li'. Connessione a metodo
 	# (non lambda): si scollega da sola quando il builder viene liberato dal "Ricarica mappe".
 	GameState.party_location_changed.connect(_su_viaggio_party)
+	# VIAGGIO A DADI: TravelDirector regge la marcia (distanza/tappe/eventi), il builder la RENDE —
+	# muove i token tappa per tappa, disegna la rotta, dirada la nebbia, pubblica l'arrivo al luogo.
+	# Comando "mappa:viaggia" (moveTo del Master fuori Ventimiglia) instrada qui la destinazione.
+	TravelDirector.viaggio_iniziato.connect(_su_viaggio_iniziato)
+	TravelDirector.viaggio_avanzato.connect(_su_viaggio_avanzato)
+	TravelDirector.viaggio_arrivato.connect(_su_viaggio_arrivato)
+	TravelDirector.viaggio_annullato.connect(_su_viaggio_annullato)
+	GameState.event_published.connect(_su_evento_mappa)
 	_da_inquadrare = true
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
@@ -261,8 +276,10 @@ func props() -> WorldProps:
 	return _props
 
 
-## VIAGGIO NARRATO sul mondo: cerca il luogo per nome tra le etichette; se c'e', il party
-## ci plana (token in cerchio), la camera segue morbida e la nebbia si dirada a destinazione.
+## VIAGGIO sul mondo verso un luogo (nome tra le etichette). Con il viaggio a dadi ATTIVO (default)
+## non si teletrasporta: parte una MARCIA A TIRI (TravelDirector calcola distanza/tappe, il party
+## avanza solo tirando il dado). Con il viaggio a dadi disattivato, il party ci plana come prima.
+## Ritorna true se il luogo esiste (marcia avviata o planata), false se il nome non e' noto.
 func viaggia_verso(nome_luogo: String) -> bool:
 	if _etichette == null or _tokens == null:
 		return false
@@ -270,6 +287,9 @@ func viaggia_verso(nome_luogo: String) -> bool:
 	if voce.is_empty():
 		return false
 	var pos: Vector2 = voce["pos"]
+	if TravelDirector.abilitato:
+		TravelDirector.inizia(String(voce["nome"]), _tokens.centro_gruppo(), pos)
+		return true
 	_tokens.muovi_tutti_verso(pos)
 	_camera.punta(pos)
 	if _nebbia != null and _nebbia.attiva():
@@ -278,8 +298,69 @@ func viaggia_verso(nome_luogo: String) -> bool:
 	return true
 
 
+## Nomi dei luoghi del set di mappe attivo (per il selettore "Viaggia a…" della toolbar).
+func nomi_luoghi() -> PackedStringArray:
+	return _etichette.nomi() if _etichette != null else PackedStringArray()
+
+
 func _su_viaggio_party(location: Dictionary) -> void:
 	viaggia_verso(String(location.get("name", "")))
+
+
+## Comando di viaggio instradato dal Master (moveTo fuori Ventimiglia) via evento globale.
+func _su_evento_mappa(nome_evento: String, payload: Variant) -> void:
+	if nome_evento == "mappa:viaggia" and payload is Dictionary:
+		viaggia_verso(String((payload as Dictionary).get("nome", "")))
+
+
+# --- Viaggio a dadi: il builder RENDE cio' che TravelDirector calcola ---
+
+## Inizio marcia: blocca il trascinamento dei token (si avanza SOLO col dado), disegna la rotta e
+## annuncia distanza e tappe. Il pannello di viaggio (TravelPanel) mostra barra e tasto Marcia.
+func _su_viaggio_iniziato(dati: Dictionary) -> void:
+	_in_viaggio_dadi = true
+	_aggiorna_blocco_token()
+	if _route != null:
+		_route.imposta_rotta(dati.get("da", Vector2.ZERO), dati.get("a", Vector2.ZERO))
+	GameState.announce("🧭 In marcia verso %s: ~%d km, circa %d tappe. Tira il dado per avanzare." % [
+		String(dati.get("nome", "")), roundi(float(dati.get("distanza_km", 0.0))),
+		int(dati.get("tappe", 0)),
+	])
+
+
+## Una tappa: i token planano verso il punto raggiunto, la camera segue, la rotta si aggiorna.
+## L'eventuale evento della tappa finisce in chat.
+func _su_viaggio_avanzato(dati: Dictionary) -> void:
+	var a: Vector2 = dati.get("a", Vector2.ZERO)
+	_tokens.muovi_tutti_verso(a)
+	_camera.punta(a)
+	if _route != null:
+		_route.imposta_progresso(a)
+	var evento: String = String(dati.get("evento", ""))
+	if not evento.is_empty():
+		GameState.announce("🎲 %d — %s" % [int(dati.get("roll", 0)), evento])
+
+
+## Arrivo: sblocca i token, pulisce la rotta, dirada la nebbia sul luogo e PUBBLICA l'arrivo
+## (evento world:luogo, il gancio dei capitoli di campagna).
+func _su_viaggio_arrivato(nome: String) -> void:
+	_in_viaggio_dadi = false
+	_aggiorna_blocco_token()
+	if _route != null:
+		_route.pulisci()
+	var voce: Dictionary = _etichette.trova(nome) if _etichette != null else {}
+	if not voce.is_empty() and _nebbia != null:
+		_nebbia.rivela(voce["pos"] as Vector2)
+	_ultimo_luogo = nome
+	GameState.announce("🏁 La compagnia giunge a %s." % nome)
+	GameState.publish("world:luogo", { "name": nome })
+
+
+func _su_viaggio_annullato() -> void:
+	_in_viaggio_dadi = false
+	_aggiorna_blocco_token()
+	if _route != null:
+		_route.pulisci()
 
 
 ## Ogni spostamento di token (a mano o da viaggio narrato) fa due cose: dirada la nebbia e,
@@ -288,6 +369,10 @@ func _su_viaggio_party(location: Dictionary) -> void:
 ## di rioannunciare lo stesso luogo finche' non ci si allontana.
 func _su_token_spostato(_id: String, pos: Vector2) -> void:
 	_nebbia.rivela(pos)
+	# Durante una marcia a dadi l'arrivo lo gestisce il viaggio (a destinazione): i passi
+	# intermedi diradano solo la nebbia, senza annunciare luoghi sfiorati lungo la strada.
+	if _in_viaggio_dadi:
+		return
 	if _etichette == null:
 		return
 	var voce: Dictionary = _etichette.piu_vicina(pos, 300.0)
@@ -307,7 +392,8 @@ func _aggiorna_blocco_token() -> void:
 		return
 	var righello_on: bool = _righello != null and _righello.attivo()
 	var props_on: bool = _props != null and _props.modalita()
-	_tokens.blocco_input = righello_on or props_on
+	# Durante una marcia a dadi il trascinamento e' bloccato: ci si muove SOLO tirando il dado.
+	_tokens.blocco_input = righello_on or props_on or _in_viaggio_dadi
 
 
 ## Accende/spegne la nebbia ("🌫"): all'accensione rivela subito attorno ai token del party.

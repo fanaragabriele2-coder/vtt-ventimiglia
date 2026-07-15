@@ -155,7 +155,8 @@ func _build_system_prompt() -> String:
 		SEPARATORE_DATI_MASTER,
 		'[{"command":"addNpc","id":"%s","count":2},{"command":"startCombat"}]' % id_esempio,
 		'Per spostare il party in un luogo della mappa: {"command":"moveTo","to":"<nome del luogo>"}.',
-		"(Se descrivi lo spostamento a parole, il gioco lo riconosce e muove il party da solo.)",
+		"(Il party NON si teletrasporta: parte una MARCIA A DADI verso quel luogo — la mappa calcola",
+		" distanza e tappe e i giocatori avanzano tirando il dado. Usa i nomi dei luoghi della mappa.)",
 		"",
 		"REGOLE DEL COMBATTIMENTO (IMPORTANTISSIME, rispettale sempre):",
 		"- Tu NON gestisci il combattimento: lo gestiscono il sistema a turni e i GIOCATORI.",
@@ -636,8 +637,14 @@ func _dispatch_command(command: Dictionary) -> void:
 		"setAbility":
 			CharacterManager.set_ability_score(String(command.get("ability", "str")), int(command.get("value", 10)))
 		"moveTo", "travelTo", "moveParty":
-			# Spostamento del party sull'overworld: stessa risoluzione POI della prosa (fonte unica).
-			ChatTravelBridge.viaggia_a_nome(String(command.get("to", command.get("name", ""))))
+			# Spostamento del party. A Ventimiglia passa dai POI (ChatTravelBridge, fonte unica);
+			# nelle altre campagne va sul Mondo cucito via evento, e diventa una MARCIA A DADI
+			# verso il luogo (WorldBuilder risolve il nome tra le etichette del set attivo).
+			var destinazione: String = String(command.get("to", command.get("name", "")))
+			if CampaignDirector.campagna_attuale_id() == "ventimiglia":
+				ChatTravelBridge.viaggia_a_nome(destinazione)
+			else:
+				GameState.publish("mappa:viaggia", { "nome": destinazione })
 		_:
 			# moveToken, addToken, revealFog, createSurface, setElevation, applyCondition, ...
 			# li gestira' il layer mappa/condizioni quando lo costruiremo.

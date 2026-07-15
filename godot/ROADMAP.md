@@ -448,6 +448,55 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       Guidance marcati come `concentration` in `data/spells.json`. Verificato con simulazione
       (CD corretta, piu' danno = piu' facile spezzarla, bersagli max 3).
 
+### ✅ Viaggio a DADI sul Mondo cucito — "la mappa calcola tutto" (luglio 2026)
+- [x] **`TravelDirector`** (autoload): quando il Master vi fa spostare, il party **NON si
+      teletrasporta**. Parte una **MARCIA**: la mappa misura la **distanza reale** dal gruppo alla
+      meta (in pixel-mondo → km → giorni), la divide in **tappe** (2–8, in scala con la distanza),
+      e si avanza **SOLO tirando il dado**. Ogni **1d20** copre una frazione di strada che dipende
+      dal risultato: un tiro alto divora leghe, un **20** e' una cavalcata, un **1** una giornata
+      storta (guadi in piena, nebbia, deviazioni). Quando la distanza percorsa raggiunge il totale,
+      **si arriva** (l'evento `world:luogo` innesca i capitoli di campagna). Matematica pura,
+      indipendente dai nodi: **SIMULATA** — 20.000 marce arrivano tutte (max 15 tiri, media ~6),
+      **mai** oltre la meta; un tragitto tipico si fa in **~3–4 tiri**.
+- [x] **Eventi di viaggio a tema**: ogni tappa puo' raccontare qualcosa (corvi che vi seguono,
+      rovine di regni caduti, un grido nel cielo, fuochi lontani all'orizzonte) — pool diversi per
+      Terra di Mezzo e Ventimiglia. Il **20** porta un buon auspicio, l'**1** un imprevisto.
+- [x] **`TravelPanel`** (overlay del Mondo): barra di **progresso**, km/tappe/giorni residui,
+      testo dell'evento e un unico grande tasto **🎲 Marcia (1d20)** che apre il **vassoio 3D**.
+      Durante la marcia il **trascinamento dei token e' bloccato**: ci si muove solo col dado, come
+      chiesto. **`WorldRoute`** disegna la **rotta sulla mappa** (tratto percorso pieno, resto
+      tratteggiato, pennino sul punto raggiunto, bandierina sulla meta).
+- [x] **Trigger dal Master e dal giocatore**: il comando `moveTo` del Master, fuori Ventimiglia,
+      instrada la meta sul Mondo cucito (`GameState "mappa:viaggia"` → `WorldBuilder.viaggia_verso`)
+      e fa partire la marcia; un selettore **🧭 Viaggia a…** in toolbar elenca i luoghi del set
+      attivo per partire a mano. Interruttore **🎲 Viaggio a dadi: ON/OFF** (default ON) per tornare
+      al salto immediato in modalita' sandbox.
+
+### 🎬 Rendere memorabile l'Avventura dell'Anello — roadmap (prossimi passi)
+La marcia a dadi (sopra) e' il **primo** tassello: fa "calcolare tutto alla mappa" e lega il
+movimento al tiro. Ecco il resto, in ordine di impatto, per un'avventura dell'Anello indimenticabile.
+1. **Incontri in viaggio** *(subito dopo)*: sulle tappe piu' sfortunate (o attraversando regioni
+   pericolose — Eregion, le porte di Moria, le Paludi) la marcia puo' **innescare uno scontro** col
+   bestiario della zona (Encounter Balancer gia' pronto): il viaggio diventa teso, non solo una
+   barra che si riempie.
+2. **Il Fardello dell'Anello** *(la firma LOTR)*: un contatore di **corruzione/peso** che cresce
+   vicino ai Nazgul, nei luoghi oscuri e ogni volta che si e' tentati di usare l'Anello; alza le
+   CD, attira gli Spettri, e apre bivi morali. E' il cuore tematico del Signore degli Anelli.
+3. **Speranza della Compagnia** *(morale)*: una statistica di gruppo che le **imprese eroiche**
+   alzano e il **terrore** (Balrog, Re Stregone, l'Occhio) abbassa; influenza i tiri salvezza
+   contro la morte e le prove sotto pressione.
+4. **Giorno/notte e accampamento**: la marcia **consuma giorni**; accamparsi cura e recupera
+   incantesimi, ma vegliare male o marciare di notte alza il rischio d'agguato. Aggancia il ciclo
+   del giorno gia' presente sul Mondo cucito.
+5. **Regioni vive**: ambience e musica che cambiano per **regione** (Landa, Moria, Lorien, Mordor)
+   e nomi/eventi di viaggio specifici del tratto che si attraversa, non solo generici di campagna.
+6. **Grampasso, compagno PNG**: un alleato guidato dall'IA che **marcia, combatte e commenta** —
+   la guida che vi porta da Brea al Morannon, con battute a tema nei momenti chiave.
+7. **Diario di viaggio & mappa che si scopre**: un log delle tappe e delle imprese, le etichette
+   dei luoghi che si **rivelano avvicinandosi**, e un finale che ricapitola le gesta della compagnia.
+8. **Reliquie leggendarie con set-bonus**: legare i doni gia' presenti (mithril, arco Galadhrim,
+   lama del ramingo) a **poteri** e piccoli bonus di set, per premiare l'esplorazione dei bivi.
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

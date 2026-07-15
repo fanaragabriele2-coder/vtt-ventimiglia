@@ -54,6 +54,9 @@ var _righello_btn: Button
 var _props_btn: Button
 var _set_option: OptionButton
 var _campagna_option: OptionButton
+var _viaggia_option: OptionButton
+var _dadi_btn: Button
+var _travel_panel: TravelPanel
 var _palette: PanelContainer
 var _palette_row: HBoxContainer
 # Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
@@ -71,6 +74,8 @@ func _ready() -> void:
 	_build_toolbar()
 	_build_palette()
 	_build_minimap()
+	_build_travel_panel()
+	_popola_viaggio()
 	# files_dropped vive sulla Window (la vista puo' essere ricreata, la finestra no): connesso
 	# qui e scollegato in _exit_tree, con guardia di visibilita' dentro il gestore — i drop
 	# valgono solo quando il Mondo cucito e' la vista attiva.
@@ -135,6 +140,23 @@ func _build_toolbar() -> void:
 	titolo.text = "🌍 Mondo:"
 	titolo.add_theme_color_override("font_color", Color(0.78, 0.61, 0.24))
 	row.add_child(titolo)
+
+	_viaggia_option = OptionButton.new()
+	_viaggia_option.custom_minimum_size = Vector2(150, 34)
+	_viaggia_option.tooltip_text = "Viaggia a dadi verso un luogo del mondo: la mappa calcola " \
+		+ "distanza e tappe, e il party avanza SOLO tirando il dado (pulsante Marcia)."
+	_viaggia_option.item_selected.connect(_su_viaggia_selezionato)
+	row.add_child(_viaggia_option)
+
+	_dadi_btn = Button.new()
+	_dadi_btn.toggle_mode = true
+	_dadi_btn.button_pressed = TravelDirector.abilitato
+	_dadi_btn.text = "🎲 Viaggio a dadi: ON"
+	_dadi_btn.tooltip_text = "Quando il Master vi fa spostare, il party marcia tirando il dado " \
+		+ "(distanza calcolata dalla mappa). Spegni per il viaggio immediato."
+	_dadi_btn.custom_minimum_size = Vector2(0, 34)
+	_dadi_btn.toggled.connect(_su_dadi_toggle)
+	row.add_child(_dadi_btn)
 
 	_set_option = OptionButton.new()
 	for voce: Array in SET_CARTELLE:
@@ -294,6 +316,44 @@ func _aggancia_minimap() -> void:
 	)
 
 
+## Overlay del viaggio a dadi (barra + tasto Marcia): in alto-centro, sopra la mappa. Persiste ai
+## "Ricarica mappe" (e' figlio della vista, non del builder) e si mostra da solo quando parte una
+## marcia, ascoltando TravelDirector.
+func _build_travel_panel() -> void:
+	_travel_panel = TravelPanel.new()
+	add_child(_travel_panel)
+	_travel_panel.set_anchors_and_offsets_preset(
+		Control.PRESET_CENTER_TOP, Control.PRESET_MODE_KEEP_SIZE, 12
+	)
+
+
+## Riempie il selettore "Viaggia a…" coi luoghi del set attivo (prima voce = intestazione inerte).
+func _popola_viaggio() -> void:
+	if _viaggia_option == null:
+		return
+	_viaggia_option.clear()
+	_viaggia_option.add_item("🧭 Viaggia a…")
+	_viaggia_option.set_item_disabled(0, true)
+	for nome: String in _builder.nomi_luoghi():
+		_viaggia_option.add_item(nome)
+	_viaggia_option.selected = 0
+
+
+## Scelta di una meta dal selettore: avvia la marcia a dadi (o il salto immediato se il viaggio a
+## dadi e' spento). Torna alla voce-intestazione cosi' si puo' riscegliere lo stesso luogo.
+func _su_viaggia_selezionato(indice: int) -> void:
+	if indice <= 0:
+		return
+	var nome: String = _viaggia_option.get_item_text(indice)
+	_viaggia_option.selected = 0
+	_builder.viaggia_verso(nome)
+
+
+func _su_dadi_toggle(acceso: bool) -> void:
+	TravelDirector.abilitato = acceso
+	_dadi_btn.text = "🎲 Viaggio a dadi: ON" if acceso else "🎲 Viaggio a dadi: OFF"
+
+
 func _on_ora_pressed(nome: String) -> void:
 	_builder.imposta_ora(nome)
 
@@ -439,3 +499,4 @@ func _ricrea_builder() -> void:
 		_builder.attiva_props(true)
 	_riempi_palette()
 	_aggancia_minimap()
+	_popola_viaggio()

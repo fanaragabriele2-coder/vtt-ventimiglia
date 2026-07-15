@@ -63,6 +63,14 @@ func trova(nome: String) -> Dictionary:
 	return migliore
 
 
+## Nomi di tutti i luoghi del set attivo (per il selettore "Viaggia a…" della toolbar).
+func nomi() -> PackedStringArray:
+	var out := PackedStringArray()
+	for voce: Dictionary in _voci:
+		out.append(String(voce["nome"]))
+	return out
+
+
 ## L'etichetta piu' vicina al punto entro `raggio` pixel-mondo (vuoto se nessuna): serve a
 ## capire "in che luogo" e' appena arrivato un token del party.
 func piu_vicina(punto: Vector2, raggio: float) -> Dictionary:
