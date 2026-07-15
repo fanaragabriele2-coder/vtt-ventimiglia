@@ -422,6 +422,22 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       verificata con simulazione Python (5000 partite convergono; crit/danno massiccio/cura/nat20/
       wipe/eleggibilita' turni tutti corretti).
 
+### ✅ Copertura e Concentrazione (dall'analisi, luglio 2026)
+- [x] **Copertura** (`CoverManager`): un bersaglio riparato da un **prop** (albero, roccia,
+      cassa) e' piu' difficile da colpire a distanza — **+2 CA** (mezza copertura) o **+5**
+      (tre quarti). Le celle di copertura sono quelle dei props del Mondo cucito, registrate da
+      `WorldProps` a ogni modifica del layout (scala fissa 128 px = 1 cella). `resolve_attack`
+      controlla se un prop sta TRA attaccante e bersaglio (cella davanti al bersaglio, sulla
+      linea verso chi tira) e alza la CA; la mischia la ignora (si e' adiacenti). Ora nascondersi
+      dietro un ostacolo conta: verificato con simulazione (direzione corretta, colpi ridotti).
+- [x] **Concentrazione + Benedizione** (`ConcentrationManager` + `CombatManager.benedici`): il
+      **Chierico** ha un pulsante ✨ Benedizione (concentrazione): fino a **3 alleati** (se stesso
+      compreso) tirano **+1d4 per colpire** finche' regge la concentrazione. Se l'incantatore
+      **subisce danno** fa un TS su **Costituzione** (CD = max(10, meta' del danno)) o
+      l'incantesimo si **spezza**; cadere a 0 PF (incosciente) la annulla comunque. Bless e
+      Guidance marcati come `concentration` in `data/spells.json`. Verificato con simulazione
+      (CD corretta, piu' danno = piu' facile spezzarla, bersagli max 3).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

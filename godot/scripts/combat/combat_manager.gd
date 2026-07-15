@@ -344,6 +344,7 @@ func end_combat() -> void:
 	SurfacesManager.reset()
 	_lore_annunciate.clear()  # al prossimo scontro le storie si raccontano di nuovo
 	_tiri_morte.clear()       # i tiri contro la morte valgono solo dentro lo scontro
+	ConcentrationManager.reset()  # nessun incantesimo di concentrazione sopravvive allo scontro
 	GameState.set_combat_active(false)
 	combat_ended.emit()
 	_allinea_pc_roster()
@@ -502,7 +503,33 @@ func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: Str
 	elif combatant["kind"] == "pc" and int(combatant["hitPoints"]) <= 0:
 		_gestisci_pg_a_zero(combatant_id, combatant, damage, era_gia_a_zero, critico)
 
+	# CONCENTRAZIONE (5e): se il ferito manteneva un incantesimo, il colpo puo' spezzarlo.
+	if damage > 0 and ConcentrationManager.e_concentrato(combatant_id):
+		ConcentrationManager.su_danno(combatant_id, damage)
+
 	_check_end_conditions(combatant)
+	return true
+
+
+## BENEDIZIONE (chierico): l'incantatore si concentra e benedice fino a 3 alleati vivi del party
+## (se stesso incluso per primo): finche' regge la concentrazione, i benedetti tirano +1d4 per
+## colpire. Ritorna false se non c'e' nessuno da benedire.
+func benedici(caster_id: String) -> bool:
+	var bersagli: Array = []
+	if not get_combatant(caster_id).is_empty() and int(get_combatant(caster_id).get("hitPoints", 0)) > 0:
+		bersagli.append(caster_id)
+	for c: Dictionary in _combatants:
+		if bersagli.size() >= 3:
+			break
+		if c["kind"] == "pc" and not bool(c["defeated"]) and int(c["hitPoints"]) > 0 \
+				and not bersagli.has(String(c["id"])):
+			bersagli.append(String(c["id"]))
+	if bersagli.is_empty():
+		return false
+	ConcentrationManager.inizia(caster_id, "Benedizione", bersagli)
+	GameState.announce("✨ %s invoca la Benedizione: %d alleato/i colpisce con +1d4 finche' "
+		% [String(get_combatant(caster_id).get("name", "Il chierico")), bersagli.size()]
+		+ "l'incantatore regge la concentrazione.")
 	return true
 
 
@@ -511,6 +538,8 @@ func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: Str
 func _gestisci_pg_a_zero(id: String, combatant: Dictionary, danno: int, era_gia_a_zero: bool,
 		critico: bool) -> void:
 	var nome: String = String(combatant.get("name", "L'eroe"))
+	# Chi cade a terra perde ogni concentrazione (incosciente): la Benedizione svanisce.
+	ConcentrationManager.interrompi(id)
 	if danno >= int(combatant.get("maxHitPoints", 1)) and era_gia_a_zero:
 		_tiri_morte[id] = { "successi": 0, "fallimenti": 3, "stabile": false, "morto": true }
 		combatant_died_final.emit(id)
@@ -736,13 +765,27 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	var modalita_finale: String = modalita_effettiva_per_attacco(attacker_id, target_id, mode)
 	var d20: Dictionary = roll_d20_with_mode(modalita_finale)
 	var attack_total: int = int(d20["chosen"]) + int(attacker["attackBonus"])
+	# BENEDIZIONE (concentrazione): un attaccante benedetto aggiunge +1d4 al tiro per colpire.
+	var benedizione: int = 0
+	if ConcentrationManager.benedetto(attacker_id):
+		benedizione = randi_range(1, 4)
+		attack_total += benedizione
 	var critical: bool = bool(d20["naturalTwenty"])
+	# COPERTURA (5e): a distanza, un bersaglio riparato da un prop alza la sua CA (+2 mezza, +5
+	# tre quarti). In mischia non conta (si e' adiacenti).
+	var copertura: int = 0
+	if attack_range_of(attacker_id) > 1:
+		copertura = CoverManager.bonus_ca(attacker_id, target_id)
+	var ca_bersaglio: int = int(target["armorClass"]) + copertura
 	# 1 naturale sbaglia sempre; 20 naturale colpisce sempre (e critica); altrimenti d20+bonus vs CA.
-	var hit: bool = not bool(d20["naturalOne"]) and (critical or attack_total >= int(target["armorClass"]))
+	var hit: bool = not bool(d20["naturalOne"]) and (critical or attack_total >= ca_bersaglio)
+	if copertura > 0 and not hit:
+		GameState.announce("🛡 %s e' protetto dalla copertura (CA +%d): il colpo non passa." % [
+			String(target["name"]), copertura])
 	var result: Dictionary = {
 		"ok": true, "attacker": attacker_id, "target": target_id, "mode": modalita_finale,
-		"roll": d20["chosen"], "attackTotal": attack_total,
-		"targetAc": int(target["armorClass"]), "critical": critical, "hit": hit, "damage": 0,
+		"roll": d20["chosen"], "attackTotal": attack_total, "blessing": benedizione,
+		"targetAc": ca_bersaglio, "cover": copertura, "critical": critical, "hit": hit, "damage": 0,
 	}
 	if hit:
 		var dmg: Dictionary = roll_damage_formula(String(attacker["damageFormula"]), critical)

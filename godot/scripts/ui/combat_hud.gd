@@ -14,6 +14,7 @@ var _attack_button: Button
 var _shove_button: Button
 var _bonus_button: Button
 var _fireball_button: Button
+var _bless_button: Button
 var _bonus_popup: PopupPanel
 var _cards: Dictionary = {}   # combatant_id -> PanelContainer (per l'evidenziazione di turno)
 var _current_id: String = ""
@@ -102,6 +103,13 @@ func _build_ui() -> void:
 		+ "tiro salvezza DES per TUTTI nel raggio, alleati compresi. Meta' danno a chi salva. " \
 		+ "L'area resta in fiamme."
 	actions.add_child(_fireball_button)
+	# Benedizione: SOLO per il Chierico. Concentrazione: fino a 3 alleati colpiscono con +1d4
+	# finche' il chierico regge la concentrazione (un colpo puo' spezzarla con un TS Cost).
+	_bless_button = _make_action("✨ Benedizione", Color(0.5, 0.42, 0.14), _on_bless_pressed)
+	_bless_button.visible = false
+	_bless_button.tooltip_text = "Concentrazione: fino a 3 alleati (te compreso) tirano +1d4 " \
+		+ "per colpire finche' reggi la concentrazione (subire danno puo' spezzarla)."
+	actions.add_child(_bless_button)
 	actions.add_child(_make_action("⏭ Termina turno", Color(0.16, 0.31, 0.16), _on_end_turn_pressed))
 
 	_build_bonus_popup()
@@ -324,6 +332,17 @@ func _on_fireball_pressed() -> void:
 	InventoryManager.spend_action_resource("action")
 
 
+func _on_bless_pressed() -> void:
+	if not _puo_agire():
+		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: la Benedizione e' l'azione del turno."
+		return
+	if CombatManager.benedici(_actor_id()):
+		CombatSfx.suona("magia")
+		InventoryManager.spend_action_resource("action")
+
+
 func _on_action_economy_changed(_economy: Dictionary) -> void:
 	_refresh_action_buttons()
 
@@ -348,14 +367,16 @@ func _refresh_action_buttons() -> void:
 	_attack_button.disabled = not ha_azione
 	_shove_button.disabled = not ha_azione
 	_bonus_button.disabled = not ha_bonus
-	# La Palla di Fuoco compare SOLO al turno di un Mago (e si spegne senza azione).
-	var e_mago: bool = false
+	# Palla di Fuoco (Mago) e Benedizione (Chierico) compaiono SOLO al turno della classe giusta.
+	var classe: String = ""
 	if turno_pc:
 		var pg: CharacterData = CharacterManager.get_character_by_id(
 			CombatManager.character_id_di(_current_id))
-		e_mago = pg != null and pg.class_name_label.to_lower() == "mago"
-	_fireball_button.visible = e_mago
+		classe = pg.class_name_label.to_lower() if pg != null else ""
+	_fireball_button.visible = classe == "mago"
 	_fireball_button.disabled = not ha_azione
+	_bless_button.visible = classe == "chierico"
+	_bless_button.disabled = not ha_azione
 
 
 func _on_end_turn_pressed() -> void:

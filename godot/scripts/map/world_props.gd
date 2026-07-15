@@ -17,6 +17,9 @@ extends Node2D
 const SALVATAGGIO: String = "user://world_props.json"
 const CARTELLA_UTENTE: String = "user://props"
 const CARTELLA_PROGETTO: String = "res://assets/props"
+# Scala di combattimento FISSA (128 px = 1 cella = 1,5 m), come i token: le celle dei props
+# diventano COPERTURA (CoverManager), non la griglia visiva che puo' cambiare lato.
+const COPERTURA_PX_CELLA: float = 128.0
 # Prop "di fuoco": piazzarli accende ANCHE una PointLight2D vera nel punto — di notte il falo'
 # scava una pozza di luce calda nel buio del CanvasModulate. Riconosciuti dal nome file.
 const LUMINOSI: Array[String] = [
@@ -248,14 +251,17 @@ func _salva() -> void:
 	var file: FileAccess = FileAccess.open(SALVATAGGIO, FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(dati))
+	_aggiorna_copertura()  # _salva e' chiamato a ogni modifica del layout: la copertura segue
 
 
 func _carica_layout() -> void:
 	_voci.clear()
 	if not FileAccess.file_exists(SALVATAGGIO):
+		_aggiorna_copertura()
 		return
 	var dati: Variant = JSON.parse_string(FileAccess.get_file_as_string(SALVATAGGIO))
 	if dati is not Array:
+		_aggiorna_copertura()
 		return
 	for voce: Variant in dati:
 		if voce is Dictionary and voce.has("file") and voce.has("x") and voce.has("y"):
@@ -265,3 +271,20 @@ func _carica_layout() -> void:
 				"scala": float(voce.get("scala", 1.0)),
 				"rot": float(voce.get("rot", 0.0)),
 			})
+	_aggiorna_copertura()
+
+
+## Registra in CoverManager la cella di ogni prop: ogni prop = mezza copertura (+2 CA) per chi
+## gli sta dietro rispetto al tiratore. E' "terreno" del campo, indipendente dallo scontro.
+func _aggiorna_copertura() -> void:
+	var celle: Dictionary = {}
+	for voce: Dictionary in _voci:
+		var c: Vector2i = _cella_copertura(voce["pos"])
+		celle["%d,%d" % [c.x, c.y]] = 1
+	CoverManager.imposta_celle(celle)
+
+
+func _cella_copertura(pos: Vector2) -> Vector2i:
+	var locale: Vector2 = pos - _rect.position
+	return Vector2i(
+		maxi(0, floori(locale.x / COPERTURA_PX_CELLA)), maxi(0, floori(locale.y / COPERTURA_PX_CELLA)))
