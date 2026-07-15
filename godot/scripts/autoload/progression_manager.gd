@@ -92,6 +92,41 @@ func get_prog(character_id: String) -> Dictionary:
 	return _progression[character_id]
 
 
+## L'ORO complessivo del party (la borsa comune: i mercanti la guardano tutta, non solo il PG
+## attivo — l'oro dei bottini finisce a chi da' il colpo di grazia, ma si spende insieme).
+func oro_totale() -> int:
+	var totale: int = 0
+	for pg: CharacterData in CharacterManager.get_party():
+		totale += int(get_prog(pg.id).get("gold", 0))
+	return totale
+
+
+## Spende oro dalla borsa comune (prima dal PG attivo, poi dagli altri). Ritorna false (e non
+## tocca nulla) se il party non ha abbastanza oro in tutto.
+func spendi_oro(quanto: int) -> bool:
+	if quanto <= 0:
+		return true
+	if oro_totale() < quanto:
+		return false
+	var resto: int = quanto
+	var ordine: Array[CharacterData] = []
+	var attivo: CharacterData = CharacterManager.get_active()
+	if attivo:
+		ordine.append(attivo)
+	for pg: CharacterData in CharacterManager.get_party():
+		if not ordine.has(pg):
+			ordine.append(pg)
+	for pg: CharacterData in ordine:
+		if resto <= 0:
+			break
+		var prog: Dictionary = get_prog(pg.id)
+		var suo: int = int(prog.get("gold", 0))
+		var preso: int = mini(suo, resto)
+		prog["gold"] = suo - preso
+		resto -= preso
+	return true
+
+
 ## Progresso frazionario verso il prossimo livello (per la barra XP): { cur, need, pct }.
 func xp_band(character_id: String) -> Dictionary:
 	var prog: Dictionary = get_prog(character_id)

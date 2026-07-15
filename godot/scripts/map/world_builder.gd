@@ -82,6 +82,7 @@ var _etichette: WorldLabels
 var _nebbia: WorldFog
 var _props: WorldProps
 var _route: WorldRoute
+var _npcs: WorldNpcs
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 var _ultimo_luogo: String = ""   # debounce degli arrivi ai luoghi (evento world:luogo)
@@ -142,6 +143,12 @@ func _ready() -> void:
 	add_child(_tokens)
 	_tokens.configura(_rect_mappa, _camera)
 	_tokens.token_spostato.connect(_su_token_spostato)
+	# NPC del mondo (mercanti "M" e missioni "!"): marker accanto alle etichette dei loro luoghi,
+	# cliccabili da vicino. Stesso piano dei token cosi' restano leggibili sopra la nebbia.
+	_npcs = WorldNpcs.new()
+	_npcs.z_index = 3
+	add_child(_npcs)
+	_npcs.configura(_camera, _etichette, _tokens)
 	# Token dei NEMICI evocati in combattimento (Encounter Balancer): appaiono a distanza reale
 	# dal party, stesso livello dei token del party cosi' condividono lo stesso piano visivo.
 	_nemici_mondo = WorldEnemyTokens.new()

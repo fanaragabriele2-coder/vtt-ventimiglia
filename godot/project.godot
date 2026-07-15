@@ -53,6 +53,8 @@ RelicsManager="*res://scripts/autoload/relics_manager.gd"
 TravelJournal="*res://scripts/autoload/travel_journal.gd"
 JourneyEvents="*res://scripts/autoload/journey_events.gd"
 CompanionManager="*res://scripts/autoload/companion_manager.gd"
+MerchantManager="*res://scripts/autoload/merchant_manager.gd"
+QuestManager="*res://scripts/autoload/quest_manager.gd"
 CombatSfx="*res://scripts/autoload/combat_sfx.gd"
 
 [audio]

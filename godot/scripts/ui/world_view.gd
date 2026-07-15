@@ -59,6 +59,8 @@ var _dadi_btn: Button
 var _travel_panel: TravelPanel
 var _status_panel: CompanyStatusPanel
 var _journal_panel: JournalPanel
+var _merchant_panel: MerchantPanel
+var _quest_panel: QuestPanel
 var _palette: PanelContainer
 var _palette_row: HBoxContainer
 # Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
@@ -264,6 +266,14 @@ func _build_toolbar() -> void:
 	diario.pressed.connect(_su_diario)
 	row.add_child(diario)
 
+	var missioni := Button.new()
+	missioni.text = "📜 Missioni"
+	missioni.tooltip_text = "Il registro delle missioni: cosa hanno chiesto gli NPC del mondo " \
+		+ "(marker \"!\" sulla mappa), a che punto siete e cosa c'e' da riscuotere."
+	missioni.custom_minimum_size = Vector2(0, 34)
+	missioni.pressed.connect(_su_missioni)
+	row.add_child(missioni)
+
 
 ## Palette dei props: seconda barra sotto la toolbar, visibile solo in modalita' "🌳 Props".
 ## Un toggle per ogni immagine del catalogo (assets/props + user://props, quest'ultima vince).
@@ -352,6 +362,18 @@ func _build_company_panels() -> void:
 	_journal_panel.set_anchors_and_offsets_preset(
 		Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_KEEP_SIZE, 14
 	)
+	# Bottega e missioni: si aprono dai marker sulla mappa (evento "npc:apri" di WorldNpcs,
+	# gestito in _su_evento_globale) o dal pulsante 📜 della toolbar.
+	_merchant_panel = MerchantPanel.new()
+	add_child(_merchant_panel)
+	_merchant_panel.set_anchors_and_offsets_preset(
+		Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_KEEP_SIZE, 14
+	)
+	_quest_panel = QuestPanel.new()
+	add_child(_quest_panel)
+	_quest_panel.set_anchors_and_offsets_preset(
+		Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE, 0
+	)
 
 
 ## Riempie il selettore "Viaggia a…" coi luoghi del set attivo (prima voce = intestazione inerte).
@@ -383,6 +405,13 @@ func _su_dadi_toggle(acceso: bool) -> void:
 
 func _su_diario() -> void:
 	_journal_panel.visible = not _journal_panel.visible
+
+
+func _su_missioni() -> void:
+	if _quest_panel.visible:
+		_quest_panel.hide()
+	else:
+		_quest_panel.apri_registro()
 
 
 func _on_ora_pressed(nome: String) -> void:
@@ -496,8 +525,16 @@ func _indice_set(cartella: String) -> int:
 
 
 ## Eventi globali del gioco che riguardano questa vista: al cambio campagna, allinea Set e
-## menu a tendina (senza toccare il resto: griglia/righello/nebbia/props restano come sono).
+## menu a tendina (senza toccare il resto: griglia/righello/nebbia/props restano come sono);
+## su "npc:apri" (click su un marker della mappa, da vicino) apre bottega o dialogo missioni.
 func _su_evento_globale(nome_evento: String, payload: Variant) -> void:
+	if nome_evento == "npc:apri" and payload is Dictionary:
+		var richiesta: Dictionary = payload
+		if String(richiesta.get("tipo", "")) == "mercante":
+			_merchant_panel.apri(MerchantManager.mercante_per_id(String(richiesta.get("id", ""))))
+		else:
+			_quest_panel.apri_luogo(String(richiesta.get("id", "")))
+		return
 	if nome_evento != "campagna:cambiata" or not (payload is Dictionary):
 		return
 	var cartella: String = String((payload as Dictionary).get("cartella", ""))

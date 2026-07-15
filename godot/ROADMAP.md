@@ -517,6 +517,76 @@ alto a destra sul Mondo, solo Terra di Mezzo). Verifica: gdparse su tutti i 75 s
 pulito sui file nuovi (baseline invariata), simulazioni Python di spirito/agguati/reliquie e
 validazione del JSON delle regioni (mostri/scene/pericoli/lookup).
 
+### ✅ Mercanti e NPC con missioni sul Mondo cucito (luglio 2026)
+- [x] **4 MERCANTI** (`data/mercanti_terra_di_mezzo.json` + `MerchantManager`): Bombadillo a
+      Brea (pozioni, torce, lame oneste), Éogar ai Campi di Rohan (acciaio raro della Marca),
+      Lindir al Guado di Bruinen (pozioni maggiori, arco epico, l'Amuleto del Viandante — un
+      Dono del Cammino comprabile), Beregond al Pelennor (arsenale epico/leggendario di Minas
+      Tirith). Marker **"M" dorato** accanto al luogo sulla mappa: click DA VICINO apre la
+      bottega (da lontano il gioco suggerisce di viaggiarci col dado). Si paga con la **borsa
+      comune** del party (`ProgressionManager.oro_totale/spendi_oro`: l'oro di bottini, storia
+      e quest), l'oggetto finisce nello zaino vero (InventoryManager). Ogni listino/luogo/item
+      VALIDATO contro i cataloghi.
+- [x] **5 NPC con QUEST** (`data/quest_terra_di_mezzo.json` + `QuestManager`): l'oste di Brea
+      (3 orchi di Isengard), lo scudiero di Rohan (3 selvaggi di Dunland), la sentinella elfica
+      del Guado (raggiungi il Cancello Ovest di Moria), il capitano di Gondor (4 Uruk-hai), il
+      pescatore del Nen Hithoel (2 Spettri della Palude). Marker **"!"** sul luogo (acceso se
+      c'e' da accettare o riscuotere). Stati disponibile → attiva → completata → **riscossa
+      dall'NPC** (ricompense VERE: oggetti + oro + XP via collect_loot/complete_quest). Le cacce
+      avanzano DA SOLE in combattimento (contano i nemici giusti), le visite scattano all'arrivo
+      nel luogo; ogni caccia e' REALIZZABILE (i bersagli compaiono negli agguati regionali e
+      nella storia — verificato). Pannello **📜 Missioni** in toolbar (registro completo) e
+      persistenza per campagna.
+
+## PARTE 5 — Verso il GIOCO COMPLETO (roadmap)
+
+Le fondamenta ci sono TUTTE: Master IA che narra e fa comparire i nemici, viaggio a dadi,
+agguati regionali, spirito della Compagnia, mercanti e quest. Queste fasi chiudono il cerchio.
+
+### 🔜 Fase G1 — Il Master regista TOTALE dei token
+Il Master gia' narra, evoca i nemici (addNpc/startCombat + rete di sicurezza sulla prosa) e
+sposta il PARTY (moveTo → marcia a dadi). Manca il controllo fine dei SINGOLI token:
+- [ ] comando `moveToken` eseguito davvero: il Master sposta UN alleato o UN nemico per nome
+      ("l'orco ripiega dietro le rocce") — oggi il comando viene re-emesso ma nessuno lo ascolta;
+      va instradato su WorldTokens/WorldEnemyTokens con risoluzione fuzzy del nome e annuncio;
+- [ ] riconoscimento degli spostamenti NARRATI dei nemici (gemello di ChatTravelBridge ma per i
+      token singoli: "il troll carica", "gli arcieri salgono sul colle") con destinazioni
+      relative (verso/lontano da un PG, su un'altura, dietro copertura);
+- [ ] il Master puo' PIAZZARE nemici fuori combattimento (imboscate visibili da preparare).
+
+### 🔜 Fase G2 — La mappa che si TRASFORMA in battaglia
+All'inizio di ogni scontro il Mondo cucito deve DIVENTARE la mappa tattica, senza cambiare vista:
+- [ ] transizione di regia su combat_started: la camera si stringe sull'area dello scontro, la
+      griglia da battaglia si accende da sola sulla zona, vignetta piu' scura, ambience "battaglia";
+- [ ] evidenza TATTICA degli ostacoli: le celle di copertura dei props (gia' in CoverManager)
+      si mostrano con bordi/scudi, le alture (ElevationManager) con frecce di quota;
+- [ ] LINEA DI VISTA vera: un prop massiccio TRA arciere e bersaglio blocca il tiro (oggi da'
+      solo +CA da copertura) — raycast sulla griglia celle;
+- [ ] anteprima del movimento: passando col mouse si vede il percorso, i metri spesi e se la
+      destinazione provoca attacchi di opportunita';
+- [ ] a fine scontro la mappa TORNA esplorazione (griglia via, camera larga, ambience regione).
+
+### 🔜 Fase G3 — Regole di combattimento in stile BG3 (complete)
+Gia' in gioco: azione/bonus/movimento, vantaggio/svantaggio, fiancheggiamento, ALTURA (bonus e
+IA che la cerca), SUPERFICI (fuoco che brucia nei round: SurfacesManager), SPINTA (shove),
+copertura +2/+5, concentrazione, tiri contro la morte. Per chiudere il set BG3:
+- [ ] **attacchi di opportunita'** (reazione): uscire dalla mischia senza Disimpegno provoca un
+      attacco gratuito — e' la regola che rende il posizionamento strategico;
+- [ ] **Disimpegno / Scatto / Schivata** come azioni complete anche per l'IA nemica;
+- [ ] **salto** come parte del movimento (scavalcare superfici pericolose, come in BG3);
+- [ ] **spinta come azione bonus** (alla BG3, non azione piena) + spinta giu' dalle alture con
+      danno da caduta;
+- [ ] **riposo breve** (dadi vita) e **riposo lungo** al campo che recupera anche gli slot;
+- [ ] **ispirazione** (background) e vantaggio situazionale dal Master.
+
+### 🔜 Fase G4 — La mappa BELLA e strategica
+- [ ] pacchetto battlemap HQ per la Terra di Mezzo (le 9 tessere attuali sono generate):
+      render Blender top-down o pacchetti CC0/Forgotten Adventures in user://maps;
+- [ ] props tematici per regione (rovine, pini di Rohan, guglie di Mordor) che sono ANCHE
+      copertura tattica — la pipeline props→CoverManager e' gia' in piedi;
+- [ ] meteo di regione (pioggia sulla Landa, cenere a Mordor) sopra l'atmosfera esistente;
+- [ ] illuminazione degli scontri: cerchio di luce sul combattente di turno, frecce tracciate.
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

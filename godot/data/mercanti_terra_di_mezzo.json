@@ -1,0 +1,61 @@
+{
+	"_comment": "MERCANTI della Terra di Mezzo. Ogni mercante sta in un LUOGO della mappa (nome esatto di un'etichetta del set): il suo marker compare accanto al nome del posto e si compra solo quando il party e' li' vicino. 'listino': item = id di items.json o armeria.json, prezzo in ORO (l'oro e' quello della progressione del party: bottini, ricompense di storia e quest).",
+	"mercanti": [
+		{
+			"id": "emporio-brea",
+			"nome": "Bombadillo — Emporio del Puledro",
+			"luogo": "Brea",
+			"saluto": "«Entrate, entrate! Corde, torce, lame oneste e la migliore pozione a ovest delle Montagne. I forestieri pagano prima, con rispetto parlando.»",
+			"listino": [
+				{ "item": "healingPotion", "prezzo": 25 },
+				{ "item": "rations", "prezzo": 5 },
+				{ "item": "torch", "prezzo": 2 },
+				{ "item": "rope", "prezzo": 8 },
+				{ "item": "shortsword", "prezzo": 40 },
+				{ "item": "shield", "prezzo": 35 },
+				{ "item": "leatherArmor", "prezzo": 45 }
+			]
+		},
+		{
+			"id": "maniscalco-rohan",
+			"nome": "Éogar — Maniscalco della Marca",
+			"luogo": "Campi di Rohan",
+			"saluto": "«Acciaio di Rohan, temprato per chi cavalca incontro al nemico e non gli volta mai la schiena. Provatelo, e non tornerete ai vostri spilli.»",
+			"listino": [
+				{ "item": "healingPotion", "prezzo": 25 },
+				{ "item": "r-lama-affilata", "prezzo": 120 },
+				{ "item": "r-arco-lungo-teso", "prezzo": 120 },
+				{ "item": "r-cuoio-rinforzato", "prezzo": 100 },
+				{ "item": "chainMail", "prezzo": 110 },
+				{ "item": "longsword", "prezzo": 60 }
+			]
+		},
+		{
+			"id": "mercante-elfico",
+			"nome": "Lindir — Mercante Elfico del Guado",
+			"luogo": "Guado di Bruinen",
+			"saluto": "«Cio' che vendo non si misura a peso d'oro, ma l'oro e' cio' che i mortali sanno offrire. Scegliete con cura: la strada davanti a voi non perdona.»",
+			"listino": [
+				{ "item": "healingPotion", "prezzo": 22 },
+				{ "item": "r-pozione-maggiore", "prezzo": 90 },
+				{ "item": "r-amuleto-viandante", "prezzo": 160 },
+				{ "item": "e-arco-frontiera", "prezzo": 260 },
+				{ "item": "quarterstaff", "prezzo": 15 }
+			]
+		},
+		{
+			"id": "quartiermastro-gondor",
+			"nome": "Beregond — Quartiermastro di Minas Tirith",
+			"luogo": "Campi del Pelennor",
+			"saluto": "«L'arsenale della Citta' Bianca apre ai suoi alleati. Comprate cio' che vi terra' vivi: ogni lama in piu' sul Pelennor e' un'ora in piu' per Gondor.»",
+			"listino": [
+				{ "item": "healingPotion", "prezzo": 25 },
+				{ "item": "r-pozione-maggiore", "prezzo": 85 },
+				{ "item": "e-giaco-runico", "prezzo": 300 },
+				{ "item": "e-lama-corsara", "prezzo": 320 },
+				{ "item": "e-elisir-rinascita", "prezzo": 220 },
+				{ "item": "l-corazza-forte", "prezzo": 650 }
+			]
+		}
+	]
+}
