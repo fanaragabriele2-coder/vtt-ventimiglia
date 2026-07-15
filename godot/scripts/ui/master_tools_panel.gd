@@ -31,11 +31,18 @@ func _ready() -> void:
 	CombatManager.combatant_damaged.connect(_su_evento_combattente)
 	CombatManager.combatant_healed.connect(_su_evento_combattente)
 	CombatManager.combatant_defeated.connect(_su_evento_combattente)
+	# Anche i cambi di stato di morte (morente/stabile/morto/rianimato) ridisegnano la lista.
+	CombatManager.combatant_dying.connect(_su_evento_combattente)
+	CombatManager.death_save_rolled.connect(_su_evento_combattente)
+	CombatManager.combatant_stabilized.connect(_su_evento_combattente)
+	CombatManager.combatant_died_final.connect(_su_evento_combattente)
+	CombatManager.combatant_revived.connect(_su_evento_combattente)
 
 
 ## Un signal di CombatManager (con firme diverse) ridisegna la lista: gli argomenti non servono,
 ## la lista si rilegge sempre intera da get_state — un solo handler variadico per tutti.
-func _su_evento_combattente(_a: Variant = null, _b: Variant = null, _c: Variant = null) -> void:
+func _su_evento_combattente(_a: Variant = null, _b: Variant = null, _c: Variant = null,
+		_d: Variant = null, _e: Variant = null) -> void:
 	_ricostruisci_lista()
 
 
@@ -107,23 +114,40 @@ func _riga_combattente(c: Dictionary) -> HBoxContainer:
 	riga.add_theme_constant_override("separation", 4)
 	var e_pc: bool = String(c.get("kind", "")) == "pc"
 	var abbattuto: bool = bool(c.get("defeated", false))
+	var id_c: String = String(c["id"])
+	# Stato di morte per i PG a terra (D&D 5e): morente / stabile / morto, coi contatori.
+	var stato_morte: String = ""
+	if e_pc and CombatManager.is_pc_dying(id_c):
+		var s: Dictionary = CombatManager.stato_morte(id_c)
+		stato_morte = "  🩸 morente (✓%d ✗%d)" % [int(s.get("successi", 0)), int(s.get("fallimenti", 0))]
+	elif e_pc and CombatManager.is_pc_stable(id_c):
+		stato_morte = "  🩹 stabile"
+	elif e_pc and CombatManager.is_pc_dead(id_c):
+		stato_morte = "  💀 morto"
 
 	var nome := Label.new()
 	var hp: String = "%d/%d" % [int(c["hitPoints"]), int(c["maxHitPoints"])]
-	nome.text = "%s %s  (%s)" % ["🛡" if e_pc else "☠", String(c["name"]), hp]
+	nome.text = "%s %s  (%s)%s" % ["🛡" if e_pc else "☠", String(c["name"]), hp, stato_morte]
 	nome.add_theme_font_size_override("font_size", 12)
 	nome.add_theme_color_override(
 		"font_color", Color(0.55, 0.52, 0.48) if abbattuto else Color(0.9, 0.85, 0.72))
 	nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	riga.add_child(nome)
 
-	riga.add_child(_mini_btn("−5", _danno_rapido.bind(String(c["id"])), Color(0.7, 0.3, 0.28)))
-	riga.add_child(_mini_btn("+5", _cura_rapida.bind(String(c["id"])), Color(0.3, 0.55, 0.35)))
+	riga.add_child(_mini_btn("−5", _danno_rapido.bind(id_c), Color(0.7, 0.3, 0.28)))
+	riga.add_child(_mini_btn("+5", _cura_rapida.bind(id_c), Color(0.3, 0.55, 0.35)))
+	if e_pc and CombatManager.is_pc_dying(id_c):
+		# Azione del Master: stabilizza un PG morente (come una prova di Medicina riuscita).
+		riga.add_child(_mini_btn("🩹", _stabilizza.bind(id_c), Color(0.35, 0.5, 0.62)))
 	if not e_pc:
 		# Solo i PNG si tolgono dalla scena: i PG del party si gestiscono da scheda/creazione.
-		var togli := _togli.bind(String(c["id"]), String(c["name"]))
+		var togli := _togli.bind(id_c, String(c["name"]))
 		riga.add_child(_mini_btn("🗑", togli, Color(0.4, 0.36, 0.34)))
 	return riga
+
+
+func _stabilizza(combatant_id: String) -> void:
+	CombatManager.stabilizza(combatant_id)
 
 
 func _mini_btn(testo: String, azione: Callable, tinta: Color) -> Button:

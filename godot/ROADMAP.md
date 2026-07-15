@@ -401,6 +401,27 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       vinto lo scontro il racconto prosegue da solo. Tutto **offline**, senza dipendere dal
       Master IA/Groq. Rimosso il vecchio `nlp_ui_controller.gd` (superato).
 
+### ✅ Analisi di giochi simili → Tiri Salvezza contro la Morte (luglio 2026)
+- [x] **Ricerca**: confronto con i VTT/CRPG di riferimento (Foundry VTT, Roll20, Baldur's Gate 3,
+      Solasta). La lacuna piu' grossa e piu' "5e" del gioco: un PG a 0 PF era **eliminato di
+      colpo**, mentre in ogni implementazione seria fa i **tiri salvezza contro la morte** e gli
+      alleati possono rianimarlo. (Altri candidati emersi: copertura +2/+5 CA, concentrazione —
+      annotati per il futuro.)
+- [x] **Death saving throws** (regola D&D 5e completa): un PG a 0 PF diventa **MORENTE** (non
+      morto). Al suo turno tira 1d20 — 10+ successo, altrimenti fallimento, **20 naturale = si
+      rialza a 1 PF**, 1 = due fallimenti; 3 successi = **stabile**, 3 fallimenti = **morto**.
+      Colpito mentre e' a terra subisce un fallimento (due se e' un critico); danno ≥ PF massimi
+      = morte istantanea (danno massiccio). **Curarlo lo rimette in piedi** e azzera i tiri.
+- [x] **Il TPK ora ha senso**: lo scontro non e' perso finche' un PG e' cosciente O morente (un
+      morente puo' ancora rialzarsi con un 20 o una cura) — party_wiped scatta solo quando tutti
+      sono stabili o morti. I PG morenti restano nel giro dei turni (solo per tirare), i nemici
+      ignorano chi e' gia' a terra.
+- [x] **`DeathSaves`** (autoload, come EnemyAI): al turno di un morente tira in automatico e passa
+      il turno (esito in chat). **`CombatManager.stabilizza()`** + pulsante 🩹 nel cassetto
+      Strumenti del Master (che ora mostra morente/stabile/morto coi contatori ✓/✗). Logica
+      verificata con simulazione Python (5000 partite convergono; crit/danno massiccio/cura/nat20/
+      wipe/eleggibilita' turni tutti corretti).
+
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
 2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti

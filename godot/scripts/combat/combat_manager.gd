@@ -31,6 +31,15 @@ signal combatant_position_changed(combatant_id: String, cell: Vector2i)
 ## Un combattente e' stato TOLTO dalla scena dal Master (non ucciso: niente XP/bottino). La UI
 ## mappa rimuove il token ascoltando questo signal.
 signal combatant_removed(combatant_id: String)
+## TIRI SALVEZZA CONTRO LA MORTE (D&D 5e): un PG a 0 PF non muore subito, e' MORENTE e ogni suo
+## turno tira 1d20 (10+ = successo, altrimenti fallimento; 20 = si rialza a 1 PF; 1 = due
+## fallimenti). 3 successi = stabile; 3 fallimenti = morto. La UI/HUD reagisce a questi signal.
+signal death_save_rolled(
+	combatant_id: String, tiro: int, esito: String, successi: int, fallimenti: int)
+signal combatant_dying(combatant_id: String)
+signal combatant_stabilized(combatant_id: String)
+signal combatant_died_final(combatant_id: String)
+signal combatant_revived(combatant_id: String)
 
 const MONSTERS_PATH: String = "res://data/monsters.json"
 const PC_PREFIX: String = "pc-"
@@ -67,6 +76,11 @@ var _positions: Dictionary = {}
 # Tipi di mostro la cui LORE e' gia' stata raccontata in questo scontro (catalog_id -> true):
 # la storia di un nemico si annuncia UNA volta alla sua prima comparsa, non per ogni gregario.
 var _lore_annunciate: Dictionary = {}
+
+# Stato dei TIRI SALVEZZA CONTRO LA MORTE dei PG morenti (combattente_id -> { successi, fallimenti,
+# stabile, morto }). Vive solo durante lo scontro (azzerato a end_combat): un PG "morente" e' a
+# 0 PF, non stabile e non morto; puo' tornare in gioco con una cura o un 20 naturale.
+var _tiri_morte: Dictionary = {}
 
 
 func _ready() -> void:
@@ -329,6 +343,7 @@ func end_combat() -> void:
 	ConditionsManager.reset()
 	SurfacesManager.reset()
 	_lore_annunciate.clear()  # al prossimo scontro le storie si raccontano di nuovo
+	_tiri_morte.clear()       # i tiri contro la morte valgono solo dentro lo scontro
 	GameState.set_combat_active(false)
 	combat_ended.emit()
 	_allinea_pc_roster()
@@ -355,10 +370,19 @@ func _find_next_living_index(from_index: int) -> int:
 		return -1
 	for offset: int in range(1, n + 1):
 		var index: int = (from_index + offset + n) % n
-		var c: Dictionary = _combatants[index]
-		if not c["defeated"] and int(c["hitPoints"]) > 0:
+		if _puo_avere_turno(_combatants[index]):
 			return index
 	return -1
+
+
+## Chi ha diritto a un turno: i PNG in piedi, i PG coscienti, e i PG MORENTI (il loro turno
+## serve solo a tirare il salvezza contro la morte). Restano fuori i morti e gli stabili.
+func _puo_avere_turno(c: Dictionary) -> bool:
+	if String(c["kind"]) == "npc":
+		return not bool(c["defeated"]) and int(c["hitPoints"]) > 0
+	if int(c["hitPoints"]) > 0:
+		return true
+	return is_pc_dying(String(c["id"]))
 
 
 func roll_all_initiative() -> void:
@@ -455,12 +479,14 @@ func roll_damage_formula(formula: String, critical: bool = false) -> Dictionary:
 ## ProgressionManager per accreditare l'XP a chi ha DAVVERO sferrato il colpo, non a chi e' mostrato
 ## in hotseat quando il PNG cade (porting del problema che js/15 risolveva parsando lastRoll.title —
 ## qui e' diretto, perche' resolve_attack conosce gia' l'attaccante).
-func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: String = "") -> bool:
+func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: String = "",
+		critico: bool = false) -> bool:
 	var combatant: Dictionary = get_combatant(combatant_id)
 	if combatant.is_empty():
 		return false
 	var damage: int = clampi(amount, 0, 9999)
 	var was_defeated: bool = bool(combatant["defeated"])
+	var era_gia_a_zero: bool = combatant["kind"] == "pc" and int(combatant["hitPoints"]) <= 0
 
 	if combatant["kind"] == "pc":
 		# Un membro del party: gli HP autorevoli stanno in CharacterManager (per-personaggio).
@@ -473,9 +499,134 @@ func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: Str
 	combatant_damaged.emit(combatant_id, damage, int(combatant["hitPoints"]))
 	if combatant["kind"] == "npc" and combatant["defeated"] and not was_defeated:
 		combatant_defeated.emit(combatant_id, source_id)
+	elif combatant["kind"] == "pc" and int(combatant["hitPoints"]) <= 0:
+		_gestisci_pg_a_zero(combatant_id, combatant, damage, era_gia_a_zero, critico)
 
 	_check_end_conditions(combatant)
 	return true
+
+
+## Un PG e' sceso (o resta) a 0 PF: entra nello stato MORENTE (o subisce fallimenti se lo era
+## gia'). Danno >= PF massimi = morte istantanea (regola del danno massiccio 5e).
+func _gestisci_pg_a_zero(id: String, combatant: Dictionary, danno: int, era_gia_a_zero: bool,
+		critico: bool) -> void:
+	var nome: String = String(combatant.get("name", "L'eroe"))
+	if danno >= int(combatant.get("maxHitPoints", 1)) and era_gia_a_zero:
+		_tiri_morte[id] = { "successi": 0, "fallimenti": 3, "stabile": false, "morto": true }
+		combatant_died_final.emit(id)
+		GameState.announce("💀 %s subisce un colpo devastante mentre e' a terra... e spira." % nome)
+		return
+	if not _tiri_morte.has(id):
+		_tiri_morte[id] = { "successi": 0, "fallimenti": 0, "stabile": false, "morto": false }
+		combatant_dying.emit(id)
+		GameState.announce("🩸 %s cade a terra a 0 PF! Ogni suo turno tira contro la morte "
+			% nome + "(o curatelo prima che sia tardi).")
+		return
+	if era_gia_a_zero and not _tiri_morte[id]["morto"]:
+		# Colpito mentre e' gia' a terra: un fallimento automatico (due se e' un critico).
+		_tiri_morte[id]["stabile"] = false
+		_aggiungi_fallimenti(id, 2 if critico else 1)
+
+
+# --- Tiri salvezza contro la morte ---
+
+## Il PG e' MORENTE (a terra, ancora in bilico: ne' stabile ne' morto)?
+func is_pc_dying(id: String) -> bool:
+	var s: Variant = _tiri_morte.get(id)
+	if s == null:
+		return false
+	return not bool((s as Dictionary)["stabile"]) and not bool((s as Dictionary)["morto"])
+
+
+func is_pc_stable(id: String) -> bool:
+	var s: Variant = _tiri_morte.get(id)
+	return s != null and bool((s as Dictionary)["stabile"])
+
+
+func is_pc_dead(id: String) -> bool:
+	var s: Variant = _tiri_morte.get(id)
+	return s != null and bool((s as Dictionary)["morto"])
+
+
+## Stato dei tiri per la UI ({} se il PG non e' in pericolo di morte).
+func stato_morte(id: String) -> Dictionary:
+	return _tiri_morte.get(id, {})
+
+
+## Tira 1d20 per un PG morente (lo chiama DeathSaves al suo turno). 20 = torna a 1 PF; 1 = due
+## fallimenti; 10+ = un successo; altrimenti un fallimento. 3 successi = stabile, 3 = morto.
+func roll_death_save(id: String) -> void:
+	if not is_pc_dying(id):
+		return
+	var nome: String = String(get_combatant(id).get("name", "L'eroe"))
+	var d: int = randi_range(1, 20)
+	if d == 20:
+		_rianima(id, 1)
+		GameState.announce("🎲 %s tira un 20 NATURALE contro la morte: si rialza con 1 PF!" % nome)
+		death_save_rolled.emit(id, d, "rivive", 0, 0)
+		return
+	var s: Dictionary = _tiri_morte[id]
+	if d == 1:
+		s["fallimenti"] = int(s["fallimenti"]) + 2
+	elif d >= 10:
+		s["successi"] = int(s["successi"]) + 1
+	else:
+		s["fallimenti"] = int(s["fallimenti"]) + 1
+	var esito: String = "successo" if d >= 10 else "fallimento"
+	if int(s["successi"]) >= 3:
+		s["stabile"] = true
+		combatant_stabilized.emit(id)
+		GameState.announce("🩹 %s si stabilizza: fuori pericolo, ma resta a terra." % nome)
+		esito = "stabile"
+	elif int(s["fallimenti"]) >= 3:
+		s["morto"] = true
+		combatant_died_final.emit(id)
+		GameState.announce("💀 %s fallisce il terzo tiro salvezza contro la morte... e spira." % nome)
+		esito = "morto"
+	else:
+		GameState.announce("🎲 %s, tiro contro la morte: %d (%s) — successi %d, fallimenti %d." % [
+			nome, d, esito, int(s["successi"]), int(s["fallimenti"]),
+		])
+	death_save_rolled.emit(id, d, esito, int(s["successi"]), int(s["fallimenti"]))
+	_check_end_conditions(get_combatant(id))
+
+
+## Un alleato/Master STABILIZZA un PG morente (azione: prova di Medicina o kit del guaritore):
+## niente piu' tiri, resta a terra ma non muore.
+func stabilizza(id: String) -> bool:
+	if not is_pc_dying(id):
+		return false
+	_tiri_morte[id]["stabile"] = true
+	combatant_stabilized.emit(id)
+	var nome: String = String(get_combatant(id).get("name", "L'eroe"))
+	GameState.announce("🩹 %s viene stabilizzato: non morira'." % nome)
+	return true
+
+
+func _aggiungi_fallimenti(id: String, n: int) -> void:
+	var s: Dictionary = _tiri_morte[id]
+	s["fallimenti"] = int(s["fallimenti"]) + n
+	if int(s["fallimenti"]) >= 3:
+		s["morto"] = true
+		combatant_died_final.emit(id)
+		var nome: String = String(get_combatant(id).get("name", "L'eroe"))
+		GameState.announce("💀 %s, colpito a terra, non ce la fa piu'." % nome)
+	death_save_rolled.emit(
+		id, 0, "morto" if s["morto"] else "fallimento", int(s["successi"]), int(s["fallimenti"]))
+
+
+## Riporta in vita un PG morente/stabile a `pf` punti ferita (cura o 20 naturale): esce dallo
+## stato di morte e torna cosciente.
+func _rianima(id: String, pf: int) -> void:
+	_tiri_morte.erase(id)
+	var c: Dictionary = get_combatant(id)
+	var char_id: String = String(c.get("characterId", ""))
+	if not char_id.is_empty():
+		# Il PG e' a 0 PF: curarlo di `pf` lo porta esattamente a `pf` (min con i PF massimi).
+		CharacterManager.heal_by_id(char_id, maxi(1, pf))
+		_sync_pcs_from_characters()
+	combatant_revived.emit(id)
+	combatant_healed.emit(id, pf, int(get_combatant(id).get("hitPoints", pf)))
 
 
 func heal_combatant(combatant_id: String, amount: int) -> bool:
@@ -484,22 +635,31 @@ func heal_combatant(combatant_id: String, amount: int) -> bool:
 		return false
 	var healing: int = clampi(amount, 0, 9999)
 	if combatant["kind"] == "pc":
+		# Curare un PG MORENTE/stabile lo riporta in gioco: esce dallo stato di morte.
+		var era_a_terra: bool = _tiri_morte.has(String(combatant_id))
 		CharacterManager.heal_by_id(String(combatant["characterId"]), healing)
 		_sync_pcs_from_characters()
+		if era_a_terra and int(get_combatant(combatant_id).get("hitPoints", 0)) > 0:
+			_tiri_morte.erase(String(combatant_id))
+			combatant_revived.emit(combatant_id)
+			GameState.announce("✨ %s riprende conoscenza e torna in piedi!"
+				% String(combatant.get("name", "L'eroe")))
 	else:
 		combatant["hitPoints"] = mini(int(combatant["maxHitPoints"]), int(combatant["hitPoints"]) + healing)
 		combatant["defeated"] = int(combatant["hitPoints"]) <= 0
-	combatant_healed.emit(combatant_id, healing, int(combatant["hitPoints"]))
+	combatant_healed.emit(combatant_id, healing, int(get_combatant(combatant_id).get("hitPoints", 0)))
 	return true
 
 
 func _check_end_conditions(last_hit: Dictionary) -> void:
 	if not _active:
 		return
-	# TPK: tutti i PG a terra.
+	# TPK: nessun PG puo' piu' agire — ne' cosciente ne' MORENTE (un morente potrebbe ancora
+	# rialzarsi con un 20 o una cura, quindi finche' ce n'e' uno lo scontro NON e' perso).
 	var pcs: Array = _combatants.filter(func(c: Dictionary) -> bool: return c["kind"] == "pc")
-	var pcs_alive: Array = pcs.filter(func(c: Dictionary) -> bool: return not c["defeated"] and int(c["hitPoints"]) > 0)
-	if pcs.size() > 0 and pcs_alive.is_empty():
+	var pcs_in_gioco: Array = pcs.filter(func(c: Dictionary) -> bool:
+		return int(c["hitPoints"]) > 0 or is_pc_dying(String(c["id"])))
+	if pcs.size() > 0 and pcs_in_gioco.is_empty():
 		_last_event = "TPK: tutto il party e' a terra."
 		party_wiped.emit()
 		end_combat()
@@ -587,7 +747,7 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	if hit:
 		var dmg: Dictionary = roll_damage_formula(String(attacker["damageFormula"]), critical)
 		result["damage"] = int(dmg["total"])
-		apply_damage_to_combatant(target_id, int(dmg["total"]), attacker_id)
+		apply_damage_to_combatant(target_id, int(dmg["total"]), attacker_id, critical)
 	attack_resolved.emit(result)
 	return result
 
