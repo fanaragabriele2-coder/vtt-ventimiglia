@@ -14,6 +14,7 @@ var _barra: ProgressBar
 var _residuo: Label
 var _evento: Label
 var _marcia_btn: Button
+var _campo_btn: Button
 var _attesa_tiro: bool = false
 var _vassoio_connesso: bool = false
 var _generazione: int = 0
@@ -27,6 +28,11 @@ func _ready() -> void:
 	TravelDirector.viaggio_avanzato.connect(_su_avanzato)
 	TravelDirector.viaggio_arrivato.connect(_su_arrivato)
 	TravelDirector.viaggio_annullato.connect(_su_annullato)
+	# Durante uno scontro (agguato in marcia, agguato notturno al campo) non si avanza ne' ci si
+	# accampa: prima si combatte. I pulsanti seguono lo stato del combattimento.
+	CombatManager.combat_started.connect(_aggiorna_pulsanti)
+	CombatManager.combat_ended.connect(_aggiorna_pulsanti)
+	JourneyEvents.riposo_finito.connect(_aggiorna_pulsanti)
 
 
 func _su_iniziato(dati: Dictionary) -> void:
@@ -42,6 +48,7 @@ func _su_iniziato(dati: Dictionary) -> void:
 	_evento.text = "Tira il dado per avanzare lungo la strada."
 	_marcia_btn.disabled = false
 	_marcia_btn.text = "🎲 Marcia (1d20)"
+	_campo_btn.disabled = false
 
 
 func _su_avanzato(dati: Dictionary) -> void:
@@ -52,7 +59,10 @@ func _su_avanzato(dati: Dictionary) -> void:
 	var evt: String = String(dati.get("evento", ""))
 	_evento.text = evt if not evt.is_empty() else "La compagnia prosegue lungo il cammino."
 	if not bool(dati.get("arrivato", false)):
-		_marcia_btn.disabled = false
+		# Se la tappa ha innescato un AGGUATO (JourneyEvents riceve il segnale prima di noi),
+		# i pulsanti restano spenti: si riaccendono a scontro finito (_aggiorna_pulsanti).
+		_marcia_btn.disabled = CombatManager.is_active()
+		_campo_btn.disabled = CombatManager.is_active()
 		_marcia_btn.text = "🎲 Marcia (1d20)"
 
 
@@ -62,6 +72,7 @@ func _su_arrivato(nome: String) -> void:
 	_titolo.text = "🏁 Arrivati a %s" % nome
 	_residuo.text = "La compagnia ha raggiunto la meta."
 	_marcia_btn.disabled = true
+	_campo_btn.disabled = true
 	_chiudi_dopo(CHIUSURA_AUTO)
 
 
@@ -70,11 +81,21 @@ func _su_annullato() -> void:
 	visible = false
 
 
+## Con uno scontro in corso i pulsanti del viaggio si spengono: prima le lame, poi la strada.
+func _aggiorna_pulsanti() -> void:
+	var blocco: bool = CombatManager.is_active()
+	if TravelDirector.in_viaggio():
+		_marcia_btn.disabled = blocco or _attesa_tiro
+		_campo_btn.disabled = blocco or JourneyEvents.riposo_in_corso()
+
+
 ## Marcia: apre il vassoio 3D per un 1d20; l'esito fa avanzare il viaggio. Senza vassoio (scena
 ## spoglia) tira all'istante, stesso flusso. Un solo tiro alla volta (il tasto si disabilita).
 func _on_marcia() -> void:
 	if not TravelDirector.in_viaggio() or _attesa_tiro:
 		return
+	if CombatManager.is_active() or JourneyEvents.riposo_in_corso():
+		return  # prima si risolve lo scontro (o si finisce di dormire), poi si riparte
 	_attesa_tiro = true
 	_marcia_btn.disabled = true
 	_marcia_btn.text = "🎲 …"
@@ -153,3 +174,19 @@ func _build_ui() -> void:
 	_marcia_btn.custom_minimum_size = Vector2(0, 44)
 	_marcia_btn.pressed.connect(_on_marcia)
 	col.add_child(_marcia_btn)
+
+	_campo_btn = Button.new()
+	_campo_btn.text = "🏕 Accampati per la notte"
+	_campo_btn.tooltip_text = "Una notte di riposo: cura tutto il party e rinfranca lo spirito " \
+		+ "— ma nelle terre pericolose l'Ombra potrebbe trovarvi nel sonno."
+	_campo_btn.custom_minimum_size = Vector2(0, 38)
+	_campo_btn.pressed.connect(_on_campo)
+	col.add_child(_campo_btn)
+
+
+## Accampamento: lo gestisce JourneyEvents (notte, rischio d'agguato, cura all'alba).
+func _on_campo() -> void:
+	if CombatManager.is_active() or JourneyEvents.riposo_in_corso():
+		return
+	_campo_btn.disabled = true
+	JourneyEvents.accampati()

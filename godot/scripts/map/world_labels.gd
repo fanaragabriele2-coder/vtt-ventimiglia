@@ -20,7 +20,15 @@ var _ultimo_zoom: float = 0.0
 
 func configura(camera: Camera2D) -> void:
 	_camera = camera
+	# Alla prima visita di un luogo (world:luogo) il suo nome si accende: serve un redraw.
+	# Connessione a METODO (non lambda): si scollega da sola quando il builder viene liberato.
+	GameState.event_published.connect(_su_evento_globale)
 	set_process(true)
+
+
+func _su_evento_globale(nome_evento: String, _payload: Variant) -> void:
+	if nome_evento == "world:luogo":
+		queue_redraw()
 
 
 ## Legge etichette.json dalla cartella indicata (res:// o user://). Ritorna quante voci valide.
@@ -121,7 +129,10 @@ func _draw() -> void:
 		var pos: Vector2 = voce["pos"]
 		var nome: String = voce["nome"]
 		var ombra: float = maxf(2.0, dim * 0.04)
+		# I luoghi mai raggiunti dal party sono solo un sussurro sulla mappa: il nome si accende
+		# per davvero alla prima visita (TravelJournal tiene l'elenco dei posti toccati).
+		var alfa: float = 1.0 if TravelJournal.luogo_visitato(nome) else 0.45
 		draw_string(font, pos + Vector2(-mezza + ombra, ombra), nome,
-			HORIZONTAL_ALIGNMENT_CENTER, mezza * 2.0, dim, Color(0, 0, 0, 0.8))
+			HORIZONTAL_ALIGNMENT_CENTER, mezza * 2.0, dim, Color(0, 0, 0, 0.8 * alfa))
 		draw_string(font, pos + Vector2(-mezza, 0), nome,
-			HORIZONTAL_ALIGNMENT_CENTER, mezza * 2.0, dim, Color(0.92, 0.86, 0.7))
+			HORIZONTAL_ALIGNMENT_CENTER, mezza * 2.0, dim, Color(0.92, 0.86, 0.7, alfa))

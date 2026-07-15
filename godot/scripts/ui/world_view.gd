@@ -57,6 +57,8 @@ var _campagna_option: OptionButton
 var _viaggia_option: OptionButton
 var _dadi_btn: Button
 var _travel_panel: TravelPanel
+var _status_panel: CompanyStatusPanel
+var _journal_panel: JournalPanel
 var _palette: PanelContainer
 var _palette_row: HBoxContainer
 # Lo stato dei comandi vive QUI (non nel builder): sopravvive a ogni "Ricarica mappe".
@@ -75,6 +77,7 @@ func _ready() -> void:
 	_build_palette()
 	_build_minimap()
 	_build_travel_panel()
+	_build_company_panels()
 	_popola_viaggio()
 	# files_dropped vive sulla Window (la vista puo' essere ricreata, la finestra no): connesso
 	# qui e scollegato in _exit_tree, con guardia di visibilita' dentro il gestore — i drop
@@ -253,6 +256,14 @@ func _build_toolbar() -> void:
 	nebbia.toggled.connect(_su_nebbia)
 	row.add_child(nebbia)
 
+	var diario := Button.new()
+	diario.text = "📓 Diario"
+	diario.tooltip_text = "Il diario di viaggio della Compagnia: partenze, agguati respinti, " \
+		+ "boss abbattuti, arrivi e cadute, scritti da soli giorno per giorno."
+	diario.custom_minimum_size = Vector2(0, 34)
+	diario.pressed.connect(_su_diario)
+	row.add_child(diario)
+
 
 ## Palette dei props: seconda barra sotto la toolbar, visibile solo in modalita' "🌳 Props".
 ## Un toggle per ogni immagine del catalogo (assets/props + user://props, quest'ultima vince).
@@ -327,6 +338,22 @@ func _build_travel_panel() -> void:
 	)
 
 
+## Cruscotto dello Spirito (giorno/Fardello/Speranza, in alto a destra, solo Terra di Mezzo) e
+## pannello del Diario di viaggio (aperto dal pulsante 📓 della toolbar). Figli della vista:
+## sopravvivono a ogni "Ricarica mappe" del builder.
+func _build_company_panels() -> void:
+	_status_panel = CompanyStatusPanel.new()
+	add_child(_status_panel)
+	_status_panel.set_anchors_and_offsets_preset(
+		Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_KEEP_SIZE, 10
+	)
+	_journal_panel = JournalPanel.new()
+	add_child(_journal_panel)
+	_journal_panel.set_anchors_and_offsets_preset(
+		Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_KEEP_SIZE, 14
+	)
+
+
 ## Riempie il selettore "Viaggia a…" coi luoghi del set attivo (prima voce = intestazione inerte).
 func _popola_viaggio() -> void:
 	if _viaggia_option == null:
@@ -352,6 +379,10 @@ func _su_viaggia_selezionato(indice: int) -> void:
 func _su_dadi_toggle(acceso: bool) -> void:
 	TravelDirector.abilitato = acceso
 	_dadi_btn.text = "🎲 Viaggio a dadi: ON" if acceso else "🎲 Viaggio a dadi: OFF"
+
+
+func _su_diario() -> void:
+	_journal_panel.visible = not _journal_panel.visible
 
 
 func _on_ora_pressed(nome: String) -> void:

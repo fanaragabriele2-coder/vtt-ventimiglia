@@ -108,11 +108,17 @@ func risolvi_prova(indice: int, totale_d20: int) -> void:
 	var abilita: String = String(prova.get("abilita", "dex"))
 	var mod: int = modificatore_di(abilita)
 	var cd: int = int(prova.get("cd", 12))
-	var totale: int = totale_d20 + mod
+	# Lo SPIRITO della Compagnia (Speranza alta/bassa, Fardello dell'Ombra) e i Doni del Cammino
+	# pesano sulle prove: la stessa strada e' piu' facile per chi spera e porta i segni dell'Ovest.
+	var spirito: int = CompanySpirit.mod_prove() + RelicsManager.bonus_prove()
+	var totale: int = totale_d20 + mod + spirito
 	var ok: bool = totale >= cd
 	var etichetta: String = String(prova.get("etichetta", NOMI_ABILITA.get(abilita, "Prova")))
-	GameState.announce("🎲 %s: %d + %d = %d contro CD %d — %s!" % [
-		etichetta, totale_d20, mod, totale, cd, "RIUSCITA" if ok else "FALLITA",
+	var dettaglio: String = "%d + %d" % [totale_d20, mod]
+	if spirito != 0:
+		dettaglio += " %+d (spirito)" % spirito
+	GameState.announce("🎲 %s: %s = %d contro CD %d — %s!" % [
+		etichetta, dettaglio, totale, cd, "RIUSCITA" if ok else "FALLITA",
 	])
 	_vai_a(String(prova.get("successo" if ok else "fallimento", _nodo_corrente)))
 

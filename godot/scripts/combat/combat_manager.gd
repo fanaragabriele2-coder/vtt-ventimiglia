@@ -595,13 +595,16 @@ func roll_death_save(id: String) -> void:
 		death_save_rolled.emit(id, d, "rivive", 0, 0)
 		return
 	var s: Dictionary = _tiri_morte[id]
+	# La SPERANZA della Compagnia pesa sull'orlo della morte (+1/-1 sulla soglia del 10);
+	# i 20 e gli 1 naturali restano naturali, come da regola.
+	var spirito: int = CompanySpirit.mod_tiri_morte()
 	if d == 1:
 		s["fallimenti"] = int(s["fallimenti"]) + 2
-	elif d >= 10:
+	elif d + spirito >= 10:
 		s["successi"] = int(s["successi"]) + 1
 	else:
 		s["fallimenti"] = int(s["fallimenti"]) + 1
-	var esito: String = "successo" if d >= 10 else "fallimento"
+	var esito: String = "successo" if d + spirito >= 10 else "fallimento"
 	if int(s["successi"]) >= 3:
 		s["stabile"] = true
 		combatant_stabilized.emit(id)
@@ -770,6 +773,11 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	if ConcentrationManager.benedetto(attacker_id):
 		benedizione = randi_range(1, 4)
 		attack_total += benedizione
+	# DONI DEL CAMMINO: con 4+ reliquie del set i PG colpiscono meglio (+1, RelicsManager).
+	var reliquie: int = 0
+	if attacker_id.begins_with(PC_PREFIX):
+		reliquie = RelicsManager.bonus_attacco()
+		attack_total += reliquie
 	var critical: bool = bool(d20["naturalTwenty"])
 	# COPERTURA (5e): a distanza, un bersaglio riparato da un prop alza la sua CA (+2 mezza, +5
 	# tre quarti). In mischia non conta (si e' adiacenti).
@@ -785,7 +793,8 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	var result: Dictionary = {
 		"ok": true, "attacker": attacker_id, "target": target_id, "mode": modalita_finale,
 		"roll": d20["chosen"], "attackTotal": attack_total, "blessing": benedizione,
-		"targetAc": ca_bersaglio, "cover": copertura, "critical": critical, "hit": hit, "damage": 0,
+		"relics": reliquie, "targetAc": ca_bersaglio, "cover": copertura,
+		"critical": critical, "hit": hit, "damage": 0,
 	}
 	if hit:
 		var dmg: Dictionary = roll_damage_formula(String(attacker["damageFormula"]), critical)
@@ -806,7 +815,8 @@ func saving_throw(combatant_id: String, ability: String, dc: int) -> Dictionary:
 	if not char_id.is_empty():
 		var pg: CharacterData = CharacterManager.get_character_by_id(char_id)
 		if pg:
-			bonus = pg.saving_throw_modifier(ability)
+			# Con 6+ Doni del Cammino la luce dell'Ovest veglia sui tiri salvezza dei PG (+1).
+			bonus = pg.saving_throw_modifier(ability) + RelicsManager.bonus_ts()
 	else:
 		var c: Dictionary = get_combatant(combatant_id)
 		bonus = int(c.get("initiativeBonus", 0)) if ability == "dex" \

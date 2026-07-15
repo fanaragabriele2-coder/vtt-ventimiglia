@@ -472,30 +472,50 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       attivo per partire a mano. Interruttore **🎲 Viaggio a dadi: ON/OFF** (default ON) per tornare
       al salto immediato in modalita' sandbox.
 
-### 🎬 Rendere memorabile l'Avventura dell'Anello — roadmap (prossimi passi)
-La marcia a dadi (sopra) e' il **primo** tassello: fa "calcolare tutto alla mappa" e lega il
-movimento al tiro. Ecco il resto, in ordine di impatto, per un'avventura dell'Anello indimenticabile.
-1. **Incontri in viaggio** *(subito dopo)*: sulle tappe piu' sfortunate (o attraversando regioni
-   pericolose — Eregion, le porte di Moria, le Paludi) la marcia puo' **innescare uno scontro** col
-   bestiario della zona (Encounter Balancer gia' pronto): il viaggio diventa teso, non solo una
-   barra che si riempie.
-2. **Il Fardello dell'Anello** *(la firma LOTR)*: un contatore di **corruzione/peso** che cresce
-   vicino ai Nazgul, nei luoghi oscuri e ogni volta che si e' tentati di usare l'Anello; alza le
-   CD, attira gli Spettri, e apre bivi morali. E' il cuore tematico del Signore degli Anelli.
-3. **Speranza della Compagnia** *(morale)*: una statistica di gruppo che le **imprese eroiche**
-   alzano e il **terrore** (Balrog, Re Stregone, l'Occhio) abbassa; influenza i tiri salvezza
-   contro la morte e le prove sotto pressione.
-4. **Giorno/notte e accampamento**: la marcia **consuma giorni**; accamparsi cura e recupera
-   incantesimi, ma vegliare male o marciare di notte alza il rischio d'agguato. Aggancia il ciclo
-   del giorno gia' presente sul Mondo cucito.
-5. **Regioni vive**: ambience e musica che cambiano per **regione** (Landa, Moria, Lorien, Mordor)
-   e nomi/eventi di viaggio specifici del tratto che si attraversa, non solo generici di campagna.
-6. **Grampasso, compagno PNG**: un alleato guidato dall'IA che **marcia, combatte e commenta** —
-   la guida che vi porta da Brea al Morannon, con battute a tema nei momenti chiave.
-7. **Diario di viaggio & mappa che si scopre**: un log delle tappe e delle imprese, le etichette
-   dei luoghi che si **rivelano avvicinandosi**, e un finale che ricapitola le gesta della compagnia.
-8. **Reliquie leggendarie con set-bonus**: legare i doni gia' presenti (mithril, arco Galadhrim,
-   lama del ramingo) a **poteri** e piccoli bonus di set, per premiare l'esplorazione dei bivi.
+### ✅ L'Avventura dell'Anello memorabile — TUTTA la roadmap implementata (luglio 2026)
+Gli 8 punti della roadmap "memorabile", tutti in gioco:
+1. **Incontri in viaggio** (`JourneyEvents`): dopo ogni tappa la strada puo' MORDERE — rischio
+   d'agguato = base 8% + pericolo della regione (fino a +21%) + Fardello (fino a +20%); un **1
+   al dado e' guai una volta su due**. I nemici sono QUELLI DEL POSTO (goblin e troll alle Soglie
+   di Moria, Spettri nelle Paludi Morte, Uruk e Haradrim al Pelennor), spawn bilanciato sul
+   party, e a scontro vinto la marcia riprende. Simulato: ~0,9 agguati a viaggio tipico.
+2. **Il Fardello dell'Ombra** (`CompanySpirit`): la corruzione (0–100) cresce coi **Nazgul**
+   (nemici "terrore": +6 a inizio scontro), nei **luoghi oscuri** (Moria, Cirith Ungol, Paludi,
+   Morannon), nelle giornate storte (1 in marcia); cala nei **rifugi** (Brea, il Guado) e
+   riposando. Ogni 25 punti le **prove del racconto perdono 1** e ogni punto **attira gli
+   agguati** (+0,2%). La firma tematica LOTR, sempre visibile nel cruscotto.
+3. **Speranza della Compagnia** (`CompanySpirit`): il morale (0–100, parte a 50) sale con le
+   vittorie (+3, +5 sugli Spettri) e i rifugi, crolla coi compagni morenti (-3), caduti (-8) e
+   col Terrore. A **70+ da' +1** alle prove e ai **tiri salvezza contro la morte**, a **25- li
+   penalizza di 1**: si muore piu' facilmente quando non si spera piu' (55% → 60% / 50% di
+   successo, verificato in simulazione). I 20 e gli 1 naturali restano naturali.
+4. **Giorno/notte e accampamento**: ogni tappa o notte = **un giorno di cammino** (contatore nel
+   cruscotto). Col pulsante **🏕 Accampati** (TravelPanel) cala la NOTTE sul Mondo cucito, si
+   rischia l'**agguato notturno** (18% + pericolo + Fardello, **dimezzato se Grampasso veglia**),
+   poi l'alba **cura tutto il party** e rinfranca lo spirito (+2 Speranza, -3 Fardello).
+5. **Regioni vive** (`data/regioni_terra_di_mezzo.json`, 11 regioni + fallback): entrare in una
+   regione la ANNUNCIA con un evento di colore suo (i tamburi di Moria, le fiammelle delle
+   Paludi, i corni di Rohan), cambia l'**ambience** (vento/acqua/drone/tamburi) e nei domini
+   dell'Ombra (pericolo 3) fa crescere il Fardello. Ogni etichetta della mappa risolve nella
+   regione giusta (verificato).
+6. **Grampasso, compagno PNG** (`CompanionManager`): il Ramingo commenta i momenti chiave
+   (partenza, agguati, l'arrivo del Terrore, vittorie, arrivi, la veglia al campo) con battute
+   brevi mai a raffica; in combattimento **si getta a stabilizzare un PG morente** (una volta
+   per scontro); al campo la sua veglia **dimezza gli agguati notturni**. Solo in Terra di Mezzo.
+7. **Diario di viaggio** (`TravelJournal` + pannello **📓 Diario**): le gesta si scrivono da sole
+   giorno per giorno (partenze, agguati respinti coi nomi dei nemici, prime visite, cadute);
+   le **etichette dei luoghi mai visitati sono attenuate** e si accendono alla prima visita;
+   a racconto finito il diario compone il **riepilogo delle gesta** (giorni, scontri, luoghi).
+   Persistenza per campagna.
+8. **Reliquie: i Doni del Cammino** (`RelicsManager`): 7 reliquie (Lama del Ramingo, Amuleto del
+   Viandante, Foglia di Lorien, Cotta di Mithril, Arco dei Galadhrim, Spada Ricomposta, Stella
+   Serena) — **tutte ottenibili nella storia** (verificato). Set-bonus a soglie annunciate:
+   **2 Doni = +1 prove, 4 = +1 tiri per colpire dei PG, 6 = +1 tiri salvezza**. Premia chi
+   esplora i bivi invece di correre al finale.
+Il tutto orchestrato dal cruscotto **Spirito della Compagnia** (giorno/Fardello/Speranza, in
+alto a destra sul Mondo, solo Terra di Mezzo). Verifica: gdparse su tutti i 75 script, gdlint
+pulito sui file nuovi (baseline invariata), simulazioni Python di spirito/agguati/reliquie e
+validazione del JSON delle regioni (mostri/scene/pericoli/lookup).
 
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
