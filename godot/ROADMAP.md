@@ -543,16 +543,31 @@ validazione del JSON delle regioni (mostri/scene/pericoli/lookup).
 Le fondamenta ci sono TUTTE: Master IA che narra e fa comparire i nemici, viaggio a dadi,
 agguati regionali, spirito della Compagnia, mercanti e quest. Queste fasi chiudono il cerchio.
 
-### 🔜 Fase G1 — Il Master regista TOTALE dei token
-Il Master gia' narra, evoca i nemici (addNpc/startCombat + rete di sicurezza sulla prosa) e
-sposta il PARTY (moveTo → marcia a dadi). Manca il controllo fine dei SINGOLI token:
-- [ ] comando `moveToken` eseguito davvero: il Master sposta UN alleato o UN nemico per nome
-      ("l'orco ripiega dietro le rocce") — oggi il comando viene re-emesso ma nessuno lo ascolta;
-      va instradato su WorldTokens/WorldEnemyTokens con risoluzione fuzzy del nome e annuncio;
-- [ ] riconoscimento degli spostamenti NARRATI dei nemici (gemello di ChatTravelBridge ma per i
-      token singoli: "il troll carica", "gli arcieri salgono sul colle") con destinazioni
-      relative (verso/lontano da un PG, su un'altura, dietro copertura);
-- [ ] il Master puo' PIAZZARE nemici fuori combattimento (imboscate visibili da preparare).
+### ✅ Fase G1 — Il Master regista TOTALE dei token (luglio 2026)
+Il Master narrava, evocava i nemici e spostava il party; ora dirige anche i SINGOLI gettoni
+(`TokenDirector`, autoload):
+- [x] **comando `moveToken` eseguito davvero**: {"command":"moveToken","target":"troll",
+      "to":"verso Elrik|lontano|copertura|altura|<luogo>","cells":4}. Il target e' FUZZY
+      (radice del nome senza vocale finale: 'orc' prende orco/orchi): un TIPO di nemico muove
+      TUTTI i suoi token ("gli orchi"), un nome del party muove quel solo PG. I nemici si
+      muovono via cella autorevole (CombatManager.set_combatant_cell: il gettone sul mondo
+      segue da solo e le distanze di gioco restano allineate), i PG con la nuova planata
+      singola `WorldTokens.muovi_verso` (nebbia, cella e salvataggio come un trascinamento).
+- [x] **spostamenti NARRATI riconosciuti** (gemello di ChatTravelBridge per i token): se il
+      Master SCRIVE "il troll carica", "gli orchi ripiegano", "gli arcieri salgono sulla
+      cresta", "i selvaggi si nascondono", i token si muovono davvero — frase per frase,
+      nome + verbo di movimento (5 categorie: carica/avanza/ritira/copertura/altura), max 4
+      mosse a narrazione, MAI se il Master ha gia' dato il comando strutturato. VERIFICATO in
+      simulazione: 8/8 frasi tipiche riconosciute, 0/5 falsi positivi su prosa neutra.
+- [x] **destinazioni RELATIVE calcolate sulla mappa**: carica = adiacente al bersaglio; avanza
+      = passo di 4 celle mai oltre l'adiacenza; ritirata = via dal fronte; copertura = la cella
+      riparata piu' vicina (CoverManager.cella_copertura_vicina, entro 8 celle); altura = la
+      cella dipinta piu' alta vicina (ElevationManager). Geometria verificata (adiacenza 1.00,
+      la ritirata allontana, il passo non scavalca mai il bersaglio).
+- [x] **`placeNpc`: nemici PIAZZATI senza scontro** — {"command":"placeNpc","id":"uruk-hai",
+      "count":2} fa comparire i token sulla mappa SENZA avviare i turni (imboscate visibili,
+      sentinelle da aggirare): la battaglia parte solo con startCombat. Niente auto-start e
+      guardia aggiunta in ChatCombatBridge. Prompt del Master aggiornato con i due comandi.
 
 ### 🔜 Fase G2 — La mappa che si TRASFORMA in battaglia
 All'inizio di ogni scontro il Mondo cucito deve DIVENTARE la mappa tattica, senza cambiare vista:

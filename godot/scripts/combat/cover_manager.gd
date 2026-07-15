@@ -25,6 +25,24 @@ func imposta_celle(celle: Dictionary) -> void:
 	copertura_cambiata.emit()
 
 
+## La cella di copertura piu' VICINA a `cella` entro `raggio` (distanza Chebyshev, esclusa la
+## cella stessa), o null se nessun riparo a portata. Usata dalla regia del Master ("il goblin
+## si nasconde dietro le casse"): il token corre al riparo piu' a portata di zampa.
+func cella_copertura_vicina(cella: Vector2i, raggio: int) -> Variant:
+	var migliore: Variant = null
+	var distanza_migliore: int = raggio + 1
+	for k: String in _celle:
+		var parti: PackedStringArray = k.split(",")
+		if parti.size() != 2:
+			continue
+		var c := Vector2i(int(parti[0]), int(parti[1]))
+		var d: int = maxi(absi(c.x - cella.x), absi(c.y - cella.y))
+		if d > 0 and d < distanza_migliore:
+			distanza_migliore = d
+			migliore = c
+	return migliore
+
+
 func copertura_di(cell_x: int, cell_y: int) -> int:
 	return int(_celle.get(_chiave(cell_x, cell_y), 0))
 

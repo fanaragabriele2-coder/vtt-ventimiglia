@@ -283,6 +283,12 @@ func props() -> WorldProps:
 	return _props
 
 
+## Gli attori della REGIA del Master (TokenDirector): i token del party, quelli dei nemici e
+## le etichette dei luoghi, in un colpo solo — un solo accessor per non gonfiare la facciata.
+func regia() -> Dictionary:
+	return { "party": _tokens, "nemici": _nemici_mondo, "etichette": _etichette }
+
+
 ## VIAGGIO sul mondo verso un luogo (nome tra le etichette). Con il viaggio a dadi ATTIVO (default)
 ## non si teletrasporta: parte una MARCIA A TIRI (TravelDirector calcola distanza/tappe, il party
 ## avanza solo tirando il dado). Con il viaggio a dadi disattivato, il party ci plana come prima.

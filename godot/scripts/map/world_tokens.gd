@@ -146,6 +146,30 @@ func _fine_viaggio() -> void:
 	_salva()
 
 
+## REGIA DEL MASTER: muove UN SOLO membro del party verso un punto (gli altri restano dove
+## sono). Plana in ~1.1s; all'arrivo nebbia, cella di combattimento e salvataggio come per un
+## trascinamento a mano. Usato da TokenDirector (comando moveToken / spostamenti narrati).
+func muovi_verso(id_personaggio: String, punto: Vector2) -> void:
+	for i: int in range(_gettoni.size()):
+		if String(_gettoni[i]["id"]) != id_personaggio:
+			continue
+		var arrivo: Vector2 = _dentro_mappa(punto)
+		var tw: Tween = create_tween()
+		tw.tween_method(_muovi_gettone.bind(i), _gettoni[i]["pos"] as Vector2, arrivo, 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_callback(_fine_mossa_singola.bind(id_personaggio))
+		return
+
+
+func _fine_mossa_singola(id_personaggio: String) -> void:
+	for g: Dictionary in _gettoni:
+		if String(g["id"]) == id_personaggio:
+			token_spostato.emit(id_personaggio, g["pos"] as Vector2)
+			_pubblica_cella(id_personaggio, g["pos"] as Vector2)
+			_salva()
+			return
+
+
 func _process(delta: float) -> void:
 	# I token scalano con lo zoom (clamp su schermo): al cambio zoom serve un redraw.
 	if _camera != null and not is_equal_approx(_camera.zoom.x, _ultimo_zoom):

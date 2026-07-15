@@ -55,6 +55,7 @@ JourneyEvents="*res://scripts/autoload/journey_events.gd"
 CompanionManager="*res://scripts/autoload/companion_manager.gd"
 MerchantManager="*res://scripts/autoload/merchant_manager.gd"
 QuestManager="*res://scripts/autoload/quest_manager.gd"
+TokenDirector="*res://scripts/network/token_director.gd"
 CombatSfx="*res://scripts/autoload/combat_sfx.gd"
 
 [audio]

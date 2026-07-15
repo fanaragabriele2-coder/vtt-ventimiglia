@@ -114,7 +114,7 @@ const NUMERI: Dictionary = {
 # strutturato: solo questi disattivano il rilevamento dalla prosa. NON "startCombat" — un
 # startCombat "nudo" (senza addNpc/spawnAt) e' proprio il caso in cui i nemici NON sono stati
 # piazzati e questa rete di sicurezza DEVE intervenire (era il bug "combattimento senza nemici").
-const COMANDI_SPAWN: Array[String] = ["addNpc", "spawnAt"]
+const COMANDI_SPAWN: Array[String] = ["addNpc", "spawnAt", "placeNpc", "placeToken"]
 
 var _re_combattimento: RegEx
 

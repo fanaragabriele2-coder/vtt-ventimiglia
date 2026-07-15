@@ -157,6 +157,11 @@ func _build_system_prompt() -> String:
 		'Per spostare il party in un luogo della mappa: {"command":"moveTo","to":"<nome del luogo>"}.',
 		"(Il party NON si teletrasporta: parte una MARCIA A DADI verso quel luogo — la mappa calcola",
 		" distanza e tappe e i giocatori avanzano tirando il dado. Usa i nomi dei luoghi della mappa.)",
+		'Per muovere UN SOLO token (alleato o nemico): {"command":"moveToken","target":"<nome>",',
+		'"to":"verso <nome PG>|lontano|copertura|altura|<luogo>","cells":4}. Se invece NARRI uno',
+		"spostamento ('il troll carica', 'gli orchi ripiegano') il gioco muove i token da solo.",
+		'Per PIAZZARE nemici visibili SENZA avviare lo scontro (imboscate, sentinelle):',
+		'{"command":"placeNpc","id":"<id nemico>","count":2} — i turni partono solo con startCombat.',
 		"",
 		"REGOLE DEL COMBATTIMENTO (IMPORTANTISSIME, rispettale sempre):",
 		"- Tu NON gestisci il combattimento: lo gestiscono il sistema a turni e i GIOCATORI.",
@@ -645,6 +650,23 @@ func _dispatch_command(command: Dictionary) -> void:
 				ChatTravelBridge.viaggia_a_nome(destinazione)
 			else:
 				GameState.publish("mappa:viaggia", { "nome": destinazione })
+		"moveToken", "moveNpc":
+			# Regia del SINGOLO token (alleato o nemico): risoluzione fuzzy e destinazioni
+			# relative (verso <PG>/lontano/copertura/altura/<luogo>) in TokenDirector.
+			TokenDirector.muovi_dichiarato(
+				String(command.get("target", command.get("id", command.get("name", "")))),
+				String(command.get("to", command.get("dest", ""))),
+				maxi(1, int(command.get("cells", 4))))
+		"placeNpc", "placeToken":
+			# PIAZZA nemici VISIBILI sulla mappa SENZA avviare lo scontro (un'imboscata che si
+			# prepara, sentinelle da aggirare): i turni partiranno solo con startCombat.
+			var quanti: int = maxi(1, int(command.get("count", 1)))
+			var id_piazzato: String = _risolvi_id_nemico(
+				String(command.get("id", command.get("name", ""))))
+			for i: int in range(quanti):
+				CombatManager.add_npc(id_piazzato)
+			GameState.announce("👁 Sagome ostili si mostrano in lontananza: non e' ancora "
+				+ "battaglia, ma vi hanno visti.")
 		_:
 			# moveToken, addToken, revealFog, createSurface, setElevation, applyCondition, ...
 			# li gestira' il layer mappa/condizioni quando lo costruiremo.
