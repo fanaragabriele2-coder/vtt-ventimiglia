@@ -383,13 +383,23 @@ Prati del Nord, canneti attorno al Guado (l'imboscata "si sente"), fiori nei pra
       il Master NON emette comandi di spawn).
 
 ### ✅ Campagna a RACCONTO ramificato con boss e prove di dado (luglio 2026)
-- [x] **"Il Fardello dell'Ombra"** (`data/storia_terra_di_mezzo.json`): un'avventura-libro di
-      **26 nodi, 9 boss fight** del Signore degli Anelli (Khamul, Guardiano nell'Acqua, Balrog,
-      Grima+Orchi, Saruman, Capitano Uruk-hai+Uruk-hai+Arcieri, Re Stregone, Shelob, Bocca di
-      Sauron+Troll+Corsari) e **10 prove di dado** (Furtivita', Persuasione, Arcano, Atletica,
-      Percezione, Intuizione, Intimidire, Tempra). Grafo VALIDATO (tutti i riferimenti/mostri/
-      item esistono, tutto raggiungibile, nessun vicolo cieco) e SIMULATO: 200 partite casuali
-      arrivano tutte al finale, ~7 boss e ~4 prove a partita, ricompense mai doppie.
+- [x] **"Il Fardello dell'Ombra"** (`data/storia_terra_di_mezzo.json`): un'avventura-libro
+      **dettagliata di 54 nodi in 5 atti** — da Brea al Monte Fato — con prosa ricca (4-8 frasi
+      per nodo) e rami che divergono davvero. Filo narrativo: NON portate voi l'Anello, ma
+      tenete aperta la strada e attirate su di voi lo Sguardo perche' il vero portatore arrivi al
+      fuoco. **14 boss fight** che usano **TUTTI i 25 nemici** del bestiario LOTR almeno una
+      volta: Spettri della Palude (agguato nelle Paludi Ditteri), Khamûl ad Amon Sûl, Ren +
+      Akhorahil al Guado di Bruinen, Guardiano nell'Acqua alle Porte di Durin, Goblin di Moria +
+      Troll a Mazarbul, Balrog sul Ponte, Adûnaphel + Hoarmurath in agguato all'uscita, Grima +
+      Orchi a Meduseld, **Drago delle Montagne Grigie** (deviazione opzionale), Saruman + Uomini
+      Selvaggi a Isengard, Capitano Uruk-hai + Uruk-hai + Arcieri Haradrim al Pelennor, Re
+      Stregone + Uvatha + Dwar, Shelob a Cirith Ungol, Bocca di Sauron + Troll + Corsari + Ji
+      Indur al Morannon. **~20 prove di dado** su tutte le sei caratteristiche (Furtivita',
+      Persuasione, Percezione, Indagare, Arcano, Atletica, Volonta', Intuizione, Intimidire) con
+      esiti diversi (scorciatoie, lore, ricompense, scontri piu' duri). Bivi veri (Isengard /
+      Drago / Pelennor; Cirith Ungol / Morannon). Grafo VALIDATO (ogni riferimento/mostro/item
+      esiste, tutto raggiungibile, nessun vicolo cieco, **ogni nodo puo' raggiungere il finale**)
+      e SIMULATO: **5000/5000 partite casuali arrivano al finale**, ricompense mai doppie.
 - [x] **`StoryDirector`** (autoload): regge nodi, opzioni, prove (1d20 + miglior modificatore
       del party vs CD → successo/fallimento portano a nodi diversi), boss fight (spawn
       bilanciato sulla mappa, alla vittoria si prosegue, a party sconfitto si puo' riprovare),
