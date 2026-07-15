@@ -43,6 +43,55 @@ func cella_copertura_vicina(cella: Vector2i, raggio: int) -> Variant:
 	return migliore
 
 
+## Tutte le celle di copertura registrate ("x,y" -> livello): per l'overlay tattico in battaglia.
+func celle_registrate() -> Dictionary:
+	return _celle.duplicate()
+
+
+## true se il tiro ha LINEA DI VISTA: nessun ostacolo MASSICCIO (livello 2, tre quarti) sta tra
+## attaccante e bersaglio. Le celle ADIACENTI ai due estremi NON bloccano — sporgersi da dietro
+## l'angolo o mirare oltre il riparo ravvicinato e' COPERTURA (+CA, bonus_ca), non un muro.
+func linea_di_vista_libera(attacker_id: String, target_id: String) -> bool:
+	var a: Variant = CombatManager.get_combatant_cell(attacker_id)
+	var b: Variant = CombatManager.get_combatant_cell(target_id)
+	if a == null or b == null:
+		return true  # senza celle note non si inventa un muro: il tiro procede
+	var ca: Vector2i = a
+	var cb: Vector2i = b
+	for c: Vector2i in _linea_celle(ca, cb):
+		if maxi(absi(c.x - ca.x), absi(c.y - ca.y)) <= 1:
+			continue
+		if maxi(absi(c.x - cb.x), absi(c.y - cb.y)) <= 1:
+			continue
+		if copertura_di(c.x, c.y) >= 2:
+			return false
+	return true
+
+
+## Le celle attraversate dal segmento a->b (Bresenham), estremi esclusi.
+static func _linea_celle(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var dx: int = absi(b.x - a.x)
+	var dy: int = -absi(b.y - a.y)
+	var sx: int = 1 if a.x < b.x else -1
+	var sy: int = 1 if a.y < b.y else -1
+	var errore: int = dx + dy
+	var c: Vector2i = a
+	while true:
+		if c != a and c != b:
+			out.append(c)
+		if c == b:
+			break
+		var e2: int = 2 * errore
+		if e2 >= dy:
+			errore += dy
+			c.x += sx
+		if e2 <= dx:
+			errore += dx
+			c.y += sy
+	return out
+
+
 func copertura_di(cell_x: int, cell_y: int) -> int:
 	return int(_celle.get(_chiave(cell_x, cell_y), 0))
 

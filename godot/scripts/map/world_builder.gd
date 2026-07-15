@@ -83,6 +83,7 @@ var _nebbia: WorldFog
 var _props: WorldProps
 var _route: WorldRoute
 var _npcs: WorldNpcs
+var _battle_mode: WorldBattleMode
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 var _ultimo_luogo: String = ""   # debounce degli arrivi ai luoghi (evento world:luogo)
@@ -160,6 +161,13 @@ func _ready() -> void:
 	_combat_fx.z_index = 5
 	add_child(_combat_fx)
 	_combat_fx.configura(_camera, _tokens, _nemici_mondo)
+	# MODALITA' BATTAGLIA (stile BG3): a inizio scontro la mappa diventa l'arena — camera che si
+	# stringe, penombra fuori, griglia tattica locale, coperture e alture in evidenza. Sotto i
+	# token (z 2, come la nebbia) cosi' i gettoni restano sempre leggibili.
+	_battle_mode = WorldBattleMode.new()
+	_battle_mode.z_index = 2
+	add_child(_battle_mode)
+	_battle_mode.configura(_rect_mappa, _camera, _tokens, _nemici_mondo)
 	_righello = WorldRuler.new()
 	_righello.z_index = 4
 	add_child(_righello)

@@ -595,8 +595,7 @@ func roll_death_save(id: String) -> void:
 		death_save_rolled.emit(id, d, "rivive", 0, 0)
 		return
 	var s: Dictionary = _tiri_morte[id]
-	# La SPERANZA della Compagnia pesa sull'orlo della morte (+1/-1 sulla soglia del 10);
-	# i 20 e gli 1 naturali restano naturali, come da regola.
+	# Speranza della Compagnia: +1/-1 sulla soglia del 10 (i naturali restano naturali).
 	var spirito: int = CompanySpirit.mod_tiri_morte()
 	if d == 1:
 		s["fallimenti"] = int(s["fallimenti"]) + 2
@@ -758,13 +757,13 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	# Fuori gittata: niente tiro (l'HUD valida prima e non spende l'azione; per IA/reazioni e'
 	# la rete di sicurezza). Ritorna un risultato "mancato per distanza" leggibile.
 	if not in_attack_range(attacker_id, target_id):
-		var fuori: Dictionary = {
-			"ok": true, "attacker": attacker_id, "target": target_id, "hit": false,
-			"outOfRange": true, "damage": 0,
-			"targetAc": int(target["armorClass"]), "attackTotal": 0,
-		}
-		attack_resolved.emit(fuori)
-		return fuori
+		return _attacco_nullo(attacker_id, target_id, int(target["armorClass"]), "outOfRange")
+	# LINEA DI VISTA (stile BG3): a distanza un ostacolo MASSICCIO (livello 2) tra i due blocca
+	# il tiro del tutto; quello ADIACENTE al bersaglio resta copertura (+CA), non un muro.
+	if attack_range_of(attacker_id) > 1 \
+			and not CoverManager.linea_di_vista_libera(attacker_id, target_id):
+		GameState.announce("🚫 %s: nessuna linea di vista sul bersaglio." % String(attacker["name"]))
+		return _attacco_nullo(attacker_id, target_id, int(target["armorClass"]), "losBlocked")
 	var modalita_finale: String = modalita_effettiva_per_attacco(attacker_id, target_id, mode)
 	var d20: Dictionary = roll_d20_with_mode(modalita_finale)
 	var attack_total: int = int(d20["chosen"]) + int(attacker["attackBonus"])
@@ -774,10 +773,8 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 		benedizione = randi_range(1, 4)
 		attack_total += benedizione
 	# DONI DEL CAMMINO: con 4+ reliquie del set i PG colpiscono meglio (+1, RelicsManager).
-	var reliquie: int = 0
-	if attacker_id.begins_with(PC_PREFIX):
-		reliquie = RelicsManager.bonus_attacco()
-		attack_total += reliquie
+	var reliquie: int = RelicsManager.bonus_attacco() if attacker_id.begins_with(PC_PREFIX) else 0
+	attack_total += reliquie
 	var critical: bool = bool(d20["naturalTwenty"])
 	# COPERTURA (5e): a distanza, un bersaglio riparato da un prop alza la sua CA (+2 mezza, +5
 	# tre quarti). In mischia non conta (si e' adiacenti).
@@ -802,6 +799,14 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 		apply_damage_to_combatant(target_id, int(dmg["total"]), attacker_id, critical)
 	attack_resolved.emit(result)
 	return result
+
+
+## Attacco che NON avviene (fuori gittata / senza linea di vista): nullo, col motivo a true.
+func _attacco_nullo(attacker_id: String, target_id: String, ca: int, motivo: String) -> Dictionary:
+	var r: Dictionary = { "ok": true, "attacker": attacker_id, "target": target_id,
+		"hit": false, motivo: true, "damage": 0, "targetAc": ca, "attackTotal": 0 }
+	attack_resolved.emit(r)
+	return r
 
 
 # --- Tiri salvezza e incantesimi ad AREA (Palla di Fuoco) ---

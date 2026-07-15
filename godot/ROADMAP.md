@@ -569,17 +569,32 @@ Il Master narrava, evocava i nemici e spostava il party; ora dirige anche i SING
       sentinelle da aggirare): la battaglia parte solo con startCombat. Niente auto-start e
       guardia aggiunta in ChatCombatBridge. Prompt del Master aggiornato con i due comandi.
 
-### 🔜 Fase G2 — La mappa che si TRASFORMA in battaglia
-All'inizio di ogni scontro il Mondo cucito deve DIVENTARE la mappa tattica, senza cambiare vista:
-- [ ] transizione di regia su combat_started: la camera si stringe sull'area dello scontro, la
-      griglia da battaglia si accende da sola sulla zona, vignetta piu' scura, ambience "battaglia";
-- [ ] evidenza TATTICA degli ostacoli: le celle di copertura dei props (gia' in CoverManager)
-      si mostrano con bordi/scudi, le alture (ElevationManager) con frecce di quota;
-- [ ] LINEA DI VISTA vera: un prop massiccio TRA arciere e bersaglio blocca il tiro (oggi da'
-      solo +CA da copertura) — raycast sulla griglia celle;
-- [ ] anteprima del movimento: passando col mouse si vede il percorso, i metri spesi e se la
-      destinazione provoca attacchi di opportunita';
-- [ ] a fine scontro la mappa TORNA esplorazione (griglia via, camera larga, ambience regione).
+### ✅ Fase G2 — La mappa che si TRASFORMA in battaglia (luglio 2026)
+A inizio scontro il Mondo cucito DIVENTA la mappa tattica, senza cambiare vista
+(`WorldBattleMode`, nodo del builder):
+- [x] **transizione di regia** su combat_started: si calcola l'ARENA (il riquadro di tutti i
+      combattenti + 4 celle di margine), la camera ci si STRINGE sopra (planata morbida della
+      VTTCamera), tutto cio' che sta FUORI dall'arena cade in penombra (l'occhio va sullo
+      scontro), l'ambience passa ai tamburi di battaglia. Se lo scontro DERIVA (fughe,
+      inseguimenti) l'arena si allarga da sola a ogni cambio turno e la camera segue.
+- [x] **griglia tattica locale**: dentro l'arena si accende una griglia dorata allineata alle
+      celle di combattimento (1 cella = 128 px = 1,5 m) SENZA toccare la griglia globale
+      dell'utente; bordo dorato attorno all'arena.
+- [x] **evidenza tattica degli ostacoli**: bordo dorato sulle celle di COPERTURA (doppio bordo
+      acceso per quella massiccia) e triangolo verde con la quota (+N) sulle ALTURE — si vede a
+      colpo d'occhio dove ripararsi e dove salire.
+- [x] **LINEA DI VISTA vera** (`CoverManager.linea_di_vista_libera` + gate in resolve_attack):
+      un ostacolo MASSICCIO (copertura di livello 2) TRA arciere e bersaglio ora BLOCCA il tiro
+      del tutto (Bresenham sulla griglia celle) — quello adiacente al bersaglio resta copertura
+      (+CA), come sporgersi dall'angolo in BG3. Verificato in simulazione: un muro su OGNI cella
+      interna del percorso blocca, in 10 direzioni; gli adiacenti agli estremi mai.
+- [x] **anteprima del movimento**: trascinando un token in battaglia si vede il percorso
+      tratteggiato e i METRI (1 cella = 1,5 m); per il PG ATTIVO il colore avvisa in ROSSO
+      («oltre il passo!») quando superi i 9 m del turno meno i metri gia' spesi. (Il flag
+      "provoca attacco di opportunita'" arriva con la G3, insieme alla regola.)
+- [x] **a fine scontro tutto TORNA esplorazione**: penombra e griglia via, camera larga sul
+      party, ambience della REGIONE (Terra di Mezzo) o automatica. Se il builder viene
+      ricreato a scontro in corso la modalita' battaglia si riattiva da sola.
 
 ### 🔜 Fase G3 — Regole di combattimento in stile BG3 (complete)
 Gia' in gioco: azione/bonus/movimento, vantaggio/svantaggio, fiancheggiamento, ALTURA (bonus e

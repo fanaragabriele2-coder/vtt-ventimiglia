@@ -36,6 +36,7 @@ var _rect: Rect2
 var _camera: Camera2D
 var _gettoni: Array[Dictionary] = []   # { "id", "nome", "colore": Color, "pos": Vector2 }
 var _trascinato: int = -1
+var _trascina_da: Vector2 = Vector2.ZERO   # partenza del drag (anteprima movimento in battaglia)
 var _ultimo_zoom: float = 0.0
 var _tween_viaggio: Tween
 var _scatti: Dictionary = {}   # id personaggio -> { "t": float, "dir": Vector2 } (affondo)
@@ -192,6 +193,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.pressed:
 			_trascinato = _colpito(get_global_mouse_position())
 			if _trascinato >= 0:
+				_trascina_da = _gettoni[_trascinato]["pos"] as Vector2
 				get_viewport().set_input_as_handled()
 		elif _trascinato >= 0:
 			_rilascia(get_global_mouse_position())
@@ -237,6 +239,48 @@ func _draw() -> void:
 				HORIZONTAL_ALIGNMENT_CENTER, r * 8.0, dim_nome, Color(0, 0, 0, 0.75))
 			draw_string(font, pos + Vector2(-r * 4, y_nome), String(g["nome"]),
 				HORIZONTAL_ALIGNMENT_CENTER, r * 8.0, dim_nome, Color(0.95, 0.92, 0.85))
+	if _trascinato >= 0 and CombatManager.is_active():
+		_disegna_anteprima_movimento(font)
+
+
+## ANTEPRIMA DEL MOVIMENTO (in battaglia): mentre trascini un token vedi il percorso e i METRI
+## (1 cella = 1,5 m). Se il token e' del PG ATTIVO il colore avvisa quando superi il passo che
+## gli resta (velocita' 9 m del turno meno i metri gia' spesi); per gli altri resta neutro.
+func _disegna_anteprima_movimento(font: Font) -> void:
+	var pos: Vector2 = _gettoni[_trascinato]["pos"]
+	var metri: float = _trascina_da.distance_to(pos) / PX_PER_CELLA * 1.5
+	if metri < 0.2:
+		return
+	var colore: Color = Color(0.9, 0.78, 0.4, 0.95)
+	var avviso: String = ""
+	var attivo: CharacterData = CharacterManager.get_active()
+	if attivo != null and String(_gettoni[_trascinato]["id"]) == attivo.id:
+		var usati: float = float(
+			InventoryManager.get_action_economy().get("movementMetersUsed", 0.0))
+		if metri > 9.0 - usati + 0.01:
+			colore = Color(0.88, 0.3, 0.25, 0.95)
+			avviso = " — oltre il passo!"
+	_tratteggio(_trascina_da, pos, colore, 4.0)
+	var dim: int = int(maxf(20.0, 15.0 / maxf(_camera.zoom.x, 0.01)))
+	var testo: String = "%.1f m%s" % [metri, avviso]
+	var meta: Vector2 = (_trascina_da + pos) * 0.5
+	draw_string(font, meta + Vector2(-150 + 2, -12 + 2), testo,
+		HORIZONTAL_ALIGNMENT_CENTER, 300.0, dim, Color(0, 0, 0, 0.8))
+	draw_string(font, meta + Vector2(-150, -12), testo,
+		HORIZONTAL_ALIGNMENT_CENTER, 300.0, dim, colore)
+
+
+func _tratteggio(da: Vector2, a: Vector2, colore: Color, spessore: float) -> void:
+	var lunghezza: float = da.distance_to(a)
+	if lunghezza <= 1.0:
+		return
+	var dir: Vector2 = (a - da) / lunghezza
+	var passo: float = 26.0
+	var t: float = 0.0
+	while t < lunghezza:
+		var t2: float = minf(t + passo * 0.55, lunghezza)
+		draw_line(da + dir * t, da + dir * t2, colore, spessore, true)
+		t += passo
 
 
 ## Raggio effettivo: fisso nel mondo ma mai invisibile su schermo.
