@@ -46,9 +46,10 @@ func _su_iniziato(dati: Dictionary) -> void:
 	var tappe: int = int(dati.get("tappe", 0))
 	_residuo.text = "~%d km · %d tappe · ~%d giorni di marcia" % [km, tappe, giorni]
 	_evento.text = "Tira il dado per avanzare lungo la strada."
-	_marcia_btn.disabled = false
+	# Con uno scontro in corso i pulsanti restano spenti anche a viaggio appena partito.
+	_marcia_btn.disabled = CombatManager.is_active()
 	_marcia_btn.text = "🎲 Marcia (1d20)"
-	_campo_btn.disabled = false
+	_campo_btn.disabled = CombatManager.is_active()
 
 
 func _su_avanzato(dati: Dictionary) -> void:

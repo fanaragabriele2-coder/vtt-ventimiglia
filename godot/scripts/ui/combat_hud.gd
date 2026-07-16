@@ -245,7 +245,9 @@ func _on_combatant_damaged(combatant_id: String, amount: int, current_hp: int) -
 		_last_event.text = "%s subisce %d danni" % [c["name"], amount]
 
 
-func _on_combatant_defeated(combatant_id: String) -> void:
+# Il segnale porta DUE argomenti (id + chi lo ha abbattuto): l'handler deve accettarli
+# entrambi, o la connessione fallisce a runtime e la card del caduto non si spegne mai.
+func _on_combatant_defeated(combatant_id: String, _source_id: String = "") -> void:
 	if _cards.has(combatant_id):
 		var card: PanelContainer = _cards[combatant_id]
 		card.modulate = Color(0.5, 0.5, 0.5, 0.6)

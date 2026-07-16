@@ -55,11 +55,35 @@ func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
 	CombatManager.combat_started.connect(_pubblica_tutte_le_celle)
 	# Vincolo BG3 sul movimento: in combattimento un PG si trascina solo nel SUO turno.
 	CombatManager.turn_changed.connect(_su_cambio_turno)
+	# Spostamenti FORZATI dal gioco (una SPINTA che fa arretrare un PG): la cella di combattimento
+	# cambia senza un trascinamento — il gettone deve seguirla, come fanno i token nemici.
+	CombatManager.combatant_position_changed.connect(_su_cella_pg_cambiata)
 	set_process(true)
 
 
 func _su_cambio_turno(combatant_id: String, _round: int) -> void:
 	_turno_corrente = combatant_id
+
+
+## La cella di un PG e' cambiata SENZA che il suo token si sia mosso (spinta, regia via cella):
+## il gettone raggiunge il centro della nuova cella. Se il token e' GIA' in quella cella (il
+## publish veniva da un nostro trascinamento), non si fa nulla — niente rimbalzi.
+func _su_cella_pg_cambiata(combatant_id: String, cella: Vector2i) -> void:
+	if not combatant_id.begins_with(PC_PREFISSO):
+		return
+	var id: String = combatant_id.trim_prefix(PC_PREFISSO)
+	for i: int in range(_gettoni.size()):
+		if String(_gettoni[i]["id"]) != id:
+			continue
+		if _cella_di(_gettoni[i]["pos"] as Vector2) == cella:
+			return  # token gia' li': era il nostro stesso publish
+		var centro: Vector2 = _dentro_mappa(_rect.position + Vector2(
+			(float(cella.x) + 0.5) * PX_PER_CELLA, (float(cella.y) + 0.5) * PX_PER_CELLA))
+		_gettoni[i]["pos"] = centro
+		token_spostato.emit(id, centro)
+		_salva()
+		queue_redraw()
+		return
 
 
 ## Cella di combattimento di una posizione del mondo (scala fissa: 128 px = 1,5 m).

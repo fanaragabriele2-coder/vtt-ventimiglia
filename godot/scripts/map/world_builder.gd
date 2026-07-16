@@ -196,6 +196,10 @@ func _ready() -> void:
 	TravelDirector.viaggio_arrivato.connect(_su_viaggio_arrivato)
 	TravelDirector.viaggio_annullato.connect(_su_viaggio_annullato)
 	GameState.event_published.connect(_su_evento_mappa)
+	# Il lucchetto del trascinamento dipende anche dal combattimento (agguato in viaggio):
+	# va ricalcolato quando lo scontro inizia e finisce.
+	CombatManager.combat_started.connect(_aggiorna_blocco_token)
+	CombatManager.combat_ended.connect(_aggiorna_blocco_token)
 	_da_inquadrare = true
 	set_process(true)
 	# Macro-funzione 3: culling + scarico VRAM, gia' collaudati in MapEngineOptimized.
@@ -426,7 +430,10 @@ func _aggiorna_blocco_token() -> void:
 	var righello_on: bool = _righello != null and _righello.attivo()
 	var props_on: bool = _props != null and _props.modalita()
 	# Durante una marcia a dadi il trascinamento e' bloccato: ci si muove SOLO tirando il dado.
-	_tokens.blocco_input = righello_on or props_on or _in_viaggio_dadi
+	# ECCETTO in combattimento (un AGGUATO in viaggio): li' comandano le regole BG3 del turno,
+	# e il giocatore DEVE poter trascinare il suo token per muoversi.
+	var marcia_blocca: bool = _in_viaggio_dadi and not CombatManager.is_active()
+	_tokens.blocco_input = righello_on or props_on or marcia_blocca
 
 
 ## Accende/spegne la nebbia ("🌫"): all'accensione rivela subito attorno ai token del party.

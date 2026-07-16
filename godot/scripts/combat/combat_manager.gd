@@ -759,6 +759,10 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	var target: Dictionary = get_combatant(target_id)
 	if attacker.is_empty() or target.is_empty():
 		return { "ok": false }
+	# Un attaccante a terra o gia' sconfitto non tira: un attacco di opportunita' puo' averlo
+	# appena ucciso a meta' della sua carica — i morti non completano l'azione.
+	if int(attacker.get("hitPoints", 0)) <= 0 or bool(attacker.get("defeated", false)):
+		return { "ok": false }
 	# Fuori gittata: niente tiro (l'HUD valida prima e non spende l'azione; per IA/reazioni e'
 	# la rete di sicurezza). Ritorna un risultato "mancato per distanza" leggibile.
 	if not in_attack_range(attacker_id, target_id):

@@ -227,6 +227,15 @@ func _su_spinta(result: Dictionary) -> void:
 	if spinta == Vector2i.ZERO:
 		spinta = Vector2i(1, 0)
 	var dest: Vector2i = (cb as Vector2i) + spinta
+	dest = Vector2i(maxi(0, dest.x), maxi(0, dest.y))
+	if dest == (cb as Vector2i):
+		return  # spinto contro il bordo del mondo: non c'e' dove arretrare
+	# I corpi bloccano: se la cella dietro e' OCCUPATA da un altro combattente vivo, il bersaglio
+	# ci sbatte contro e non arretra (niente token sovrapposti).
+	if _cella_occupata(dest, trg):
+		GameState.announce("👐 %s sbatte contro qualcuno alle sue spalle e non arretra!"
+			% _nome(trg))
+		return
 	var quota_prima: int = ElevationManager.quota_di((cb as Vector2i).x, (cb as Vector2i).y)
 	var quota_dopo: int = ElevationManager.quota_di(dest.x, dest.y)
 	sposta_forzato(trg, dest)
@@ -240,6 +249,19 @@ func _su_spinta(result: Dictionary) -> void:
 			_nome(trg), piani, danno,
 		])
 		CombatManager.apply_damage_to_combatant(trg, danno, atk)
+
+
+## La cella e' occupata da un combattente VIVO diverso da `escluso`?
+func _cella_occupata(cella: Vector2i, escluso: String) -> bool:
+	for c: Variant in CombatManager.get_state()["combatants"]:
+		var comb: Dictionary = c
+		var cid: String = String(comb.get("id", ""))
+		if cid == escluso or int(comb.get("hitPoints", 0)) <= 0:
+			continue
+		var pos: Variant = CombatManager.get_combatant_cell(cid)
+		if pos != null and (pos as Vector2i) == cella:
+			return true
+	return false
 
 
 # --- Abilita' fisiche (per la spinta: qui per alleggerire CombatManager) ---
