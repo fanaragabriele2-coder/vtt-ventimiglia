@@ -31,6 +31,7 @@ var _nodi: Dictionary = {}
 var _nodo_corrente: String = ""
 var _premiati: Dictionary = {}
 var _attesa_vittoria: bool = false
+var _tentativi_riprova: int = 0   # riprove consecutive sullo stesso scontro (clemenza crescente)
 var _avviato: bool = false
 
 
@@ -220,6 +221,7 @@ func _su_vittoria() -> void:
 	if not _attesa_vittoria:
 		return
 	_attesa_vittoria = false
+	_tentativi_riprova = 0  # scontro vinto: il prossimo boss riparte dalla clemenza minima
 	var n: Dictionary = _nodi[_nodo_corrente]
 	if n.has("ricompensa"):
 		_premia(_nodo_corrente, n["ricompensa"])
@@ -243,6 +245,27 @@ func _su_sconfitta() -> void:
 ## Riprende il boss fight del nodo corrente dopo una sconfitta (respawn dello scontro).
 func riprova() -> void:
 	if _nodi.has(_nodo_corrente) and (_nodi[_nodo_corrente] as Dictionary).has("combattimento"):
+		# Il party sconfitto e' TUTTO a 0 PF: senza rianimarlo, il nuovo scontro finirebbe
+		# all'istante in un'altra sconfitta — un softlock infinito (trovato dal test di
+		# partita completa: 600 campagne su 600 morivano qui). Il riprova e' PROGRESSIVO:
+		# la prima volta vi rialzate a meta' delle forze; dalla seconda in poi il racconto
+		# e' clemente — forze piene e una pozione a testa (95% di campagne completate in
+		# simulazione, ~1 tentativo extra per boss).
+		_tentativi_riprova += 1
+		var pieno: bool = _tentativi_riprova >= 2
+		for pg: CharacterData in CharacterManager.get_party():
+			@warning_ignore("integer_division")
+			var soglia: int = pg.hp_max if pieno else maxi(1, pg.hp_max / 2)
+			if pg.hp_current < soglia:
+				CharacterManager.heal_by_id(pg.id, soglia - pg.hp_current)
+			if pieno:
+				InventoryManager.add_item("healingPotion", 1)
+		if pieno:
+			GameState.announce("🕯 Il destino insiste: vi risvegliate in FORZE PIENE, e nella "
+				+ "bisaccia trovate una pozione a testa. Questo scontro SI PUO' vincere.")
+		else:
+			GameState.announce("🕯 Vi risvegliate doloranti ma vivi: la volonta' dell'Ombra "
+				+ "non vi ha ancora spezzati. Riprovate, a meta' delle forze.")
 		_processa_ingresso()
 
 

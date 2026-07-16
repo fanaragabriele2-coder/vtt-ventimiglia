@@ -6,372 +6,939 @@
 		"prologo": {
 			"testo": "Pioggia sottile sui tetti di paglia di Brea. Nella sala comune del Puledro Impennato il fuoco crepita basso e le voci si spengono quando la porta si apre: forestieri in un tempo in cui nessuno viaggia piu' per scelta. In un angolo, sotto un cappuccio verde-scuro, un uomo dagli occhi grigi vi osserva da prima ancora che vi sedeste — la mano vicino all'elsa, la calma di chi ha camminato mille leghe da solo. Al banco, tre viandanti tutti in nero non hanno toccato la birra da un'ora: non bevono, non parlano, non si tolgono il cappuccio. L'aria intorno a loro sembra piu' fredda. Il forestiero incrocia il vostro sguardo e, con un cenno impercettibile, vi invita a decidere in fretta che tipo di gente siete.",
 			"opzioni": [
-				{ "testo": "Avvicinati piano agli uomini in nero e origlia cosa mormorano", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 12, "successo": "bree_origliato", "fallimento": "bree_teso" } },
-				{ "testo": "Siediti col forestiero e convincilo che puo' fidarsi di voi", "prova": { "etichetta": "Persuasione", "abilita": "cha", "cd": 12, "successo": "bree_ramingo", "fallimento": "bree_teso" } },
-				{ "testo": "Studia gli uomini in nero senza farti notare: cosa sono davvero?", "prova": { "etichetta": "Percezione", "abilita": "wis", "cd": 12, "successo": "bree_osserva", "fallimento": "bree_teso" } }
+				{
+					"testo": "Avvicinati piano agli uomini in nero e origlia cosa mormorano",
+					"prova": {
+						"etichetta": "Furtivita'",
+						"abilita": "dex",
+						"cd": 12,
+						"successo": "bree_origliato",
+						"fallimento": "bree_teso"
+					}
+				},
+				{
+					"testo": "Siediti col forestiero e convincilo che puo' fidarsi di voi",
+					"prova": {
+						"etichetta": "Persuasione",
+						"abilita": "cha",
+						"cd": 12,
+						"successo": "bree_ramingo",
+						"fallimento": "bree_teso"
+					}
+				},
+				{
+					"testo": "Studia gli uomini in nero senza farti notare: cosa sono davvero?",
+					"prova": {
+						"etichetta": "Percezione",
+						"abilita": "wis",
+						"cd": 12,
+						"successo": "bree_osserva",
+						"fallimento": "bree_teso"
+					}
+				}
 			]
 		},
 		"bree_origliato": {
 			"testo": "Ti muovi tra le panche come un'ombra e cogli un sussurro che non e' fatto di voce ma di gelo: 'Il fiume... Bruinen... li' l'Orientale li aspetta. Khamul non fallisce.' Poche parole, ma pesano come una sentenza: qualcuno sa dove andate, e ha mandato avanti i suoi. Il forestiero, quando gli riferite, annuisce cupo: 'Allora dobbiamo correre, e sapere e' meta' della corsa.' Vi porge una fiala d'un liquido rossastro e il suo nome — Grampasso — come si porge un patto.",
-			"ricompensa": { "items": ["healingPotion"], "gold": 10 },
+			"ricompensa": {
+				"items": [
+					"healingPotion"
+				],
+				"gold": 10
+			},
 			"opzioni": [
-				{ "testo": "Partite nella notte, verso est", "vai_a": "partenza_notturna" }
+				{
+					"testo": "Partite nella notte, verso est",
+					"vai_a": "partenza_notturna"
+				}
 			]
 		},
 		"bree_ramingo": {
 			"testo": "Ti siedi di fronte al forestiero e parli piano, senza giri di parole. Lui ti ascolta con quegli occhi che sembrano leggere piu' di quel che dici; poi, lentamente, la tensione nelle sue spalle si scioglie. 'Mi chiamano Grampasso, e per chi conta ho un altro nome. Ho vegliato su questa terra per anni senza ringraziamenti — ma non posso portare da solo cio' che va portato.' Sfila da sotto il mantello una lama lunga e ben tenuta e ve la affida: 'Prendetela. La strada per il Guado di Bruinen e' guardata, e i suoi guardiani non sono uomini.'",
-			"ricompensa": { "items": ["r-lama-ramingo"], "gold": 10 },
+			"ricompensa": {
+				"items": [
+					"r-lama-ramingo"
+				],
+				"gold": 10
+			},
 			"opzioni": [
-				{ "testo": "Stringete il patto e partite", "vai_a": "partenza_notturna" }
+				{
+					"testo": "Stringete il patto e partite",
+					"vai_a": "partenza_notturna"
+				}
 			]
 		},
 		"bree_osserva": {
 			"testo": "Tieni gli occhi bassi ma la mente sveglia, e a poco a poco il quadro si compone: quei tre non respirano come uomini. Sotto i cappucci non c'e' volto, solo un'oscurita' che rimanda la luce delle candele senza scaldarsi. Sono Spettri dell'Anello — i Nazgul — e cercano qualcosa che uno di voi porta. Sapere cosa hai davanti vale una spada in piu': quando il forestiero dal cappuccio verde vi fa segno, siete gia' pronti a muovervi prima che loro si voltino.",
-			"ricompensa": { "items": ["rations"], "gold": 5 },
+			"ricompensa": {
+				"items": [
+					"rations"
+				],
+				"gold": 5
+			},
 			"opzioni": [
-				{ "testo": "Uscite dal retro prima che si accorgano di voi", "vai_a": "partenza_notturna" }
+				{
+					"testo": "Uscite dal retro prima che si accorgano di voi",
+					"vai_a": "partenza_notturna"
+				}
 			]
 		},
 		"bree_teso": {
 			"testo": "Qualcosa tradisce la vostra attenzione — un'asse che scricchiola, uno sguardo tenuto un istante di troppo. Lentissimo, uno degli uomini in nero volta il capo verso di voi, e con quel gesto il fuoco stesso pare abbassarsi. Un freddo di tomba scende nella sala. Il forestiero dal cappuccio verde e' gia' in piedi: rovescia un tavolo tra voi e loro e grida un'unica parola — 'CORRETE!' — spingendovi verso la porta sul retro e la notte aperta.",
 			"opzioni": [
-				{ "testo": "Fuggite nella notte verso est", "vai_a": "partenza_notturna" }
+				{
+					"testo": "Fuggite nella notte verso est",
+					"vai_a": "partenza_notturna"
+				}
 			]
 		},
 		"partenza_notturna": {
 			"testo": "Fuori Brea il mondo si fa nero e vasto. Grampasso cammina davanti, silenzioso, leggendo il terreno come altri leggono un libro. Davanti a voi si aprono le Terre Solitarie: paludi, brughiere, colline spoglie dove un tempo sorgeva un regno e ora restano solo pietre. Due vie portano al Guado di Bruinen. La strada maestra e' rapida ma esposta, un nastro chiaro su cui un cavaliere si vede da lontano. I sentieri nascosti tra le colline sono piu' lenti, ma il buio e' amico di chi sa muovercisi.",
 			"opzioni": [
-				{ "testo": "La strada maestra: velocita' prima di tutto", "vai_a": "agguato_lonelands" },
-				{ "testo": "I sentieri nascosti tra le colline", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 13, "successo": "viaggio_sicuro", "fallimento": "agguato_lonelands" } }
+				{
+					"testo": "La strada maestra: velocita' prima di tutto",
+					"vai_a": "agguato_lonelands"
+				},
+				{
+					"testo": "I sentieri nascosti tra le colline",
+					"prova": {
+						"etichetta": "Furtivita'",
+						"abilita": "dex",
+						"cd": 13,
+						"successo": "viaggio_sicuro",
+						"fallimento": "agguato_lonelands"
+					}
+				}
 			]
 		},
 		"viaggio_sicuro": {
 			"testo": "Grampasso vi conduce per gole e avvallamenti dove il vento copre i vostri passi. Due volte, lontano, sentite lo schiocco di zoccoli sulla strada maestra che avete evitato, e due volte l'oscurita' vi nasconde. Ma i sentieri nascosti hanno la loro insidia: al calare del sole la terra si fa molle sotto i piedi e vi ritrovate in una palude sconfinata, un labirinto di pozze nere e canneti dove il vapore sale come fiato di morti. 'Le Paludi Ditteri', mormora Grampasso. 'Guardatevi dalle luci: non seguitele, per nulla al mondo.'",
 			"opzioni": [
-				{ "testo": "Attraversate la palude tenendo gli occhi bassi", "vai_a": "paludi_luci" }
+				{
+					"testo": "Attraversate la palude tenendo gli occhi bassi",
+					"vai_a": "paludi_luci"
+				}
 			]
 		},
 		"paludi_luci": {
 			"testo": "Nel buio d'inchiostro cominciano ad accendersi: piccole fiamme pallide sospese sull'acqua, azzurre e fredde, che oscillano piano come lanterne di viandanti perduti. Sono belle, e chiamano. Ogni volta che uno di voi rallenta, stanco, una luce sembra farsi piu' vicina, piu' calda, promettendo un sentiero asciutto appena oltre le canne. Grampasso stringe una spalla a ciascuno: 'Sono gli Spettri della Palude, luci dei morti annegati. Chi le segue non torna. Reggete la mente, o dovremo reggere la spada.'",
 			"opzioni": [
-				{ "testo": "Chiudi la mente al richiamo e guarda solo i piedi di Grampasso", "prova": { "etichetta": "Volonta'", "abilita": "wis", "cd": 12, "successo": "campo_notturno", "fallimento": "boss_spettro_palude" } },
-				{ "testo": "Segui a spada tratta la luce fino alla sua fonte", "vai_a": "boss_spettro_palude" }
+				{
+					"testo": "Chiudi la mente al richiamo e guarda solo i piedi di Grampasso",
+					"prova": {
+						"etichetta": "Volonta'",
+						"abilita": "wis",
+						"cd": 12,
+						"successo": "campo_notturno",
+						"fallimento": "boss_spettro_palude"
+					}
+				},
+				{
+					"testo": "Segui a spada tratta la luce fino alla sua fonte",
+					"vai_a": "boss_spettro_palude"
+				}
 			]
 		},
 		"boss_spettro_palude": {
 			"testo": "La luce piu' vicina si spegne di colpo e l'acqua nera si apre: da sotto la superficie si levano figure diafane dai visi affogati, mani lunghe che grondano melma, occhi come candele morte. Gli Spettri della Palude hanno scelto la loro preda — il piu' stanco, il piu' ferito — e scivolano sull'acqua senza incresparla. 'Restate sul terreno solido!' grida Grampasso, la lama gia' bassa sull'acqua. 'Non fatevi trascinare nelle pozze!'",
-			"combattimento": [ { "name": "Spettro della Palude", "count": 2 } ],
-			"intensita": "equo",
+			"combattimento": [
+				{
+					"name": "Spettro della Palude",
+					"count": 2
+				}
+			],
+			"intensita": "facile",
 			"dopo_vittoria": "campo_notturno",
-			"ricompensa": { "items": ["rations"], "gold": 15 }
+			"ricompensa": {
+				"items": [
+					"rations"
+				],
+				"gold": 15
+			}
 		},
 		"agguato_lonelands": {
 			"testo": "La strada e' rapida, ma la rapidita' ha un prezzo. Da un fosso ai lati sbucano sagome curve dalla pelle grigia e le zanne gialle: non goblin qualunque, ma esploratori di Mordor mandati avanti a fiutare la vostra pista. Ringhiano un ordine gutturale e si scagliano. Grampasso sguaina la lama: 'Non si passa parlando. Fate largo!'",
-			"combattimento": [ { "name": "Orco di Isengard", "count": 2 } ],
-			"intensita": "equo",
+			"combattimento": [
+				{
+					"name": "Orco di Isengard",
+					"count": 2
+				}
+			],
+			"intensita": "facile",
 			"dopo_vittoria": "campo_notturno",
-			"ricompensa": { "items": [], "gold": 15 }
+			"ricompensa": {
+				"items": [],
+				"gold": 15
+			}
 		},
 		"campo_notturno": {
 			"testo": "La notte cala su un cerchio di pietre annerite dal tempo — le rovine di qualche torre di guardia dimenticata. Grampasso accende un fuoco tenue in una conca, dove la luce non si veda da lontano. 'Riposate a turni', dice. 'Ma tenete un occhio aperto: qui il passato non dorme mai del tutto.' C'e' un'ora prima di ripartire per Amon Sul, la Collina del Vento. Come la spendete?",
 			"opzioni": [
-				{ "testo": "Fai la guardia e scruta il buio oltre il fuoco", "prova": { "etichetta": "Percezione", "abilita": "wis", "cd": 12, "successo": "campo_avvistamento", "fallimento": "amon_sul" } },
-				{ "testo": "Fruga tra le rovine: forse qualcosa e' sopravvissuto", "prova": { "etichetta": "Indagare", "abilita": "int", "cd": 13, "successo": "amon_tesoro", "fallimento": "amon_sul" } },
-				{ "testo": "Riposa: domani servira' ogni forza", "vai_a": "amon_sul" }
+				{
+					"testo": "Fai la guardia e scruta il buio oltre il fuoco",
+					"prova": {
+						"etichetta": "Percezione",
+						"abilita": "wis",
+						"cd": 12,
+						"successo": "campo_avvistamento",
+						"fallimento": "amon_sul"
+					}
+				},
+				{
+					"testo": "Fruga tra le rovine: forse qualcosa e' sopravvissuto",
+					"prova": {
+						"etichetta": "Indagare",
+						"abilita": "int",
+						"cd": 13,
+						"successo": "amon_tesoro",
+						"fallimento": "amon_sul"
+					}
+				},
+				{
+					"testo": "Riposa: domani servira' ogni forza",
+					"vai_a": "amon_sul"
+				}
 			]
 		},
 		"campo_avvistamento": {
 			"testo": "Mentre gli altri dormono, tieni gli occhi sull'oscurita' — e l'oscurita' si muove. Tre punti piu' neri del nero scivolano lungo la strada maestra lontana, senza fretta, come chi sa di avere tutta la notte. I Nazgul stanno battendo il paese. Svegli i compagni senza un grido e li fate spostare dal cerchio di pietre appena in tempo: gli Spettri passano oltre, a un tiro di freccia, e non vi vedono. Aver visto per primi vale piu' di una vittoria.",
-			"ricompensa": { "items": ["healingPotion"], "gold": 0 },
+			"ricompensa": {
+				"items": [
+					"healingPotion"
+				],
+				"gold": 0
+			},
 			"opzioni": [
-				{ "testo": "All'alba, verso Amon Sul", "vai_a": "amon_sul" }
+				{
+					"testo": "All'alba, verso Amon Sul",
+					"vai_a": "amon_sul"
+				}
 			]
 		},
 		"amon_tesoro": {
 			"testo": "Tra le pietre crollate le tue dita trovano un vano dove il vento non e' mai entrato. Dentro, avvolto in cuoio marcito, un amuleto di conchiglia e argento annerito: il talismano di un antico viandante del Nord, freddo e leggero come una promessa. Chi lo indossa cammina un po' piu' sicuro tra i pericoli. Lo stringi in pugno mentre il fuoco si spegne.",
-			"ricompensa": { "items": ["r-amuleto-viandante"], "gold": 10 },
+			"ricompensa": {
+				"items": [
+					"r-amuleto-viandante"
+				],
+				"gold": 10
+			},
 			"opzioni": [
-				{ "testo": "All'alba, verso Amon Sul", "vai_a": "amon_sul" }
+				{
+					"testo": "All'alba, verso Amon Sul",
+					"vai_a": "amon_sul"
+				}
 			]
 		},
 		"amon_sul": {
 			"testo": "Amon Sul si erge sola sulla brughiera, la corona spezzata dell'antica torre di vedetta nera contro il cielo di piombo. Grampasso vi guida su per il sentiero fino al cerchio di rovine in cima, e la' l'aria cambia: si fa densa, gelida, sbagliata. 'Sono gia' stati qui', mormora. 'E torneranno.' Come per rispondergli, all'orlo della luce compare una figura incappucciata piu' fredda della notte stessa — Khamul, secondo dei Nove, l'Ombra dell'Est. I Nazgul temono una cosa sola: il fuoco.",
 			"opzioni": [
-				{ "testo": "Accendi grandi torce e brandiscile: respingi lo Spettro col fuoco", "prova": { "etichetta": "Intimidire", "abilita": "cha", "cd": 13, "successo": "guado_intro", "fallimento": "boss_khamul" } },
-				{ "testo": "Nasconditi tra le pietre e lascialo passare oltre", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 14, "successo": "guado_intro", "fallimento": "boss_khamul" } },
-				{ "testo": "Affronta Khamul sulla cima, lama contro ombra", "vai_a": "boss_khamul" }
+				{
+					"testo": "Accendi grandi torce e brandiscile: respingi lo Spettro col fuoco",
+					"prova": {
+						"etichetta": "Intimidire",
+						"abilita": "cha",
+						"cd": 13,
+						"successo": "guado_intro",
+						"fallimento": "boss_khamul"
+					}
+				},
+				{
+					"testo": "Nasconditi tra le pietre e lascialo passare oltre",
+					"prova": {
+						"etichetta": "Furtivita'",
+						"abilita": "dex",
+						"cd": 14,
+						"successo": "guado_intro",
+						"fallimento": "boss_khamul"
+					}
+				},
+				{
+					"testo": "Affronta Khamul sulla cima, lama contro ombra",
+					"vai_a": "boss_khamul"
+				}
 			]
 		},
 		"boss_khamul": {
 			"testo": "Le torce non bastano. Khamul avanza tra le rovine di Amon Sul e il freddo della sua presenza morde le ossa: dove era mortale fu un re dell'Oriente, e cio' che resta di lui non conosce paura ne' pieta'. Grampasso afferra un tizzone ardente e vi si mette accanto. 'Il fuoco lo ferisce, l'acciaio lo trattiene. Reggete!'",
-			"combattimento": [ { "name": "Khamûl lo Stregone Orientale", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Khamûl lo Stregone Orientale",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "guado_intro",
-			"ricompensa": { "items": ["r-foglia-lorien"], "gold": 20 }
+			"ricompensa": {
+				"items": [
+					"r-foglia-lorien"
+				],
+				"gold": 20
+			}
 		},
 		"guado_intro": {
 			"testo": "Tre giorni di corsa e le colline lasciano il posto ai boschi: siete alle porte del regno nascosto degli Elfi, e tra voi e la salvezza scorre il Bruinen. Le sue acque corrono nere e veloci sotto un cielo che finalmente sa di pioggia pulita. Ma sull'altra riva, dove il guado tocca la ghiaia, zoccoli senza cavaliere battono il terreno come tuoni lontani: i Cavalieri Neri hanno fiutato il fardello e vi aspettano al passaggio. Grampasso guarda l'acqua: 'Il fiume risponde all'antica magia degli Elfi. Se sapete come chiedere...'",
 			"opzioni": [
-				{ "testo": "Guada a nuoto la corrente, tenendo alto il fardello", "prova": { "etichetta": "Atletica", "abilita": "str", "cd": 13, "successo": "moria_viaggio", "fallimento": "boss_nazgul_guado" } },
-				{ "testo": "Invoca la piena del Bruinen contro gli Spettri", "prova": { "etichetta": "Arcano", "abilita": "int", "cd": 14, "successo": "guado_piena", "fallimento": "boss_nazgul_guado" } },
-				{ "testo": "Affronta i Cavalieri che scendono nel guado", "vai_a": "boss_nazgul_guado" }
+				{
+					"testo": "Guada a nuoto la corrente, tenendo alto il fardello",
+					"prova": {
+						"etichetta": "Atletica",
+						"abilita": "str",
+						"cd": 13,
+						"successo": "moria_viaggio",
+						"fallimento": "boss_nazgul_guado"
+					}
+				},
+				{
+					"testo": "Invoca la piena del Bruinen contro gli Spettri",
+					"prova": {
+						"etichetta": "Arcano",
+						"abilita": "int",
+						"cd": 14,
+						"successo": "guado_piena",
+						"fallimento": "boss_nazgul_guado"
+					}
+				},
+				{
+					"testo": "Affronta i Cavalieri che scendono nel guado",
+					"vai_a": "boss_nazgul_guado"
+				}
 			]
 		},
 		"guado_piena": {
 			"testo": "Pronunci le parole antiche cosi' come Grampasso te le sussurra, e il fiume risponde. Dall'alto della valle arriva un rombo crescente: un'onda di schiuma bianca si erge in cavalli scintillanti e piomba sul guado. Gli Spettri stridono — un suono che gela il sangue — e la corrente li travolge, disperdendo i loro cavalli nella furia dell'acqua. Quando il Bruinen torna calmo, la riva e' vostra. La via a est, verso le Porte di Durin, e' libera.",
-			"ricompensa": { "items": ["r-foglia-lorien"], "gold": 15 },
+			"ricompensa": {
+				"items": [
+					"r-foglia-lorien"
+				],
+				"gold": 15
+			},
 			"opzioni": [
-				{ "testo": "Proseguite verso il Cancello Ovest di Moria", "vai_a": "moria_viaggio" }
+				{
+					"testo": "Proseguite verso il Cancello Ovest di Moria",
+					"vai_a": "moria_viaggio"
+				}
 			]
 		},
 		"boss_nazgul_guado": {
 			"testo": "Non c'e' tempo per la magia: due Cavalieri Neri spronano i destrieri nel guado, le lame lunghe estratte, l'acqua che schizza nera attorno agli zoccoli. Ren lo Sconvolto, folle gia' da vivo, ride senza voce; accanto a lui, lo Stregone Cieco Akhorahil vede senza occhi e punta dritto il cuore piu' ardente della compagnia. Grampasso pianta i piedi nella corrente: 'Nell'acqua sono meno forti. Colpite adesso!'",
-			"combattimento": [ { "name": "Ren lo Sconvolto", "count": 1 }, { "name": "Akhorahil", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Ren lo Sconvolto",
+					"count": 1
+				},
+				{
+					"name": "Akhorahil",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "moria_viaggio",
-			"ricompensa": { "items": [], "gold": 30 }
+			"ricompensa": {
+				"items": [],
+				"gold": 30
+			}
 		},
 		"moria_viaggio": {
 			"testo": "Oltre il fiume la terra si alza in creste sempre piu' aspre: le Montagne Nebbiose vi sbarrano la via, muraglia di pietra e neve. Il valico alto e' impraticabile in questa stagione, sepolto sotto la bufera. Resta una sola strada, e nessuno la pronuncia volentieri: sotto la montagna, per le Miniere di Moria. Grampasso si ferma davanti alla parete grigia dove un tempo i Nani scavarono un regno. 'Io temo quel luogo', dice piano. 'Ma non c'e' altra via.'",
 			"opzioni": [
-				{ "testo": "Cercate il Cancello Ovest lungo la parete", "vai_a": "moria_ingresso" }
+				{
+					"testo": "Cercate il Cancello Ovest lungo la parete",
+					"vai_a": "moria_ingresso"
+				}
 			]
 		},
 		"moria_ingresso": {
 			"testo": "Al chiaro di luna, sulla liscia parete di Moria, si accendono linee d'argento: l'arco delle Porte di Durin, invisibile di giorno, disegnato in ithildin che risponde solo alla luce delle stelle. Sotto l'arco corre una scritta elfica: 'Di', amico, ed entra.' Davanti alle porte, uno stagno immoto riflette una luna che nel cielo non c'e'. L'acqua e' nera, ferma, sbagliata — e sotto la superficie, molto in basso, qualcosa di enorme si muove piano.",
 			"opzioni": [
-				{ "testo": "Ricorda la parola elfica che apre le Porte", "prova": { "etichetta": "Arcano", "abilita": "int", "cd": 13, "successo": "moria_dentro", "fallimento": "boss_guardiano" } },
-				{ "testo": "Scruta l'acqua nera prima di avvicinarti al portale", "prova": { "etichetta": "Percezione", "abilita": "wis", "cd": 12, "successo": "moria_dentro", "fallimento": "boss_guardiano" } },
-				{ "testo": "Non c'e' tempo: forza le porte di spalla", "vai_a": "boss_guardiano" }
+				{
+					"testo": "Ricorda la parola elfica che apre le Porte",
+					"prova": {
+						"etichetta": "Arcano",
+						"abilita": "int",
+						"cd": 13,
+						"successo": "moria_dentro",
+						"fallimento": "boss_guardiano"
+					}
+				},
+				{
+					"testo": "Scruta l'acqua nera prima di avvicinarti al portale",
+					"prova": {
+						"etichetta": "Percezione",
+						"abilita": "wis",
+						"cd": 12,
+						"successo": "moria_dentro",
+						"fallimento": "boss_guardiano"
+					}
+				},
+				{
+					"testo": "Non c'e' tempo: forza le porte di spalla",
+					"vai_a": "boss_guardiano"
+				}
 			]
 		},
 		"boss_guardiano": {
 			"testo": "Un tonfo, e lo stagno esplode. Tentacoli piu' spessi di tronchi si levano dall'acqua nera, cercano l'aria, le porte, le vostre gambe: il Guardiano nell'Acqua, l'orrore antico che sonnecchia davanti al Cancello Ovest, si e' svegliato. Una presa vi solleva verso una bocca di denti in cerchio. 'Dentro, DENTRO!' urla Grampasso, tagliando un tentacolo. 'Spezzate la sua presa e correte oltre la soglia!'",
-			"combattimento": [ { "name": "Guardiano nell'Acqua", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Guardiano nell'Acqua",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "moria_dentro",
-			"ricompensa": { "items": ["r-cuoio-rinforzato"], "gold": 25 }
+			"ricompensa": {
+				"items": [
+					"r-cuoio-rinforzato"
+				],
+				"gold": 25
+			}
 		},
 		"moria_dentro": {
 			"testo": "Le porte si chiudono alle vostre spalle e il buio di Khazad-dum vi inghiotte. Le torce disegnano cerchi tremuli su colonne alte quanto torri, su scalinate che salgono e scendono nel nulla, su un silenzio cosi' profondo che il vostro respiro sembra un grido. Un tempo qui vivevano migliaia di Nani; ora c'e' solo polvere e un odore stagnante di cose morte. Grampasso alza la torcia. 'Quattro giorni al buio', dice. 'Restate uniti. E qualunque cosa sentiate battere sotto i vostri piedi... non fermatevi a chiedere cos'e'.'",
 			"opzioni": [
-				{ "testo": "Addentratevi nelle sale delle miniere", "vai_a": "moria_mazarbul" }
+				{
+					"testo": "Addentratevi nelle sale delle miniere",
+					"vai_a": "moria_mazarbul"
+				}
 			]
 		},
 		"moria_mazarbul": {
 			"testo": "Una camera piu' ampia si apre a lato del cammino: al centro, un blocco di pietra bianca come un sarcofago, e sopra rune naniche che Grampasso legge a fatica. 'Qui giace Balin, Signore di Moria.' Cosi' e' finita la colonia che aveva osato tornare. Accanto, tra ossa e scudi spezzati, un grosso libro rilegato in ferro giace aperto, l'ultima pagina scritta con mano tremante. Da qualche parte, nel profondo, un tamburo comincia a battere: doom, doom. Qualcosa vi ha sentiti.",
 			"opzioni": [
-				{ "testo": "Leggi in fretta l'ultima pagina del Libro di Mazarbul", "prova": { "etichetta": "Indagare", "abilita": "int", "cd": 12, "successo": "moria_tesoro", "fallimento": "boss_goblin_moria" } },
-				{ "testo": "Lascia stare il libro: i tamburi si avvicinano, tira dritto", "vai_a": "moria_ponte_via" }
+				{
+					"testo": "Leggi in fretta l'ultima pagina del Libro di Mazarbul",
+					"prova": {
+						"etichetta": "Indagare",
+						"abilita": "int",
+						"cd": 12,
+						"successo": "moria_tesoro",
+						"fallimento": "boss_goblin_moria"
+					}
+				},
+				{
+					"testo": "Lascia stare il libro: i tamburi si avvicinano, tira dritto",
+					"vai_a": "moria_ponte_via"
+				}
 			]
 		},
 		"moria_tesoro": {
 			"testo": "Leggi in fretta, mentre i tamburi crescono: 'Non possiamo uscire. Hanno preso il ponte... stanno arrivando.' L'avvertimento dei Nani morti vi risparmia una trappola: sapendo dove sono le gallerie crollate, individuate un vano nascosto dietro la tomba, e dentro — miracolo tra le ombre — una corta cotta di maglia che pesa come seta e brilla come argento sotto squame di pesce. Mithril, il metallo prezioso dei Nani. La indossi mentre i primi goblin urlano nel buio: reggera' colpi che l'acciaio non fermerebbe.",
-			"ricompensa": { "items": ["e-cotta-mithril"], "gold": 20 },
+			"ricompensa": {
+				"items": [
+					"e-cotta-mithril"
+				],
+				"gold": 20
+			},
 			"opzioni": [
-				{ "testo": "Al ponte, prima che vi circondino", "vai_a": "moria_ponte_via" }
+				{
+					"testo": "Al ponte, prima che vi circondino",
+					"vai_a": "moria_ponte_via"
+				}
 			]
 		},
 		"boss_goblin_moria": {
 			"testo": "I tamburi diventano un boato e la Camera di Mazarbul si riempie di occhi gialli: goblin di Moria a decine sciamano da ogni fessura, e dietro di loro qualcosa di enorme piega la testa per passare dalla porta — un troll delle caverne, cieco di rabbia, la pelle grigia come pietra bagnata. 'Alle spalle contro la tomba!' grida Grampasso. 'Non fatevi accerchiare!'",
-			"combattimento": [ { "name": "Goblin di Moria", "count": 3 }, { "name": "Troll delle Caverne", "count": 1 } ],
-			"intensita": "difficile",
+			"combattimento": [
+				{
+					"name": "Goblin di Moria",
+					"count": 2
+				},
+				{
+					"name": "Troll delle Caverne",
+					"count": 1
+				}
+			],
+			"intensita": "equo",
 			"dopo_vittoria": "moria_ponte_via",
-			"ricompensa": { "items": [], "gold": 30 }
+			"ricompensa": {
+				"items": [],
+				"gold": 30
+			}
 		},
 		"moria_ponte_via": {
 			"testo": "Correte per gallerie che tremano, inseguiti dagli strilli dei goblin, finche' il pavimento si apre in un abisso senza fondo attraversato da un unico ponte di pietra, stretto quanto un uomo: il Ponte di Khazad-dum. Ma dietro di voi il buio ha preso fuoco. Una luce rossa risale dalle radici del mondo, e con essa un caldo di fornace e un terrore piu' antico dei goblin. I goblin stessi stridono e si ritraggono. Grampasso impallidisce: 'Un flagello di Durin... un Balrog. CORRETE al ponte!'",
 			"opzioni": [
-				{ "testo": "Sul ponte, mentre l'ombra di fuoco vi raggiunge", "vai_a": "boss_balrog" }
+				{
+					"testo": "Sul ponte, mentre l'ombra di fuoco vi raggiunge",
+					"vai_a": "boss_balrog"
+				}
 			]
 		},
 		"boss_balrog": {
 			"testo": "Sul ponte si erge cio' che ha svuotato Moria: una montagna di fiamma e tenebra, ali di fumo spalancate contro l'abisso, una frusta di fuoco che schiocca nel buio. Il Balrog di Morgoth, demone del mondo antico che i Nani svegliarono scavando troppo a fondo per avidita' d'oro. Non si puo' fuggire, non si puo' ragionare: si puo' solo resistere abbastanza da passare oltre. Grampasso si volta, la lama levata contro l'impossibile. 'Andate! Io lo tengo! ANDATE!'",
-			"combattimento": [ { "name": "Balrog di Morgoth", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Balrog di Morgoth",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "agguato_nazgul",
-			"ricompensa": { "items": ["r-pozione-maggiore"], "gold": 45 }
+			"ricompensa": {
+				"items": [
+					"r-pozione-maggiore"
+				],
+				"gold": 45
+			}
 		},
 		"agguato_nazgul": {
 			"testo": "Emergete dalla Porta Est di Moria nella luce accecante del giorno, i polmoni pieni d'aria pulita, il cuore ancora nel buio del ponte. Ma i Nove non dormono, e il fardello li chiama come un faro. Prima che possiate riprendere fiato, l'ombra torna: due Cavalieri Neri vi hanno aggirati mentre eravate sottoterra e ora chiudono la via verso il bosco d'argento. Adunaphel la Silente avanza senza un suono; accanto a lei Hoarmurath di Dir porta addosso il gelo del suo regno morto. Non c'e' Grampasso a coprirvi, questa volta: siete soli.",
-			"combattimento": [ { "name": "Adûnaphel la Silente", "count": 1 }, { "name": "Hoarmurath di Dir", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Adûnaphel la Silente",
+					"count": 1
+				},
+				{
+					"name": "Hoarmurath di Dir",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "lorien",
-			"ricompensa": { "items": [], "gold": 35 }
+			"ricompensa": {
+				"items": [],
+				"gold": 35
+			}
 		},
 		"lorien": {
 			"testo": "Oltre gli ultimi Nazgul il bosco cambia: gli alberi diventano alti e argentei, l'aria dolce, la luce dorata anche sotto le nuvole. Siete entrati in Lothlorien, il Bosco d'Oro, dove il tempo scorre altrimenti e l'Ombra non ha ancora messo piede. Elfi silenziosi vi scortano fino a una radura dove la Signora del bosco vi attende: alta, luminosa, con occhi che vedono lontano. Vi offre riposo, e a ciascuno un dono — a te un arco elfico che non manca mai il bersaglio. 'Riposate', dice. 'Ma prima, se avete cuore, guardate nello Specchio: mostra cose che furono, cose che sono, e cose che potrebbero ancora essere.'",
-			"ricompensa": { "items": ["e-arco-galadhrim"], "gold": 0 },
+			"ricompensa": {
+				"items": [
+					"e-arco-galadhrim"
+				],
+				"gold": 0
+			},
 			"opzioni": [
-				{ "testo": "Guarda nello Specchio della Signora", "prova": { "etichetta": "Volonta'", "abilita": "wis", "cd": 13, "successo": "lorien_visione", "fallimento": "rohan_arrivo" } },
-				{ "testo": "Accetta il dono, riposa e riparti al mattino", "vai_a": "rohan_arrivo" }
+				{
+					"testo": "Guarda nello Specchio della Signora",
+					"prova": {
+						"etichetta": "Volonta'",
+						"abilita": "wis",
+						"cd": 13,
+						"successo": "lorien_visione",
+						"fallimento": "rohan_arrivo"
+					}
+				},
+				{
+					"testo": "Accetta il dono, riposa e riparti al mattino",
+					"vai_a": "rohan_arrivo"
+				}
 			]
 		},
 		"lorien_visione": {
 			"testo": "Ti chini sulla coppa d'acqua e lo Specchio ti mostra piu' di quanto un cuore debole reggerebbe: un occhio di fuoco cerchiato di fiamma che ruota cercando, cercando; eserciti neri che marciano su una citta' bianca; e un attimo — un solo attimo — in cui una piccola mano getta qualcosa in una montagna che arde. Reggi lo sguardo senza distoglierlo, e la Signora annuisce. 'Hai visto la strada. Va' sapendo dove finisce.' Riparti con una calma nuova, come chi ha gia' intravisto la fine e ha scelto di camminarci verso.",
-			"ricompensa": { "items": ["r-pozione-maggiore"], "gold": 0 },
+			"ricompensa": {
+				"items": [
+					"r-pozione-maggiore"
+				],
+				"gold": 0
+			},
 			"opzioni": [
-				{ "testo": "Lascia Lothlorien, verso Rohan", "vai_a": "rohan_arrivo" }
+				{
+					"testo": "Lascia Lothlorien, verso Rohan",
+					"vai_a": "rohan_arrivo"
+				}
 			]
 		},
 		"rohan_arrivo": {
 			"testo": "Il Bosco d'Oro resta alle spalle come un sogno, e davanti si aprono i grandi Campi di Rohan: prati sconfinati battuti dal vento, mandrie di cavalli all'orizzonte, il cielo largo come il mare. Ma sotto quel cielo c'e' odore di ferro e di tradimento. Cavalcate verso Edoras, la citta' dorata sulla collina, e la trovate silenziosa, cupa: il re Theoden siede curvo su un trono che dovrebbe splendere, invecchiato prima del tempo. Al suo orecchio, come un ragno paziente, sussurra un uomo pallido dagli occhi obliqui.",
 			"opzioni": [
-				{ "testo": "Entrate nella Sala d'Oro di Meduseld", "vai_a": "rohan_edoras" }
+				{
+					"testo": "Entrate nella Sala d'Oro di Meduseld",
+					"vai_a": "rohan_edoras"
+				}
 			]
 		},
 		"rohan_edoras": {
 			"testo": "Nella penombra di Meduseld l'uomo pallido vi viene incontro strisciando parole di miele: Grima, che a Rohan chiamano Vermilinguo. 'Il re non riceve stranieri armati', sibila, 'ne' chi si intromette negli affari di Saruman il Saggio.' Ma nei suoi occhi c'e' la paura di chi ha molto da nascondere, e la corte intorno ascolta, incerta a chi credere. Una parola giusta, qui, puo' valere piu' di una spada — o farvi finire in catene.",
 			"opzioni": [
-				{ "testo": "Smaschera davanti alla corte le menzogne che avvelenano il re", "prova": { "etichetta": "Intuizione", "abilita": "wis", "cd": 13, "successo": "rohan_smascherato", "fallimento": "boss_grima" } },
-				{ "testo": "Incute in Grima un terrore tale da fargli tradire se stesso", "prova": { "etichetta": "Intimidire", "abilita": "cha", "cd": 13, "successo": "rohan_smascherato", "fallimento": "boss_grima" } },
-				{ "testo": "Trascina fuori Grima dalla sala con la forza", "vai_a": "boss_grima" }
+				{
+					"testo": "Smaschera davanti alla corte le menzogne che avvelenano il re",
+					"prova": {
+						"etichetta": "Intuizione",
+						"abilita": "wis",
+						"cd": 13,
+						"successo": "rohan_smascherato",
+						"fallimento": "boss_grima"
+					}
+				},
+				{
+					"testo": "Incute in Grima un terrore tale da fargli tradire se stesso",
+					"prova": {
+						"etichetta": "Intimidire",
+						"abilita": "cha",
+						"cd": 13,
+						"successo": "rohan_smascherato",
+						"fallimento": "boss_grima"
+					}
+				},
+				{
+					"testo": "Trascina fuori Grima dalla sala con la forza",
+					"vai_a": "boss_grima"
+				}
 			]
 		},
 		"rohan_smascherato": {
 			"testo": "Le parole colpiscono dritte: sveli davanti a tutti i doni di Saruman nascosti nelle stanze di Grima, le lettere, l'oro. La corte mormora, poi grida; il re solleva il capo come chi si desta da un lungo sonno malato. Vermilinguo capisce di essere perduto e la maschera cade: sotto il servo strisciante c'e' un uomo con una lama e una scorta di orchi appostati fuori. 'Se non posso avere Rohan con le parole', ringhia, 'la insanguinero'.' Ma ora la corte e' con voi.",
-			"ricompensa": { "items": [], "gold": 25 },
+			"ricompensa": {
+				"items": [],
+				"gold": 25
+			},
 			"opzioni": [
-				{ "testo": "Affrontate Grima e la sua scorta", "vai_a": "boss_grima" }
+				{
+					"testo": "Affrontate Grima e la sua scorta",
+					"vai_a": "boss_grima"
+				}
 			]
 		},
 		"boss_grima": {
 			"testo": "Grima schiocca le dita e dai portici bui sbucano orchi forgiati nelle fosse di Isengard, armati e feroci. 'Uccideteli!' strilla, gia' arretrando verso l'uscita, pronto a fuggire alla prima ferita. E' un codardo — ma i suoi orchi non lo sono. La Sala d'Oro diventa un campo di battaglia sotto gli occhi del re risvegliato.",
-			"combattimento": [ { "name": "Grima Vermilinguo", "count": 1 }, { "name": "Orco di Isengard", "count": 2 } ],
+			"combattimento": [
+				{
+					"name": "Grima Vermilinguo",
+					"count": 1
+				},
+				{
+					"name": "Orco di Isengard",
+					"count": 2
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "bivio_guerra",
-			"ricompensa": { "items": ["e-giaco-runico"], "gold": 30 }
+			"ricompensa": {
+				"items": [
+					"e-giaco-runico"
+				],
+				"gold": 30
+			}
 		},
 		"bivio_guerra": {
 			"testo": "Rohan e' salva, il re di nuovo in se', ma la guerra e' solo cominciata e il vostro cammino si biforca. A nord la torre nera di Orthanc fuma d'industria: Saruman il Bianco raduna eserciti e va spezzato prima che dilaghi. A sud, oltre i monti, le armate di Mordor marciano sulla citta' bianca di Gondor, e ogni spada conta sui Campi del Pelennor. E c'e' una terza voce, un vecchio racconto dei cavallerizzi: sulle Montagne Grigie e' sceso un drago in cerca d'oro, e chi lo abbattesse guadagnerebbe un tesoro da leggenda. Dove pesa di piu' il vostro acciaio?",
 			"opzioni": [
-				{ "testo": "A nord, a Isengard, a spezzare Saruman", "vai_a": "isengard" },
-				{ "testo": "Alle Montagne Grigie, a caccia del drago", "vai_a": "caccia_drago" },
-				{ "testo": "A sud, verso i Campi del Pelennor", "vai_a": "pelennor_viaggio" }
+				{
+					"testo": "A nord, a Isengard, a spezzare Saruman",
+					"vai_a": "isengard"
+				},
+				{
+					"testo": "Alle Montagne Grigie, a caccia del drago",
+					"vai_a": "caccia_drago"
+				},
+				{
+					"testo": "A sud, verso i Campi del Pelennor",
+					"vai_a": "pelennor_viaggio"
+				}
 			]
 		},
 		"caccia_drago": {
 			"testo": "Cavalcate a nord, dove i prati cedono a creste di pietra grigia e il vento sa di zolfo. La tana e' facile da trovare: bestiame carbonizzato, alberi riversi, e un bagliore di monete nel buio di una caverna. Il Drago delle Montagne Grigie solleva la testa dal suo mucchio d'oro, occhi come fornaci, e la sua voce e' un rombo che scuote la roccia: brucia per primi i deboli e i feriti, con la pazienza di chi ha secoli. Non e' la vostra strada — ma la gloria e il suo tesoro valgono il rischio.",
-			"combattimento": [ { "name": "Drago delle Montagne Grigie", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Drago delle Montagne Grigie",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "pelennor_viaggio",
-			"ricompensa": { "items": ["e-elisir-rinascita"], "gold": 80 }
+			"ricompensa": {
+				"items": [
+					"e-elisir-rinascita"
+				],
+				"gold": 80
+			}
 		},
 		"isengard": {
 			"testo": "Ai piedi di Orthanc l'anello di Isengard e' un cantiere di fumo e fucine, ma la torre stessa e' silenzio. In cima appare una figura vestita di bianco che muta colore alla luce: Saruman, capo del vostro Ordine, il Saggio caduto nell'ambizione. E parla — e la sua Voce e' la sua arma piu' terribile: miele e ragione, che vi spiega quanto sarebbe saggio inginocchiarsi, quanto inutile resistere, quanto giusto lui abbia sempre avuto. Reggere quell'incanto e' meta' della battaglia.",
 			"opzioni": [
-				{ "testo": "Chiudi il cuore alla Voce e non ascoltare le sue ragioni", "prova": { "etichetta": "Volonta'", "abilita": "wis", "cd": 15, "successo": "boss_saruman", "fallimento": "saruman_ammaliato" } },
-				{ "testo": "Interrompilo con l'acciaio prima che finisca di parlare", "vai_a": "boss_saruman" }
+				{
+					"testo": "Chiudi il cuore alla Voce e non ascoltare le sue ragioni",
+					"prova": {
+						"etichetta": "Volonta'",
+						"abilita": "wis",
+						"cd": 15,
+						"successo": "boss_saruman",
+						"fallimento": "saruman_ammaliato"
+					}
+				},
+				{
+					"testo": "Interrompilo con l'acciaio prima che finisca di parlare",
+					"vai_a": "boss_saruman"
+				}
 			]
 		},
 		"saruman_ammaliato": {
 			"testo": "Per un istante la Voce vince: le sue parole ti sembrano ragionevoli, giuste, e la spada nella tua mano si fa pesante di dubbio. Poi il ricordo di Moria, del ponte, di chi e' caduto perche' voi passaste, spezza l'incanto — ma hai perso il vantaggio della sorpresa, e Saruman ora sa quanto siete fragili. Scaglia contro di voi i suoi servi con un sorriso di compatimento. Bisognera' vincere piu' duramente.",
 			"opzioni": [
-				{ "testo": "Scuotiti di dosso l'incantesimo e attacca", "vai_a": "boss_saruman" }
+				{
+					"testo": "Scuotiti di dosso l'incantesimo e attacca",
+					"vai_a": "boss_saruman"
+				}
 			]
 		},
 		"boss_saruman": {
 			"testo": "Saruman scende dalla torre avvolto nel suo mantello cangiante, il bastone che crepita di potere, e con un gesto aizza contro di voi gli Uomini Selvaggi di Dunland che ha sobillato con vecchie promesse di vendetta. La sua Voce ora non lusinga: comanda, e i dunlendiani caricano urlando. 'Sciocchi', tuona il Bianco caduto. 'Credete di fermare la marea con un pugno di spade?'",
-			"combattimento": [ { "name": "Saruman il Bianco", "count": 1 }, { "name": "Uomo Selvaggio di Dunland", "count": 2 } ],
+			"combattimento": [
+				{
+					"name": "Saruman il Bianco",
+					"count": 1
+				},
+				{
+					"name": "Uomo Selvaggio di Dunland",
+					"count": 2
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "pelennor_viaggio",
-			"ricompensa": { "items": ["r-pozione-maggiore"], "gold": 40 }
+			"ricompensa": {
+				"items": [
+					"r-pozione-maggiore"
+				],
+				"gold": 40
+			}
 		},
 		"pelennor_viaggio": {
 			"testo": "Cavalcate a sud senza sosta, giorno e notte, mentre il cielo davanti a voi si tinge di un rosso che non e' alba: e' Mordor che respira. Superate le ultime colline e appare Minas Tirith, la citta' bianca a sette livelli, bellissima e assediata, avvolta nel fumo. Ai suoi piedi si stende una pianura che dovrebbe essere dorata di grano e invece e' nera di eserciti: i Campi del Pelennor, dove si decide la sorte degli Uomini. Non c'e' piu' tempo di scegliere: c'e' solo da combattere.",
 			"opzioni": [
-				{ "testo": "Scendete nella battaglia del Pelennor", "vai_a": "pelennor" }
+				{
+					"testo": "Scendete nella battaglia del Pelennor",
+					"vai_a": "pelennor"
+				}
 			]
 		},
 		"pelennor": {
 			"testo": "La pianura e' un mare di fuoco, ferro e grida. Una falange di Uruk-hai avanza compatta verso le mura spezzate, scudi serrati, dietro una pioggia di frecce degli arcieri del Sud venuti coi Mumakil. A guidarli, un capitano dall'elmo cornuto che punta dritto la vostra insegna. Reggere la linea qui significa dare tempo alla citta'; spezzarla significa aprire una breccia nella marea. Potete caricare di fronte, o tentare di aggirare la falange e colpire il capitano al fianco scoperto.",
 			"opzioni": [
-				{ "testo": "Carica di fronte e spezza la falange", "vai_a": "boss_pelennor" },
-				{ "testo": "Aggira nel fumo e colpisci il capitano al fianco", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 14, "successo": "pelennor_fianco", "fallimento": "boss_pelennor" } }
+				{
+					"testo": "Carica di fronte e spezza la falange",
+					"vai_a": "boss_pelennor"
+				},
+				{
+					"testo": "Aggira nel fumo e colpisci il capitano al fianco",
+					"prova": {
+						"etichetta": "Furtivita'",
+						"abilita": "dex",
+						"cd": 14,
+						"successo": "pelennor_fianco",
+						"fallimento": "boss_pelennor"
+					}
+				}
 			]
 		},
 		"pelennor_fianco": {
 			"testo": "Sfruttate il fumo denso della battaglia per scivolare lungo il fianco della falange, non visti, fino alle spalle del capitano. Quando lo raggiungete, lui si volta un istante troppo tardi: la sorpresa e' vostra, e con essa il vantaggio. Gli Uruk-hai, vedendo il loro comandante minacciato, rompono la formazione per proteggerlo — e una falange rotta e' una falange che si puo' battere.",
-			"ricompensa": { "items": [], "gold": 30 },
+			"ricompensa": {
+				"items": [],
+				"gold": 30
+			},
 			"opzioni": [
-				{ "testo": "Colpisci ora, prima che si ricompongano", "vai_a": "boss_pelennor" }
+				{
+					"testo": "Colpisci ora, prima che si ricompongano",
+					"vai_a": "boss_pelennor"
+				}
 			]
 		},
 		"boss_pelennor": {
 			"testo": "Il capitano Uruk-hai ruggisce un ordine e i suoi si serrano attorno a lui, mentre gli arcieri Haradrim incoccano dalle retrovie. E' il cuore della falange, il punto dove la battaglia si spezza in un senso o nell'altro. 'Per Gondor!' grida qualcuno sulle mura sopra di voi. Reggete, e la citta' vivra' un'ora di piu'.",
-			"combattimento": [ { "name": "Capitano Uruk-hai", "count": 1 }, { "name": "Uruk-hai", "count": 2 }, { "name": "Arciere Haradrim", "count": 2 } ],
-			"intensita": "difficile",
+			"combattimento": [
+				{
+					"name": "Capitano Uruk-hai",
+					"count": 1
+				},
+				{
+					"name": "Uruk-hai",
+					"count": 1
+				},
+				{
+					"name": "Arciere Haradrim",
+					"count": 1
+				}
+			],
+			"intensita": "facile",
 			"dopo_vittoria": "re_stregone_arriva",
-			"ricompensa": { "items": ["l-corazza-forte"], "gold": 55 }
+			"ricompensa": {
+				"items": [
+					"l-corazza-forte"
+				],
+				"gold": 55
+			}
 		},
 		"re_stregone_arriva": {
 			"testo": "La falange e' spezzata, ma la vittoria dura un respiro. Un'ombra alata oscura il sole morente e un grido lacera il cielo — un suono che fa cadere le spade dalle mani e piegare le ginocchia ai piu' forti. Dall'alto scende una figura coronata di ferro e vuoto, in sella a una bestia di incubo: il Re Stregone di Angmar, primo dei Nove, Signore dei Nazgul, distruttore del Nord. Con lui calano due dei suoi fratelli d'ombra. Il gelo della tomba si posa sul campo, e la sua sola presenza vuole spezzarvi il cuore prima ancora della spada. 'Nessun uomo vivente puo' fermarmi', risuona la corona vuota.",
 			"opzioni": [
-				{ "testo": "Reggi il terrore, pianta i piedi e alza la lama", "prova": { "etichetta": "Volonta'", "abilita": "wis", "cd": 15, "successo": "boss_re_stregone", "fallimento": "re_stregone_terrore" } },
-				{ "testo": "Sfidalo comunque, malgrado la profezia", "vai_a": "boss_re_stregone" }
+				{
+					"testo": "Reggi il terrore, pianta i piedi e alza la lama",
+					"prova": {
+						"etichetta": "Volonta'",
+						"abilita": "wis",
+						"cd": 15,
+						"successo": "boss_re_stregone",
+						"fallimento": "re_stregone_terrore"
+					}
+				},
+				{
+					"testo": "Sfidalo comunque, malgrado la profezia",
+					"vai_a": "boss_re_stregone"
+				}
 			]
 		},
 		"re_stregone_terrore": {
 			"testo": "Il gelo ti morde le ginocchia e per un lungo istante la mano trema, il cuore urla di fuggire, la corona vuota sembra riempire tutto il mondo. Ma dietro di te c'e' la citta' degli Uomini, ci sono i compagni caduti perche' tu arrivassi fin qui, c'e' una piccola mano che da qualche parte porta il vero fardello verso il fuoco. Stringi i denti, e ti rialzi. La paura resta — ma non comanda piu'.",
 			"opzioni": [
-				{ "testo": "Affronta il Re Stregone malgrado tutto", "vai_a": "boss_re_stregone" }
+				{
+					"testo": "Affronta il Re Stregone malgrado tutto",
+					"vai_a": "boss_re_stregone"
+				}
 			]
 		},
 		"boss_re_stregone": {
 			"testo": "Il Signore dei Nazgul cala su di voi, la mazza di ferro che fende l'aria come un tuono, scortato da Uvatha il Cavaliere e da Dwar il Signore dei Cani. 'Non intrometterti tra il Nazgul e la sua preda', tuona senza voce. Ricordate la vecchia profezia — che nessun UOMO potra' ucciderlo — e ricordate anche che la profezia non dice nulla di chi uomo non e', o di un cuore che rifiuta di arrendersi. Provategli che si sbaglia.",
-			"combattimento": [ { "name": "Il Re Stregone di Angmar", "count": 1 }, { "name": "Uvatha il Cavaliere", "count": 1 }, { "name": "Dwar di Waw", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Il Re Stregone di Angmar",
+					"count": 1
+				},
+				{
+					"name": "Uvatha il Cavaliere",
+					"count": 1
+				},
+				{
+					"name": "Dwar di Waw",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "mordor_ingresso",
-			"ricompensa": { "items": ["e-talismano-rocca"], "gold": 70 }
+			"ricompensa": {
+				"items": [
+					"e-talismano-rocca"
+				],
+				"gold": 70
+			}
 		},
 		"mordor_ingresso": {
 			"testo": "La marea si ritira dal Pelennor: il Signore dei Nazgul e' caduto, e senza di lui gli eserciti di Mordor esitano. Ma la guerra non si vince difendendo — si vince attirando l'Occhio lontano dalla Montagna, perche' il vero portatore possa compiere l'ultimo passo non visto. Dovete entrare in Mordor, e fare rumore. Davanti a voi due vie nel muro nero: il passo alto e segreto di Cirith Ungol, guardato da un orrore antico, o la sfida aperta ai Cancelli Neri del Morannon, dove tutto l'occhio di Sauron e' puntato.",
 			"opzioni": [
-				{ "testo": "Il passo segreto di Cirith Ungol", "vai_a": "cirith" },
-				{ "testo": "La sfida aperta ai Cancelli Neri", "vai_a": "cancelli" }
+				{
+					"testo": "Il passo segreto di Cirith Ungol",
+					"vai_a": "cirith"
+				},
+				{
+					"testo": "La sfida aperta ai Cancelli Neri",
+					"vai_a": "cancelli"
+				}
 			]
 		},
 		"cirith": {
 			"testo": "Il sentiero sale ripido tra guglie di roccia nera fino a una galleria che sprofonda nel cuore della montagna. L'aria dentro e' densa di un fetore di veleno rappreso e di ragnatele vecchie quanto le radici del mondo. Il buio qui e' vivo, e ha fame: qualcosa, nelle tenebre, ha gia' sentito il vostro odore e il vostro calore. Ogni passo fa crocchiare bozzoli avvizziti sotto i piedi. Muoversi in silenzio potrebbe farvi passare oltre; il minimo rumore la svegliera'.",
 			"opzioni": [
-				{ "testo": "Attraversate la tana in perfetto silenzio", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 14, "successo": "cirith_passati", "fallimento": "boss_shelob" } },
-				{ "testo": "Bruciate le ragnatele con una torcia e passate di forza", "vai_a": "boss_shelob" }
+				{
+					"testo": "Attraversate la tana in perfetto silenzio",
+					"prova": {
+						"etichetta": "Furtivita'",
+						"abilita": "dex",
+						"cd": 14,
+						"successo": "cirith_passati",
+						"fallimento": "boss_shelob"
+					}
+				},
+				{
+					"testo": "Bruciate le ragnatele con una torcia e passate di forza",
+					"vai_a": "boss_shelob"
+				}
 			]
 		},
 		"cirith_passati": {
 			"testo": "Passo dopo passo, trattenendo il respiro tra le uova gonfie e le ossa lucide, vi muovete come ombre. La cosa nel buio si agita — un fruscio enorme di zampe, un occhio che luccica opaco — ma non attacca: siete scivolati oltre, nel punto piu' stretto del passo, senza destare del tutto la sua fame. Alla luce fioca oltre la galleria, tra i bozzoli di antiche prede, qualcosa brilla: una lama spezzata e riforgiata, che pare attendere una mano degna. La raccogliete e proseguite, il cuore che batte forte.",
-			"ricompensa": { "items": ["l-spada-ramingo-ricomposta"], "gold": 40 },
+			"ricompensa": {
+				"items": [
+					"l-spada-ramingo-ricomposta"
+				],
+				"gold": 40
+			},
 			"opzioni": [
-				{ "testo": "Uscite dal passo, verso i Cancelli Neri", "vai_a": "cancelli" }
+				{
+					"testo": "Uscite dal passo, verso i Cancelli Neri",
+					"vai_a": "cancelli"
+				}
 			]
 		},
 		"boss_shelob": {
 			"testo": "Un fruscio di zampe piu' spesse di tronchi, e l'orrore cala dall'alto: Shelob, ultima figlia di Ungoliant, piu' antica di Sauron stesso nel suo covo di veleno. Otto occhi opachi, un pungiglione grondante, un ventre gonfio di secoli di prede. Tesse, aspetta e sceglie sempre il boccone piu' debole — ma questa volta la preda ha le zanne. Non c'e' spazio per fuggire nella galleria stretta: solo per combattere, torce alte contro il buio affamato.",
-			"combattimento": [ { "name": "Shelob", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "Shelob",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "cancelli",
-			"ricompensa": { "items": ["e-elisir-rinascita"], "gold": 50 }
+			"ricompensa": {
+				"items": [
+					"e-elisir-rinascita"
+				],
+				"gold": 50
+			}
 		},
 		"cancelli": {
 			"testo": "Davanti a voi il Morannon: i Cancelli Neri di Mordor, due torri di ferro e un muro che sbarra la gola tra le montagne. Con un fragore che scuote la terra i cancelli si spalancano, e ne esce piu' male di quanto la speranza osi contare — orchi, troll, corsari del Sud a migliaia. Da un carro nero scende un cavaliere senza volto, alto e crudele, con un titolo al posto del nome dimenticato: la Bocca di Sauron, araldo di Barad-dur. Non dovete vincere questo mare: dovete solo tenerlo, e tenere l'Occhio puntato QUI, abbastanza a lungo. Potete sfidare l'araldo a viso aperto, o creare una diversione nel fumo per guadagnare terreno.",
 			"opzioni": [
-				{ "testo": "Sfida la Bocca di Sauron sotto le mura di Mordor", "vai_a": "boss_bocca" },
-				{ "testo": "Crea una diversione nel fumo prima di colpire", "prova": { "etichetta": "Furtivita'", "abilita": "dex", "cd": 15, "successo": "cancelli_diversione", "fallimento": "boss_bocca" } }
+				{
+					"testo": "Sfida la Bocca di Sauron sotto le mura di Mordor",
+					"vai_a": "boss_bocca"
+				},
+				{
+					"testo": "Crea una diversione nel fumo prima di colpire",
+					"prova": {
+						"etichetta": "Furtivita'",
+						"abilita": "dex",
+						"cd": 15,
+						"successo": "cancelli_diversione",
+						"fallimento": "boss_bocca"
+					}
+				}
 			]
 		},
 		"cancelli_diversione": {
 			"testo": "Nel fumo denso della gola appiccate il fuoco a un carro di rifornimenti e scagliate grida in lingua nera, seminando confusione tra le file nemiche: per un momento gli orchi si voltano, incerti, cercando un attacco che non arriva da dove pensano. Guadagnate terreno e posizione, e quando la Bocca di Sauron si volta verso il vero pericolo — voi — non e' piu' lui a scegliere il campo. L'Occhio, in alto, arde di rabbia: e' esattamente dove lo volevate.",
-			"ricompensa": { "items": [], "gold": 40 },
+			"ricompensa": {
+				"items": [],
+				"gold": 40
+			},
 			"opzioni": [
-				{ "testo": "Colpisci ora l'araldo di Sauron", "vai_a": "boss_bocca" }
+				{
+					"testo": "Colpisci ora l'araldo di Sauron",
+					"vai_a": "boss_bocca"
+				}
 			]
 		},
 		"boss_bocca": {
 			"testo": "La Bocca di Sauron ride sotto l'elmo cieco e alza la mano guantata: al suo cenno un troll delle caverne carica muggendo, i corsari di Umbar sguainano le scimitarre, e nel cielo un ultimo Cavaliere Nero — Ji Indur, che i mortali chiamavano Sventamorte — cala come un'eclissi per spezzare l'ultimo coraggio. Questa e' la linea estrema del mondo: oltre di voi non c'e' che il fuoco della Montagna e una piccola mano che porta il vero fardello. Che l'Occhio guardi voi, e non il Monte Fato. Reggete. Solo un momento ancora.",
-			"combattimento": [ { "name": "La Bocca di Sauron", "count": 1 }, { "name": "Troll delle Caverne", "count": 1 }, { "name": "Corsaro di Umbar", "count": 2 }, { "name": "Ji Indur Sventamorte", "count": 1 } ],
+			"combattimento": [
+				{
+					"name": "La Bocca di Sauron",
+					"count": 1
+				},
+				{
+					"name": "Troll delle Caverne",
+					"count": 1
+				},
+				{
+					"name": "Corsaro di Umbar",
+					"count": 2
+				},
+				{
+					"name": "Ji Indur Sventamorte",
+					"count": 1
+				}
+			],
 			"intensita": "difficile",
 			"dopo_vittoria": "finale",
-			"ricompensa": { "items": ["l-stella-serena"], "gold": 120 }
+			"ricompensa": {
+				"items": [
+					"l-stella-serena"
+				],
+				"gold": 120
+			}
 		},
 		"finale": {
 			"testo": "Mentre l'ultimo nemico cade e voi restate in piedi tra i Cancelli Neri, esausti e vivi, accade. Lontano, sul Monte Fato, la fiamma si richiude su se stessa. E in un solo istante l'Occhio di Sauron — che ardeva su ogni landa da Barad-dur a Minas Tirith, che vi ha braccati da Brea fino a qui — si spegne come una candela nel vento. Le torri del Morannon crollano su se stesse. La terra si apre e inghiotte le fortezze dell'Ombra. Gli eserciti d'orchi, privati del padrone che li teneva insieme con la paura, si sciolgono in fuga urlante. Voi non avete portato l'Anello: non era il vostro compito. Avete fatto qualcosa di piu' difficile e meno cantato — avete tenuto aperta la strada, avete attirato su di voi lo sguardo che avrebbe visto il portatore, avete comprato col vostro sangue e il vostro coraggio i minuti che sono bastati. La Terra di Mezzo non conoscera' mai tutti i vostri nomi. Ma e' salva perche' voi c'eravate. E questo, oltre ogni canto, basta.",

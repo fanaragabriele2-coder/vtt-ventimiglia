@@ -95,8 +95,14 @@ func _overrides_da_scala(tipo: Dictionary, stat_scale: float) -> Variant:
 	if tmpl.is_empty() or absf(stat_scale - 1.0) < 0.06:
 		return null
 	var hp: int = maxi(1, roundi(float(tmpl.get("hitPoints", 1)) * stat_scale))
-	var delta_attacco: int = roundi((stat_scale - 1.0) * 2.0)
-	var delta_danno: int = roundi((stat_scale - 1.0) * 3.0)
+	# L'attacco scala con pendenza 6 (clamp +-4): un boss ridotto a 0.2 perde -4 al tiro,
+	# non -2 — altrimenti colpiva quasi sempre eroi di basso livello.
+	var delta_attacco: int = clampi(roundi((stat_scale - 1.0) * 6.0), -4, 4)
+	# Il DANNO scala IN PROPORZIONE alla media della formula (non +-2 fisso): il colpo di un
+	# Balrog a scala 0.2 fa ~1/5 del danno, mai sotto una media di 1 — prima il "danno
+	# massiccio" (>= PF massimi) uccideva sul colpo gli eroi di 1° livello a ogni tiro.
+	var media: float = _media_formula(String(tmpl.get("damageFormula", "1d4")))
+	var delta_danno: int = maxi(roundi(media * (stat_scale - 1.0)), -int(media - 1.0))
 	return {
 		"hitPoints": hp, "maxHitPoints": hp,
 		"attackBonus": int(tmpl.get("attackBonus", 0)) + delta_attacco,
@@ -104,9 +110,33 @@ func _overrides_da_scala(tipo: Dictionary, stat_scale: float) -> Variant:
 	}
 
 
+## Media di una formula di danno "NdF+B" ("2d8+3" -> 12.0). Ignora cio' che non riconosce.
+static func _media_formula(formula: String) -> float:
+	var regex := RegEx.new()
+	regex.compile("(\\d+)d(\\d+)([+-]\\d+)?")
+	var m: RegExMatch = regex.search(formula.replace(" ", ""))
+	if m == null:
+		return 1.0
+	var n: float = float(m.get_string(1).to_int())
+	var facce: float = float(m.get_string(2).to_int())
+	var bonus: float = float(m.get_string(3).to_int()) if not m.get_string(3).is_empty() else 0.0
+	return n * (facce + 1.0) / 2.0 + bonus
+
+
+## Il moltiplicatore d'ECONOMIA D'AZIONE del DMG: 1 mostro x1, 2 x1.5, 3-6 x2, 7+ x2.5.
+static func _molt_gruppo(quanti: int) -> float:
+	if quanti <= 1:
+		return 1.0
+	if quanti == 2:
+		return 1.5
+	if quanti <= 6:
+		return 2.0
+	return 2.5
+
+
 ## Bilancia la lista di spawn richiesta ([{name, count}, ...]). Ritorna { lista, statScale, cr,
 ## budget, potenza, intensita, nemiciTotali }. lista: stessi tipi ma con count/overrides ricalcolati
-## cosi' la minaccia totale ~ budget, senza mai superare ~3 nemici per PG vivo, ne' scendere sotto 1.
+## cosi' la minaccia totale ~ budget, mai piu' di (vivi+2) corpi in campo, mai sotto 1 per tipo.
 func bilancia(lista_richiesta: Array, party: Array[Dictionary], intensita: String = "equo") -> Dictionary:
 	var vivi: int = 0
 	for pg: Dictionary in party:
@@ -132,12 +162,18 @@ func bilancia(lista_richiesta: Array, party: Array[Dictionary], intensita: Strin
 	if tipi.is_empty():
 		return { "lista": [], "statScale": 1.0, "cr": 0.0, "budget": budget, "potenza": potenza, "intensita": intensita, "nemiciTotali": 0 }
 
-	var tetto_totale: int = maxi(1, vivi * 3)
+	# Tetto dei CORPI: party piccolo = pochi nemici (l'economia d'azione uccide piu' delle
+	# statistiche: 6 corpi contro 2 PG e' una condanna qualunque sia il loro CR).
+	var tetto_totale: int = maxi(1, vivi + 2)
 	var chiesto_totale: int = 0
 	var minaccia_richiesta: float = 0.0
 	for t: Dictionary in tipi:
 		chiesto_totale += int(t["countRichiesto"])
 		minaccia_richiesta += float(t["countRichiesto"]) * float(t["pesoUnitario"])
+	# MOLTIPLICATORE DI GRUPPO (regola del DMG 5e): piu' mostri = piu' azioni = piu' pericolo
+	# della somma dei loro CR. Senza questo, gli scontri multi-nemico erano muri invalicabili
+	# (verificato con la simulazione della campagna completa: pelennor/goblin_moria a 0%).
+	minaccia_richiesta *= _molt_gruppo(chiesto_totale)
 
 	var scala_count: float = minf(1.0, minf(budget / maxf(1.0, minaccia_richiesta), float(tetto_totale) / float(maxi(1, chiesto_totale))))
 	var lista: Array[Dictionary] = []
@@ -147,9 +183,15 @@ func bilancia(lista_richiesta: Array, party: Array[Dictionary], intensita: Strin
 	lista = _applica_tetto(lista, tetto_totale)
 
 	var minaccia_attuale: float = 0.0
+	var corpi: int = 0
 	for t: Dictionary in lista:
 		minaccia_attuale += float(t["count"]) * float(t["pesoUnitario"])
-	var stat_scale: float = clampf(budget / maxf(1.0, minaccia_attuale), 0.5, 1.6)
+		corpi += int(t["count"])
+	minaccia_attuale *= _molt_gruppo(corpi)
+	# Scala delle statistiche: puo' scendere FINO a 0.2 (un Balrog contro eroi di 1° livello
+	# diventa un'eco del suo potere, non un'esecuzione) e salire poco (1.15: i rinforzi sopra
+	# il budget restano leggeri — prima il cap 1.6 creava orchi pompati letali al 1° livello).
+	var stat_scale: float = clampf(budget / maxf(1.0, minaccia_attuale), 0.2, 1.15)
 
 	for t: Dictionary in lista:
 		t["overrides"] = _overrides_da_scala(t, stat_scale)
