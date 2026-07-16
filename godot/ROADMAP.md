@@ -652,10 +652,91 @@ copertura +2/+5, linea di vista, concentrazione, tiri contro la morte. Il set BG
       combattente di turno, che lo segue quando si muove — si vede a colpo d'occhio di chi e'
       il momento anche a camera larga. (Le frecce tracciate c'erano gia': WorldCombatFX.)
 
-### 🎯 Ancora da fare
-1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*
-2. **Asset "veri" dell'utente**: render Blender (props/miniature/dungeon) e pacchetti
-   Forgotten Adventures in `user://` — la pipeline è già tutta in piedi
+### ✅ Figure degli oggetti nell'inventario (luglio 2026)
+- [x] **Non piu' solo il NOME**: ogni oggetto raccolto mostra la sua FIGURA. 37 icone generate
+      (`tools/genera_icone_oggetti.py`, in assets/items): forma per categoria (spada, arco,
+      pugnale, bastone, armatura, scudo, amuleto, pozione, focus, torcia, corda, razioni,
+      arnesi) e colore per rarita' (comune grigio, rara azzurro, epica viola, leggendaria oro)
+      con alone e gemma. Caricate da **`ItemArt`** (lettura raw, immune ai .import come i token).
+- [x] **In gioco**: icona 40x40 accanto al nome nell'INVENTARIO (scheda personaggio) e nel
+      LISTINO del mercante. Metti i tuoi PNG in `user://items/<id>.png` per sostituirle.
+
+---
+
+## PARTE 6 — Verso il gioco COMPLETO al 100% (roadmap dettagliata)
+
+Il gioco e' gia' meccanicamente e strutturalmente solido (campagna completabile al 95% in
+simulazione, regole BG3, mappa che si trasforma in battaglia, viaggio a dadi, mercanti, quest,
+Fardello/Speranza, meteo). Ecco cosa resta per renderlo un prodotto rifinito al 100%, in ordine
+di impatto. Ogni voce e' una sessione o poco piu'.
+
+### 🎬 H1 — ANIMAZIONI: il gioco che si MUOVE
+- [ ] **Sprite animati dei combattenti**: oggi i token sono immagini fisse con un affondo. Dare
+      a ogni token un leggero "respiro" (bob sinusoidale), un lampo bianco quando e' colpito,
+      una dissolvenza+rotazione quando muore (invece di sparire di colpo), un tremito sullo
+      schermo (screen shake) sui colpi critici.
+- [ ] **Numeri di danno stilizzati**: i numeri volanti ci sono (WorldCombatFX) ma spartani —
+      renderli piu' grossi, con colore per tipo (rosso taglio, arancione fuoco, viola veleno),
+      un arco di salita e una dissolvenza; i CRITICI piu' grandi e dorati.
+- [ ] **Transizioni di pannello**: pannelli (scheda, mercante, diario, storia) che entrano con
+      uno slide+fade invece di apparire; il cambio Esplorazione↔Battaglia con un breve
+      "iris"/vignetta che si stringe.
+- [ ] **Pickup toast**: quando RACCOGLI un oggetto, un cartellino con la sua FIGURA + nome che
+      sale e svanisce ("hai ottenuto: Cotta di Mithril"), oltre alla riga in chat — l'icona
+      c'e' gia' (ItemArt), manca il popup.
+- [ ] **Dadi con impatto**: al risultato del 3D, un piccolo zoom + suono metallico; il 20 e
+      l'1 naturali con un flash dedicato (gia' annunciati, manca il feedback visivo forte).
+
+### 🔊 H2 — SUONI: il gioco che si SENTE
+- [ ] **SFX di combattimento per tipo d'arma**: oggi c'e' un set base (CombatSfx). Aggiungere
+      colpo di spada/mazza/freccia distinti, il "twang" dell'arco a distanza, l'impatto sordo
+      sull'armatura vs il taglio sulla carne, il crack del critico.
+- [ ] **SFX d'interfaccia**: click dei pulsanti, apertura/chiusura pannelli, acquisto dal
+      mercante (tintinnio d'oro), level-up (fanfara), oggetto raccolto.
+- [ ] **SFX degli eventi di viaggio**: passi sulla marcia, tuono in pioggia, corni di Rohan,
+      i tamburi di Moria che crescono avvicinandosi — agganciati agli eventi gia' esistenti
+      (regione:cambiata, agguati, riposo).
+- [ ] **Musica adattiva**: un tema per l'esplorazione, uno per la battaglia, uno per i momenti
+      di terrore (Nazgul/Balrog), con crossfade — l'ambience procedurale (AmbienceManager) c'e',
+      manca la MELODIA. Sintetizzabile o importabile da pacchetti CC0.
+- [ ] **Voce del Master piu' viva**: la TTS c'e' (MasterVoice); dare intonazioni diverse per
+      narrazione / combattimento / boss, e leggere anche gli eventi di viaggio.
+
+### ⚙️ H3 — MECCANICHE: completare il sistema di gioco 5e/BG3
+- [ ] **Incantesimi veri per il mago e il chierico**: oggi Palla di Fuoco e Benedizione. Aggiungere
+      Dardo Incantato, Cura Ferite, Scudo, Fulmine, Ragnatela (area/superficie), con gli SLOT gia'
+      presenti (InventoryManager.spell_slots) — un piccolo grimorio giocabile.
+- [ ] **Reazioni interattive**: l'attacco di opportunita' scatta da solo; dare al giocatore la
+      SCELTA di usare la reazione (parata, incantesimo di reazione) con un prompt breve.
+- [ ] **Condizioni di stato complete**: avvelenato, spaventato, prono, afferrato, stordito
+      (ConditionsManager c'e' come impianto) con icone sul token e effetti sui tiri.
+- [ ] **Oggetti consumabili in combattimento dal token**: bere una pozione, lanciare olio/acido,
+      usare una pergamena — l'inventario e le figure ci sono, manca l'azione "usa" in battaglia.
+- [ ] **Progressione delle abilita' di classe** al level-up (non solo HP/competenza): Azione
+      Impetuosa del guerriero, Attacco Furtivo del ladro, Furia del barbaro.
+
+### 🧱 H4 — STRUTTURA: robustezza e longevita'
+- [ ] **Salvataggi multipli con slot** e schermata di caricamento (oggi il progresso e' per
+      campagna in user://, ma senza gestione di piu' partite/slot).
+- [ ] **Schermo di morte e ripresa** curato (oltre al riprova della storia): un epilogo se il
+      party cade davvero, con le gesta dal Diario.
+- [ ] **Bilanciamento continuo**: il simulatore di partita completa (tools, Python) e' un test
+      di regressione — rilanciarlo a ogni modifica del bestiario/storia per non reintrodurre muri.
+- [ ] **Seconda campagna giocabile a fondo** (Ventimiglia ha i POI ma non un racconto ramificato
+      come la Terra di Mezzo): darle il suo StoryDirector con boss e prove.
+- [ ] **Tutorial/onboarding**: le prime schermate spiegano poco; un breve "primo scontro guidato"
+      che introduce movimento, attacco, azioni bonus e viaggio a dadi.
+
+### 🎨 H5 — RIFINITURA VISIVA
+- [ ] **Ritratti veri di eroi e nemici** (i token attuali sono distintivi generati): render
+      Blender o pacchetti CC0 in user://tokens — la pipeline fuzzy c'e' gia'.
+- [ ] **Icone oggetti "dipinte"** che sostituiscano le forme generate (stessa cartella
+      user://items, stessi id).
+- [ ] **Font a tema fantasy** per titoli ed etichette (oggi il font di sistema).
+- [ ] **Cursori e cornici** coerenti con l'estetica del Tavolo Oscuro.
+
+### 🌐 H6 — (rimandato) Multiplayer e mondo condiviso
+- [ ] **Multiplayer Supabase** e ruoli Master/giocatore — la rete (NetOutbox) e' predisposta.
 
 ---
 

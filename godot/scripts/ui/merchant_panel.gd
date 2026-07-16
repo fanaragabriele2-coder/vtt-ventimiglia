@@ -43,6 +43,12 @@ func _riempi_listino(mercante: Dictionary) -> void:
 		var riga := HBoxContainer.new()
 		riga.add_theme_constant_override("separation", 8)
 		_lista.add_child(riga)
+		# FIGURA dell'oggetto a listino, accanto al nome e al prezzo.
+		var icona := TextureRect.new()
+		icona.custom_minimum_size = Vector2(40, 40)
+		icona.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icona.texture = ItemArt.per_id(item_id)
+		riga.add_child(icona)
 		var etichetta := Label.new()
 		etichetta.text = "%s — %d oro" % [nome, prezzo]
 		etichetta.size_flags_horizontal = Control.SIZE_EXPAND_FILL

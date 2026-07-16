@@ -309,6 +309,13 @@ func _make_inventory_row(entry: Dictionary) -> Control:
 	hb.add_theme_constant_override("separation", 6)
 	row.add_child(hb)
 
+	# FIGURA dell'oggetto (non solo il nome): icona 40x40 a sinistra della riga.
+	var icona := TextureRect.new()
+	icona.custom_minimum_size = Vector2(40, 40)
+	icona.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icona.texture = ItemArt.per_id(catalog_id)
+	hb.add_child(icona)
+
 	var rarita: String = ArmeriaManager.rarita_di(catalog_id)
 	var name_col: Color = ArmeriaManager.colore_rarita(rarita) if not rarita.is_empty() else Color(0.9, 0.87, 0.8)
 	var qty: int = int(entry.get("quantity", 1))
