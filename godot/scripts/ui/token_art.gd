@@ -104,13 +104,21 @@ static func _carica_utente_esatto(id: String) -> Texture2D:
 	return _carica_file_utente(id + ".png")
 
 
-## Il token incluso nel progetto (segnaposto), <id>.png in assets/tokens.
+## Il token incluso nel progetto (segnaposto), <id>.png in assets/tokens. Prima l'import di
+## Godot (in editor c'e' la cache), poi il FILE GREZZO — cosi' i token inclusi si vedono anche
+## SENZA i .import (progetto appena estratto da uno zip, export senza reimport): e' la stessa
+## lettura raw delle mappe e dei token utente, immune al sistema d'import. Senza questo fallback
+## i nemici mostravano il cerchio con la lettera invece del loro disegno.
 static func _carica_inclusa(id: String) -> Texture2D:
 	var progetto: String = CARTELLA_PROGETTO.path_join(id + ".png")
 	if ResourceLoader.exists(progetto):
 		var risorsa: Resource = load(progetto)
 		if risorsa is Texture2D:
 			return risorsa
+	if FileAccess.file_exists(progetto):
+		var img: Image = Image.load_from_file(ProjectSettings.globalize_path(progetto))
+		if img != null:
+			return ImageTexture.create_from_image(img)
 	return null
 
 

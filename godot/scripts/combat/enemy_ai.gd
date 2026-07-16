@@ -37,16 +37,31 @@ func _on_turn_changed(combatant_id: String, round_number: int) -> void:
 		return
 	var stato: Dictionary = CombatManager.get_state()
 	var cur: Dictionary = CombatManager.get_combatant(combatant_id)
-	if cur.is_empty() or String(cur["kind"]) != "npc" or bool(cur["defeated"]):
+	# Non e' il turno di un PNG: l'IA non interviene (i PG coscienti li muove il giocatore, i
+	# PG morenti li gestisce DeathSaves). NON tocca next_turn: non e' il suo turno.
+	if cur.is_empty() or String(cur["kind"]) != "npc":
 		return
-	if _pg_vivi(stato).is_empty():
-		return  # nessun PG vivo da attaccare: non far girare a vuoto i turni dei nemici
 	var chiave: String = "%d:%d:%s" % [round_number, int(stato["currentTurnIndex"]), combatant_id]
 	if chiave == _ultima_chiave_turno:
 		return
 	_ultima_chiave_turno = chiave
+	# Un PNG sconfitto non dovrebbe avere il turno; se capita, lo si PASSA (mai bloccare la coda).
+	if bool(cur["defeated"]):
+		CombatManager.next_turn()
+		return
+	# NOTA: NON si esce se non ci sono PG coscienti. Se tutti i PG sono a terra ma MORENTI, lo
+	# scontro non e' finito (possono rialzarsi con un 20 o una cura): il nemico DEVE comunque
+	# agire e concludere il turno, altrimenti i morenti non arriverebbero mai a tirare contro la
+	# morte e il combattimento si bloccherebbe (era il bug del turno nemico "congelato").
 	await get_tree().create_timer(PAUSA_AZIONE_SEC).timeout
-	_agisci_nemico(cur)
+	# Durante la pausa lo scontro (o questo PNG) puo' essere finito: si esce senza toccare i turni.
+	if not CombatManager.is_active():
+		return
+	var attuale: Dictionary = CombatManager.get_combatant(combatant_id)
+	if attuale.is_empty() or bool(attuale.get("defeated", false)):
+		CombatManager.next_turn()
+		return
+	_agisci_nemico(attuale)
 
 
 static func chebyshev(a: Vector2i, b: Vector2i) -> int:
@@ -128,6 +143,10 @@ func _agisci_nemico(cur: Dictionary) -> void:
 	var comp: String = _comportamento_di(cur)
 	var bersaglio: Dictionary = _bersaglio_per_comportamento(comp, stato, String(cur["id"]))
 	if bersaglio.is_empty():
+		# Nessun PG in piedi: il nemico non infierisce sui caduti e conclude il turno — cosi'
+		# i morenti (tutti a terra) possono tirare contro la morte e magari rialzarsi.
+		GameState.announce("🛡 %s non trova nemici in piedi da affrontare e resta in guardia."
+			% String(cur["name"]))
 		CombatManager.next_turn()
 		return
 
