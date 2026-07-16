@@ -136,20 +136,24 @@ func _agisci_nemico(cur: Dictionary) -> void:
 	var gittata: int = CombatManager.attack_range_of(String(cur["id"]))
 
 	# CODARDO ferito (goblin, Grima): la sua storia dice che scappa — fugge invece di combattere.
+	# E scappa da FURBO: si DISIMPEGNA prima di correre (niente attacchi di opportunita').
 	if comp == "codardo" and npc_cell != null and pc_cell != null \
 			and float(cur["hitPoints"]) < float(cur["maxHitPoints"]) * SOGLIA_FUGA_CODARDO:
 		var fuga: Variant = _cella_libera_lontano(
 			String(cur["id"]), npc_cell, pc_cell, PORTATA_MOVIMENTO + 1)
 		if fuga != null:
+			TacticalRules.disimpegna(String(cur["id"]))
 			CombatManager.set_combatant_cell(String(cur["id"]), fuga)
 			GameState.announce("🏃 %s, ferito, perde il coraggio e scappa via da %s!"
 				% [String(cur["name"]), String(bersaglio["name"])])
 			CombatManager.next_turn()
 			return
 
-	# GUARDIANO (il Guardiano nell'Acqua): difende il suo posto, NON insegue chi sta lontano.
+	# GUARDIANO (il Guardiano nell'Acqua): difende il suo posto, NON insegue chi sta lontano —
+	# e mentre attende si mette in SCHIVATA (svantaggio a chi lo bersaglia da fuori).
 	if comp == "guardiano" and npc_cell != null and pc_cell != null \
 			and chebyshev(npc_cell, pc_cell) > gittata + 1:
+		TacticalRules.schiva(String(cur["id"]))
 		GameState.announce("🗿 %s non abbandona il suo posto: attende nell'ombra."
 			% String(cur["name"]))
 		CombatManager.next_turn()
@@ -201,6 +205,15 @@ func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector
 			GameState.announce(frase % [String(cur["name"]), String(bersaglio["name"])])
 		npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
 		dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else 999
+		# Il BERSERKER che non arriva a contatto SCATTA (azione: passo raddoppiato) e avanza
+		# ancora: la carica non si ferma a meta' strada.
+		if comp == "berserker" and dist > 1 and npc_cell != null:
+			var rincorsa: Variant = _cella_libera_verso(String(cur["id"]), npc_cell, pc_cell)
+			if rincorsa != null:
+				TacticalRules.scatta(String(cur["id"]))
+				CombatManager.set_combatant_cell(String(cur["id"]), rincorsa)
+				npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
+				dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else 999
 	if dist <= 1:
 		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
 	else:

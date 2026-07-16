@@ -13,6 +13,9 @@ var _last_event: Label
 var _attack_button: Button
 var _shove_button: Button
 var _bonus_button: Button
+var _disengage_button: Button
+var _dash_button: Button
+var _dodge_button: Button
 var _fireball_button: Button
 var _bless_button: Button
 var _bonus_popup: PopupPanel
@@ -91,10 +94,25 @@ func _build_ui() -> void:
 
 	_attack_button = _make_action("⚔ Attacca", Color(0.47, 0.16, 0.11), _on_attack_pressed)
 	actions.add_child(_attack_button)
+	# SPINTA alla BG3: e' un'azione BONUS (non piena) — sposta il bersaglio di 1 cella e, se
+	# cade da un'altura, si somma il danno da caduta (TacticalRules).
 	_shove_button = _make_action("👐 Spingi", Color(0.11, 0.24, 0.31), _on_shove_pressed)
+	_shove_button.tooltip_text = "Azione BONUS (stile BG3): prova di Atletica contrapposta; se " \
+		+ "riesce il bersaglio arretra di 1 cella (giu' da un'altura = danno da caduta)."
 	actions.add_child(_shove_button)
 	_bonus_button = _make_action("⚡ Bonus", Color(0.42, 0.32, 0.08), _on_bonus_pressed)
 	actions.add_child(_bonus_button)
+	# Le tre azioni tattiche BG3 (azione piena): Disimpegno, Scatto, Schivata.
+	_disengage_button = _make_action("🌀 Disimpegno", Color(0.18, 0.22, 0.38), _on_disengage_pressed)
+	_disengage_button.tooltip_text = "Azione: ti sganci dalla mischia SENZA provocare attacchi " \
+		+ "di opportunita' fino al tuo prossimo turno."
+	actions.add_child(_disengage_button)
+	_dash_button = _make_action("💨 Scatto", Color(0.16, 0.34, 0.3), _on_dash_pressed)
+	_dash_button.tooltip_text = "Azione: passo raddoppiato in questo turno (9 -> 18 m)."
+	actions.add_child(_dash_button)
+	_dodge_button = _make_action("🛡 Schivata", Color(0.3, 0.3, 0.16), _on_dodge_pressed)
+	_dodge_button.tooltip_text = "Azione: chi ti attacca ha SVANTAGGIO fino al tuo prossimo turno."
+	actions.add_child(_dodge_button)
 	# Palla di Fuoco: SOLO per il Mago (il pulsante compare al suo turno). Esplosione ad area
 	# centrata sul bersaglio selezionato, tiro DES per tutti nel raggio — alleati compresi.
 	_fireball_button = _make_action("🔥 Palla di Fuoco", Color(0.55, 0.28, 0.05), _on_fireball_pressed)
@@ -295,11 +313,41 @@ func _on_shove_pressed() -> void:
 	var target: String = _selected_target_id()
 	if target.is_empty():
 		return
-	if not InventoryManager.can_afford("action"):
-		_last_event.text = "Azione gia' usata: la spinta e' la tua azione del turno."
+	if not InventoryManager.can_afford("bonusAction"):
+		_last_event.text = "Azione bonus gia' usata: la spinta (stile BG3) e' un'azione bonus."
+		return
+	if not CombatManager.in_attack_range(_actor_id(), target):
+		_last_event.text = "Per spingere devi essere ADIACENTE al bersaglio."
 		return
 	CombatManager.shove(_actor_id(), target)
+	InventoryManager.spend_action_resource("bonusAction")
+
+
+func _on_disengage_pressed() -> void:
+	if not _puo_agire() or not _spendi_azione("il Disimpegno"):
+		return
+	TacticalRules.disimpegna(_actor_id())
+
+
+func _on_dash_pressed() -> void:
+	if not _puo_agire() or not _spendi_azione("lo Scatto"):
+		return
+	TacticalRules.scatta(_actor_id())
+
+
+func _on_dodge_pressed() -> void:
+	if not _puo_agire() or not _spendi_azione("la Schivata"):
+		return
+	TacticalRules.schiva(_actor_id())
+
+
+## Spende l'azione piena per un'azione tattica, con messaggio se e' gia' stata usata.
+func _spendi_azione(nome: String) -> bool:
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: %s e' l'azione del turno." % nome
+		return false
 	InventoryManager.spend_action_resource("action")
+	return true
 
 
 ## Palla di Fuoco del Mago: CD e danno derivati dalla SUA scheda (CD = 8 + competenza + mod
@@ -365,7 +413,10 @@ func _refresh_action_buttons() -> void:
 	var ha_azione: bool = turno_pc and bool(eco.get("action", false))
 	var ha_bonus: bool = turno_pc and bool(eco.get("bonusAction", false))
 	_attack_button.disabled = not ha_azione
-	_shove_button.disabled = not ha_azione
+	_shove_button.disabled = not ha_bonus  # la spinta e' un'azione BONUS (stile BG3)
+	_disengage_button.disabled = not ha_azione
+	_dash_button.disabled = not ha_azione
+	_dodge_button.disabled = not ha_azione
 	_bonus_button.disabled = not ha_bonus
 	# Palla di Fuoco (Mago) e Benedizione (Chierico) compaiono SOLO al turno della classe giusta.
 	var classe: String = ""

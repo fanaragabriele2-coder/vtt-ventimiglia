@@ -166,18 +166,48 @@ func _su_party_caduto() -> void:
 		riposo_finito.emit()
 
 
-## Il riposo compie il suo lavoro: tutto il party torna in forze, lo spirito si alleggerisce,
-## e all'alba si riparte.
+## Il riposo LUNGO compie il suo lavoro (regole 5e/BG3): tutti i PF, tutti i DADI VITA, tutti
+## gli SLOT incantesimo tornano al massimo; lo spirito si alleggerisce e all'alba si riparte.
 func _fine_riposo() -> void:
 	if not _riposo_in_corso:
 		return
 	_riposo_in_corso = false
 	for pg: CharacterData in CharacterManager.get_party():
 		CharacterManager.heal_by_id(pg.id, 999)
+		pg.hit_dice_remaining = pg.hit_dice_total
+	for livello: int in range(1, 10):
+		InventoryManager.set_spell_slot(livello, "remaining", 9)  # clampato al max dello slot
 	CompanySpirit.riposo()
-	GameState.announce("🌅 L'alba trova la Compagnia riposata: ferite chiuse, forze ritrovate.")
+	GameState.announce("🌅 L'alba trova la Compagnia riposata: ferite chiuse, dadi vita e "
+		+ "slot incantesimo ritrovati.")
 	_imposta_ora("giorno")
 	riposo_finito.emit()
+
+
+## RIPOSO BREVE (stile BG3): ogni PG ferito spende UN DADO VITA (il suo dX + mod Costituzione)
+## e recupera i PF corrispondenti. Niente notte, niente agguati: una pausa per rifiatare.
+## I dadi vita sono finiti — tornano tutti col riposo lungo al campo.
+func riposo_breve() -> void:
+	if CombatManager.is_active():
+		GameState.announce("⛔ Non si riposa con le lame sguainate: prima finisci lo scontro.")
+		return
+	var curati: int = 0
+	for pg: CharacterData in CharacterManager.get_party():
+		if pg.hp_current >= pg.hp_max:
+			continue
+		if pg.hit_dice_remaining <= 0:
+			GameState.announce("☕ %s non ha piu' dadi vita: serve un riposo lungo." %
+				pg.character_name)
+			continue
+		var facce: int = maxi(4, int(String(pg.hit_dice_formula).get_slice("d", 1)))
+		var cura: int = maxi(1, randi_range(1, facce) + pg.modifier_of("con"))
+		pg.hit_dice_remaining -= 1
+		CharacterManager.heal_by_id(pg.id, cura)
+		GameState.announce("☕ %s spende un dado vita (1d%d): recupera %d PF (dadi rimasti: %d)."
+			% [pg.character_name, facce, cura, pg.hit_dice_remaining])
+		curati += 1
+	if curati == 0:
+		GameState.announce("☕ Riposo breve: nessuno aveva ferite da medicare (o dadi vita).")
 
 
 func _imposta_ora(nome: String) -> void:

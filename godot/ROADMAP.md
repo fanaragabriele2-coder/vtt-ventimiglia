@@ -596,18 +596,34 @@ A inizio scontro il Mondo cucito DIVENTA la mappa tattica, senza cambiare vista
       party, ambience della REGIONE (Terra di Mezzo) o automatica. Se il builder viene
       ricreato a scontro in corso la modalita' battaglia si riattiva da sola.
 
-### 🔜 Fase G3 — Regole di combattimento in stile BG3 (complete)
-Gia' in gioco: azione/bonus/movimento, vantaggio/svantaggio, fiancheggiamento, ALTURA (bonus e
-IA che la cerca), SUPERFICI (fuoco che brucia nei round: SurfacesManager), SPINTA (shove),
-copertura +2/+5, concentrazione, tiri contro la morte. Per chiudere il set BG3:
-- [ ] **attacchi di opportunita'** (reazione): uscire dalla mischia senza Disimpegno provoca un
-      attacco gratuito — e' la regola che rende il posizionamento strategico;
-- [ ] **Disimpegno / Scatto / Schivata** come azioni complete anche per l'IA nemica;
-- [ ] **salto** come parte del movimento (scavalcare superfici pericolose, come in BG3);
-- [ ] **spinta come azione bonus** (alla BG3, non azione piena) + spinta giu' dalle alture con
-      danno da caduta;
-- [ ] **riposo breve** (dadi vita) e **riposo lungo** al campo che recupera anche gli slot;
-- [ ] **ispirazione** (background) e vantaggio situazionale dal Master.
+### ✅ Fase G3 — Regole di combattimento in stile BG3, COMPLETE (luglio 2026)
+Gia' in gioco: azione/bonus/movimento, vantaggio/svantaggio, fiancheggiamento, altura, superfici,
+copertura +2/+5, linea di vista, concentrazione, tiri contro la morte. Il set BG3 ora e' chiuso
+(`TacticalRules`, autoload):
+- [x] **attacchi di opportunita'** (reazione, una a round): chi ESCE dalla portata di mischia di
+      un nemico senza Disimpegno subisce un attacco gratuito — agganciato DENTRO
+      `set_combatant_cell`, quindi vale per TUTTI (trascinamento dei PG, IA nemica, regia del
+      Master). Gli arcieri non li fanno (solo la mischia), gli spostamenti FORZATI (spinta) non
+      provocano, il PG attivo spende la reazione dell'economia. Verificato: 6/6 casi (esce =
+      provoca; Disimpegno/adiacente/non agganciato/arciere/reazione spesa = no).
+- [x] **Disimpegno / Scatto / Schivata** come azioni complete, PG e IA: tre pulsanti nuovi
+      nell'HUD (azione piena); il CODARDO si disimpegna prima di fuggire, il BERSERKER scatta
+      se la carica non arriva a contatto, il GUARDIANO si mette in schivata mentre attende.
+      La Schivata da' svantaggio a chi attacca (colpito: 60% -> 36%, simulato).
+- [x] **movimento con le regole**: in combattimento un PG si trascina SOLO nel suo turno, entro
+      il passo residuo (9 m, 18 con lo Scatto), mai da terra — fuori regola il token TORNA
+      indietro con la spiegazione; l'anteprima avvisa in rosso PRIMA di sbagliare.
+- [x] **salto** nel movimento: le superfici pericolose (fuoco, veleno) si SCAVALCANO con lo
+      slancio — bruciano solo ATTERRANDOCI dentro (danno d'ingresso immediato), come in BG3.
+- [x] **spinta alla BG3**: e' un'azione BONUS (non piena), richiede l'adiacenza, e se riesce
+      SPOSTA il bersaglio di una cella via dall'attaccante; se la cella d'arrivo e' piu' BASSA
+      c'e' il **danno da caduta** (1d6 per livello di quota perso — media 7 su 2 livelli).
+- [x] **riposo breve** (stile BG3, pulsante ☕ nel pannello di viaggio): ogni PG ferito spende
+      UN dado vita (dX + mod COS, mai meno di 1 PF) — i dadi sono finiti; il **riposo lungo**
+      al campo ora ripristina anche TUTTI i dadi vita e gli SLOT incantesimo.
+- [x] **ispirazione e vantaggio situazionale dal Master**: comandi {"command":"inspire"},
+      {"command":"advantage"/"disadvantage","target":...} — vantaggio (o svantaggio) al
+      PROSSIMO attacco di quel combattente, consumato all'uso e annunciato. Prompt aggiornato.
 
 ### 🔜 Fase G4 — La mappa BELLA e strategica
 - [ ] pacchetto battlemap HQ per la Terra di Mezzo (le 9 tessere attuali sono generate):

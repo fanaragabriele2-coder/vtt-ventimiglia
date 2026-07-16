@@ -730,6 +730,11 @@ func modalita_effettiva_per_attacco(attacker_id: String, target_id: String, mode
 	elif elev == "disadvantage":
 		svantaggio_extra = true
 
+	# Regole tattiche BG3: schivata del bersaglio, ispirazione/vantaggio del Master (consumati).
+	var tattiche: Dictionary = TacticalRules.modificatori_attacco(attacker_id, target_id)
+	vantaggio_extra = vantaggio_extra or bool(tattiche["vantaggio"])
+	svantaggio_extra = svantaggio_extra or bool(tattiche["svantaggio"])
+
 	return ElevationManager.componi_modalita(mode_richiesta, vantaggio_extra, svantaggio_extra)
 
 
@@ -891,8 +896,9 @@ func shove(attacker_id: String, target_id: String) -> Dictionary:
 	var target: Dictionary = get_combatant(target_id)
 	if attacker.is_empty() or target.is_empty():
 		return { "ok": false }
-	var atk_bonus: int = _athletics_bonus(attacker_id)
-	var def_bonus: int = maxi(_athletics_bonus(target_id), _acrobatics_bonus(target_id))
+	var atk_bonus: int = TacticalRules.bonus_atletica(attacker_id)
+	var def_bonus: int = maxi(
+		TacticalRules.bonus_atletica(target_id), TacticalRules.bonus_acrobazia(target_id))
 	var atk_roll: int = roll_d20_with_mode("normal")["chosen"] + atk_bonus
 	var def_roll: int = roll_d20_with_mode("normal")["chosen"] + def_bonus
 	var success: bool = atk_roll >= def_roll  # in parita' vince chi spinge (regola del monolite)
@@ -903,27 +909,6 @@ func shove(attacker_id: String, target_id: String) -> Dictionary:
 	_last_event = "%s spinge %s: %s" % [attacker["name"], target["name"], "riuscita" if success else "fallita"]
 	shove_resolved.emit(result)
 	return result
-
-
-func _athletics_bonus(combatant_id: String) -> int:
-	var char_id: String = character_id_di(combatant_id)
-	if not char_id.is_empty():
-		var pg: CharacterData = CharacterManager.get_character_by_id(char_id)
-		if pg:
-			return pg.skill_modifier("athletics")
-	# PNG: approssimazione dal bonus d'attacco (proxy della forza fisica), come nel legacy.
-	var c: Dictionary = get_combatant(combatant_id)
-	return int(c.get("attackBonus", 2)) - 2 if not c.is_empty() else 0
-
-
-func _acrobatics_bonus(combatant_id: String) -> int:
-	var char_id: String = character_id_di(combatant_id)
-	if not char_id.is_empty():
-		var pg: CharacterData = CharacterManager.get_character_by_id(char_id)
-		if pg:
-			return pg.skill_modifier("acrobatics")
-	var c: Dictionary = get_combatant(combatant_id)
-	return int(c.get("initiativeBonus", 0)) if not c.is_empty() else 0
 
 
 # --- Reazione / Attacco di opportunita' (porting del Modulo 24) ---
@@ -941,7 +926,11 @@ func opportunity_attack(reactor_id: String, target_id: String) -> Dictionary:
 # --- Posizioni sulla griglia (letta da fiancheggiamento/elevazione/superfici/IA nemici) ---
 
 ## Registra/aggiorna la cella di un combattente ed emette il signal (la UI mappa si allinea da sola).
+## PRIMA di muovere passa da TacticalRules: attacchi di opportunita' e superfici (salto).
 func set_combatant_cell(combatant_id: String, cell: Vector2i) -> void:
+	var prima: Variant = _positions.get(combatant_id)
+	if prima != null:
+		TacticalRules.pre_spostamento(combatant_id, prima as Vector2i, cell)
 	_positions[combatant_id] = cell
 	combatant_position_changed.emit(combatant_id, cell)
 

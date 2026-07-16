@@ -162,6 +162,9 @@ func _build_system_prompt() -> String:
 		"spostamento ('il troll carica', 'gli orchi ripiegano') il gioco muove i token da solo.",
 		'Per PIAZZARE nemici visibili SENZA avviare lo scontro (imboscate, sentinelle):',
 		'{"command":"placeNpc","id":"<id nemico>","count":2} — i turni partono solo con startCombat.',
+		'Per premiare un giocatore brillante: {"command":"inspire","target":"<nome PG>"} gli da\'',
+		'vantaggio al prossimo attacco. Per il vantaggio/svantaggio situazionale su chiunque:',
+		'{"command":"advantage","target":"<nome>"} oppure {"command":"disadvantage","target":"<nome>"}.',
 		"",
 		"REGOLE DEL COMBATTIMENTO (IMPORTANTISSIME, rispettale sempre):",
 		"- Tu NON gestisci il combattimento: lo gestiscono il sistema a turni e i GIOCATORI.",
@@ -657,6 +660,15 @@ func _dispatch_command(command: Dictionary) -> void:
 				String(command.get("target", command.get("id", command.get("name", "")))),
 				String(command.get("to", command.get("dest", ""))),
 				maxi(1, int(command.get("cells", 4))))
+		"inspire", "inspiration":
+			# Ispirazione dal Master: vantaggio al prossimo tiro d'attacco di quel PG.
+			TacticalRules.ispira(String(command.get("target", command.get("name", ""))))
+		"advantage", "grantAdvantage":
+			TacticalRules.vantaggio_situazionale(
+				String(command.get("target", command.get("name", ""))), "advantage")
+		"disadvantage":
+			TacticalRules.vantaggio_situazionale(
+				String(command.get("target", command.get("name", ""))), "disadvantage")
 		"placeNpc", "placeToken":
 			# PIAZZA nemici VISIBILI sulla mappa SENZA avviare lo scontro (un'imboscata che si
 			# prepara, sentinelle da aggirare): i turni partiranno solo con startCombat.

@@ -37,6 +37,7 @@ var _camera: Camera2D
 var _gettoni: Array[Dictionary] = []   # { "id", "nome", "colore": Color, "pos": Vector2 }
 var _trascinato: int = -1
 var _trascina_da: Vector2 = Vector2.ZERO   # partenza del drag (anteprima movimento in battaglia)
+var _turno_corrente: String = ""           # id del combattente di turno (vincolo BG3 sul drag)
 var _ultimo_zoom: float = 0.0
 var _tween_viaggio: Tween
 var _scatti: Dictionary = {}   # id personaggio -> { "t": float, "dir": Vector2 } (affondo)
@@ -52,7 +53,13 @@ func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
 	# IA, Palla di Fuoco) vengono da QUI. All'inizio di ogni scontro si pubblicano le celle di
 	# tutto il party; poi ogni trascinamento/viaggio le tiene aggiornate.
 	CombatManager.combat_started.connect(_pubblica_tutte_le_celle)
+	# Vincolo BG3 sul movimento: in combattimento un PG si trascina solo nel SUO turno.
+	CombatManager.turn_changed.connect(_su_cambio_turno)
 	set_process(true)
+
+
+func _su_cambio_turno(combatant_id: String, _round: int) -> void:
+	_turno_corrente = combatant_id
 
 
 ## Cella di combattimento di una posizione del mondo (scala fissa: 128 px = 1,5 m).
@@ -244,8 +251,8 @@ func _draw() -> void:
 
 
 ## ANTEPRIMA DEL MOVIMENTO (in battaglia): mentre trascini un token vedi il percorso e i METRI
-## (1 cella = 1,5 m). Se il token e' del PG ATTIVO il colore avvisa quando superi il passo che
-## gli resta (velocita' 9 m del turno meno i metri gia' spesi); per gli altri resta neutro.
+## (1 cella = 1,5 m). Nel TUO turno il colore avvisa in rosso quando superi il passo che resta
+## (TacticalRules: 9 m, 18 con lo Scatto, meno i metri gia' spesi); fuori turno avvisa subito.
 func _disegna_anteprima_movimento(font: Font) -> void:
 	var pos: Vector2 = _gettoni[_trascinato]["pos"]
 	var metri: float = _trascina_da.distance_to(pos) / PX_PER_CELLA * 1.5
@@ -253,13 +260,13 @@ func _disegna_anteprima_movimento(font: Font) -> void:
 		return
 	var colore: Color = Color(0.9, 0.78, 0.4, 0.95)
 	var avviso: String = ""
-	var attivo: CharacterData = CharacterManager.get_active()
-	if attivo != null and String(_gettoni[_trascinato]["id"]) == attivo.id:
-		var usati: float = float(
-			InventoryManager.get_action_economy().get("movementMetersUsed", 0.0))
-		if metri > 9.0 - usati + 0.01:
-			colore = Color(0.88, 0.3, 0.25, 0.95)
-			avviso = " — oltre il passo!"
+	var cid: String = PC_PREFISSO + String(_gettoni[_trascinato]["id"])
+	if cid != _turno_corrente:
+		colore = Color(0.88, 0.3, 0.25, 0.95)
+		avviso = " — non e' il suo turno!"
+	elif metri > TacticalRules.metri_rimasti(cid) + 0.01:
+		colore = Color(0.88, 0.3, 0.25, 0.95)
+		avviso = " — oltre il passo!"
 	_tratteggio(_trascina_da, pos, colore, 4.0)
 	var dim: int = int(maxf(20.0, 15.0 / maxf(_camera.zoom.x, 0.01)))
 	var testo: String = "%.1f m%s" % [metri, avviso]
@@ -306,12 +313,44 @@ func _rilascia(punto: Vector2) -> void:
 			(floorf(locale.x / cella) + 0.5) * cella,
 			(floorf(locale.y / cella) + 0.5) * cella
 		)
+	# REGOLE BG3 in combattimento: ci si muove solo nel PROPRIO turno, entro il passo che resta
+	# (9 m, 18 con lo Scatto), e mai da terra. Fuori regola il token TORNA al punto di partenza.
+	var errore: String = _valida_e_spendi_passo(pos)
+	if not errore.is_empty():
+		GameState.announce(errore)
+		_gettoni[_trascinato]["pos"] = _trascina_da
+		_trascinato = -1
+		queue_redraw()
+		return
 	_gettoni[_trascinato]["pos"] = pos
 	token_spostato.emit(String(_gettoni[_trascinato]["id"]), pos)
 	_pubblica_cella(String(_gettoni[_trascinato]["id"]), pos)
 	_trascinato = -1
 	_salva()
 	queue_redraw()
+
+
+## Valida il rilascio in `pos` contro le regole BG3 e, se la mossa e' LECITA, spende i metri di
+## passo. Ritorna la regola violata (stringa vuota = via libera). Fuori combattimento il
+## trascinamento resta LIBERO (posizionamento da tavolo).
+func _valida_e_spendi_passo(pos: Vector2) -> String:
+	if not CombatManager.is_active():
+		return ""
+	var cid: String = PC_PREFISSO + String(_gettoni[_trascinato]["id"])
+	var nome: String = String(_gettoni[_trascinato]["nome"])
+	var metri: float = _trascina_da.distance_to(pos) / PX_PER_CELLA * 1.5
+	if metri < 0.2:
+		return ""  # rimesso praticamente dov'era: nessuna mossa
+	if cid != _turno_corrente:
+		return "⛔ %s puo' muoversi solo nel SUO turno (regole BG3)." % nome
+	if CombatManager.is_pc_dying(cid) or CombatManager.is_pc_stable(cid):
+		return "⛔ %s e' a terra: non puo' muoversi." % nome
+	var rimasti: float = TacticalRules.metri_rimasti(cid)
+	if metri > rimasti + 0.01:
+		return "⛔ %s: %.1f m sono oltre il passo (restano %.1f m — usa lo Scatto)." % [
+			nome, metri, rimasti]
+	TacticalRules.spendi_metri(cid, metri)
+	return ""
 
 
 func _dentro_mappa(p: Vector2) -> Vector2:

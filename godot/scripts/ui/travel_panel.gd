@@ -177,11 +177,19 @@ func _build_ui() -> void:
 
 	_campo_btn = Button.new()
 	_campo_btn.text = "🏕 Accampati per la notte"
-	_campo_btn.tooltip_text = "Una notte di riposo: cura tutto il party e rinfranca lo spirito " \
-		+ "— ma nelle terre pericolose l'Ombra potrebbe trovarvi nel sonno."
+	_campo_btn.tooltip_text = "RIPOSO LUNGO: cura tutto, ripristina dadi vita e slot incantesimo " \
+		+ "e rinfranca lo spirito — ma nelle terre pericolose l'Ombra potrebbe trovarvi nel sonno."
 	_campo_btn.custom_minimum_size = Vector2(0, 38)
 	_campo_btn.pressed.connect(_on_campo)
 	col.add_child(_campo_btn)
+
+	var breve := Button.new()
+	breve.text = "☕ Riposo breve (dadi vita)"
+	breve.tooltip_text = "Stile BG3: ogni PG ferito spende UN dado vita (dX + mod COS) e " \
+		+ "recupera i PF corrispondenti. I dadi tornano tutti col riposo lungo."
+	breve.custom_minimum_size = Vector2(0, 34)
+	breve.pressed.connect(func() -> void: JourneyEvents.riposo_breve())
+	col.add_child(breve)
 
 
 ## Accampamento: lo gestisce JourneyEvents (notte, rischio d'agguato, cura all'alba).

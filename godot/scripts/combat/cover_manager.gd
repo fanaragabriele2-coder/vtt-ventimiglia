@@ -58,7 +58,7 @@ func linea_di_vista_libera(attacker_id: String, target_id: String) -> bool:
 		return true  # senza celle note non si inventa un muro: il tiro procede
 	var ca: Vector2i = a
 	var cb: Vector2i = b
-	for c: Vector2i in _linea_celle(ca, cb):
+	for c: Vector2i in linea_celle(ca, cb):
 		if maxi(absi(c.x - ca.x), absi(c.y - ca.y)) <= 1:
 			continue
 		if maxi(absi(c.x - cb.x), absi(c.y - cb.y)) <= 1:
@@ -68,8 +68,9 @@ func linea_di_vista_libera(attacker_id: String, target_id: String) -> bool:
 	return true
 
 
-## Le celle attraversate dal segmento a->b (Bresenham), estremi esclusi.
-static func _linea_celle(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+## Le celle attraversate dal segmento a->b (Bresenham), estremi esclusi. PUBBLICA: la usa anche
+## TacticalRules (salto sopra le superfici lungo il percorso di uno spostamento).
+static func linea_celle(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	var dx: int = absi(b.x - a.x)
 	var dy: int = -absi(b.y - a.y)
