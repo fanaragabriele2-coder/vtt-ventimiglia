@@ -84,6 +84,7 @@ var _props: WorldProps
 var _route: WorldRoute
 var _npcs: WorldNpcs
 var _battle_mode: WorldBattleMode
+var _meteo: WorldWeather
 var _file_trovati: bool = false  # distingue "cartella vuota" da "file presenti ma non caricabili"
 var _cartella_attiva: String = CARTELLA_MAPPE_UTENTE  # quale delle due e' stata davvero usata
 var _ultimo_luogo: String = ""   # debounce degli arrivi ai luoghi (evento world:luogo)
@@ -122,7 +123,9 @@ func _ready() -> void:
 	_props = WorldProps.new()
 	_props.z_index = -4
 	add_child(_props)
-	_props.configura(_rect_mappa, _camera)
+	# La cartella del set porta anche l'ARREDO fisso (arredo.json: props tematici per regione,
+	# che contano come copertura tattica — anche massiccia).
+	_props.configura(_rect_mappa, _camera, _cartella_attiva)
 	# Livelli di gioco sopra il terreno, dal basso verso l'alto: etichette dei luoghi (1, sotto
 	# la nebbia: i nomi si scoprono esplorando), nebbia (2), token del party (3), righello (4).
 	_etichette = WorldLabels.new()
@@ -168,6 +171,15 @@ func _ready() -> void:
 	_battle_mode.z_index = 2
 	add_child(_battle_mode)
 	_battle_mode.configura(_rect_mappa, _camera, _tokens, _nemici_mondo)
+	# METEO DI REGIONE (pioggia/cenere/nebbia): sopra i token (la pioggia cade anche sugli
+	# eroi), sotto gli effetti di combattimento. Modo iniziale dalla regione dove sta il party.
+	_meteo = WorldWeather.new()
+	_meteo.z_index = 4
+	add_child(_meteo)
+	_meteo.configura(_rect_mappa, _camera)
+	if CampaignDirector.campagna_attuale_id() != "ventimiglia":
+		_meteo.imposta_modo(String(
+			JourneyEvents.regione_di(_tokens.centro_gruppo()).get("meteo", "sereno")))
 	_righello = WorldRuler.new()
 	_righello.z_index = 4
 	add_child(_righello)

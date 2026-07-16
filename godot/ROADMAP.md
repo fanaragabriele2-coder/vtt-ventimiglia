@@ -625,13 +625,32 @@ copertura +2/+5, linea di vista, concentrazione, tiri contro la morte. Il set BG
       {"command":"advantage"/"disadvantage","target":...} — vantaggio (o svantaggio) al
       PROSSIMO attacco di quel combattente, consumato all'uso e annunciato. Prompt aggiornato.
 
-### 🔜 Fase G4 — La mappa BELLA e strategica
-- [ ] pacchetto battlemap HQ per la Terra di Mezzo (le 9 tessere attuali sono generate):
-      render Blender top-down o pacchetti CC0/Forgotten Adventures in user://maps;
-- [ ] props tematici per regione (rovine, pini di Rohan, guglie di Mordor) che sono ANCHE
-      copertura tattica — la pipeline props→CoverManager e' gia' in piedi;
-- [ ] meteo di regione (pioggia sulla Landa, cenere a Mordor) sopra l'atmosfera esistente;
-- [ ] illuminazione degli scontri: cerchio di luce sul combattente di turno, frecce tracciate.
+### ✅ Fase G4 — La mappa BELLA e strategica (luglio 2026)
+- [x] **Tessere HQ della Terra di Mezzo** (`tools/genera_mappe_hq.py`): il mondo 3072x3072 e'
+      generato IN UN COLPO SOLO (rumore frattale multi-ottava + domain warp, numpy) e poi
+      diviso in 9 tessere — quindi le cuciture sono perfette PER COSTRUZIONE (salto ai bordi
+      1.12 vs 1.06 interno: invisibile, misurato). Biomi ancorati alle regioni di gioco: Bosco
+      Atro fitto e scuro, praterie DORATE di Rohan con ciuffi d'erba alta, lago Nen Hithoel e
+      FIUME che scende al Guado fino alle Paludi (pozze nere e canneti), monti di Moria con
+      nevai e hillshade da nord-ovest, Emyn Muil a creste, Pelennor a campi con chiazze di
+      battaglia, Mordor di cenere con CREPE DI BRACE; piu' la Grande Via Est e la via del sud,
+      il villaggio di Brea coi tetti rossi, il muro nero del Morannon e le guglie di Cirith
+      Ungol. Etichette/regioni/coordinate INVARIATE (stesse dimensioni delle tessere).
+- [x] **Props tematici per regione** (`tools/genera_props_lotr.py` + 6 PNG in assets/props:
+      pino di Rohan, albero di Bosco Atro, rovina antica, guglia di Mordor, masso dell'Emyn,
+      ceppo di palude) e **ARREDO FISSO del set** (assets/maps_terra_di_mezzo/arredo.json,
+      37 pezzi): scenografia NON modificabile caricata da WorldProps, che conta come COPERTURA
+      TATTICA — rovine e guglie sono livello 2: +5 CA e BLOCCANO la linea di vista (10 muri
+      veri sparsi per il mondo). I 6 props entrano anche nella palette 🌳 per piazzarli a mano.
+- [x] **Meteo di regione** (`WorldWeather`): PIOGGIA obliqua sulla Landa e sul Nen Hithoel,
+      CENERE con braci ardenti nei domini di Mordor (Pelennor, Cirith Ungol, Morannon), banchi
+      di NEBBIA su paludi, Moria, Bosco Atro ed Emyn Muil, sereno a Brea e a Rohan — campo
+      "meteo" nel JSON delle regioni, cambio annunciato da JourneyEvents ("regione:cambiata"),
+      particelle disegnate a mano nel riquadro camera (costo costante a ogni zoom). Sopra i
+      token, sotto gli effetti di combattimento.
+- [x] **Illuminazione degli scontri**: CERCHIO DI LUCE dorato (tre aloni concentrici) sotto il
+      combattente di turno, che lo segue quando si muove — si vede a colpo d'occhio di chi e'
+      il momento anche a camera larga. (Le frecce tracciate c'erano gia': WorldCombatFX.)
 
 ### 🎯 Ancora da fare
 1. **Multiplayer Supabase** e ruoli Master/giocatore *(rimandato su richiesta)*

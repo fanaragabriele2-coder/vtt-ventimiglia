@@ -93,6 +93,8 @@ func _entra_in_regione(regione: Dictionary) -> void:
 	if not eventi.is_empty():
 		colore = " " + String(eventi[_rng.randi_range(0, eventi.size() - 1)])
 	GameState.announce("🗺 %s.%s" % [String(regione.get("nome", "Terre sconosciute")), colore])
+	# Il METEO della regione (WorldWeather) e chiunque altro voglia reagire al cambio di zona.
+	GameState.publish("regione:cambiata", regione)
 	var scena: String = String(regione.get("scena", ""))
 	if not scena.is_empty() and AmbienceManager.is_attiva():
 		AmbienceManager.imposta_scena(scena)

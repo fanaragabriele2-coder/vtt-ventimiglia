@@ -41,17 +41,23 @@ var _modalita: bool = false
 var _selezionato: String = ""            # nome del prop scelto nella palette
 var _catalogo: Dictionary = {}           # nome -> Texture2D (user:// vince sul progetto)
 var _voci: Array[Dictionary] = []        # { "file", "pos": Vector2, "scala": float, "rot": float }
+# ARREDO FISSO del set di mappe (<cartella>/arredo.json): i props TEMATICI della regione
+# (pini di Rohan, rovine, guglie di Mordor...) — si disegnano SOTTO quelli dell'utente,
+# contano come COPERTURA (anche massiccia: "livello" 2 blocca la linea di vista), ma non si
+# trascinano, non si cancellano e non finiscono nel salvataggio: sono parte del mondo.
+var _voci_fisse: Array[Dictionary] = []
 var _trascinato: int = -1
 var _luci: Node2D                        # contenitore delle PointLight2D dei prop luminosi
 var _texture_luce: GradientTexture2D
 
 
-func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
+func configura(rect_mondo: Rect2, camera: Camera2D, cartella_set: String = "") -> void:
 	_rect = rect_mondo
 	_camera = camera
 	_luci = Node2D.new()
 	add_child(_luci)
 	_carica_catalogo()
+	_carica_arredo(cartella_set)
 	_carica_layout()
 	_sincronizza_luci()
 	queue_redraw()
@@ -128,15 +134,21 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
+	for voce: Dictionary in _voci_fisse:
+		_disegna_voce(voce)
 	for voce: Dictionary in _voci:
-		var tex: Texture2D = _catalogo.get(String(voce["file"]))
-		if tex == null:
-			continue  # immagine sparita dal disco: la voce resta, tornera' col file
-		var scala: float = float(voce.get("scala", 1.0))
-		var rot: float = deg_to_rad(float(voce.get("rot", 0.0)))
-		draw_set_transform(voce["pos"] as Vector2, rot, Vector2(scala, scala))
-		draw_texture(tex, -tex.get_size() * 0.5)
+		_disegna_voce(voce)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _disegna_voce(voce: Dictionary) -> void:
+	var tex: Texture2D = _catalogo.get(String(voce["file"]))
+	if tex == null:
+		return  # immagine sparita dal disco: la voce resta, tornera' col file
+	var scala: float = float(voce.get("scala", 1.0))
+	var rot: float = deg_to_rad(float(voce.get("rot", 0.0)))
+	draw_set_transform(voce["pos"] as Vector2, rot, Vector2(scala, scala))
+	draw_texture(tex, -tex.get_size() * 0.5)
 
 
 func _piazza(nome: String, punto: Vector2) -> void:
@@ -168,7 +180,7 @@ func _sincronizza_luci() -> void:
 		return
 	for figlio: Node in _luci.get_children():
 		figlio.queue_free()
-	for voce: Dictionary in _voci:
+	for voce: Dictionary in _voci_fisse + _voci:
 		if not LUMINOSI.has(String(voce["file"]).to_lower()):
 			continue
 		var luce := PointLight2D.new()
@@ -274,14 +286,43 @@ func _carica_layout() -> void:
 	_aggiorna_copertura()
 
 
-## Registra in CoverManager la cella di ogni prop: ogni prop = mezza copertura (+2 CA) per chi
-## gli sta dietro rispetto al tiratore. E' "terreno" del campo, indipendente dallo scontro.
+## Registra in CoverManager la cella di ogni prop: prop dell'utente = mezza copertura (+2 CA);
+## l'arredo fisso porta il SUO livello ("livello" 2 = massiccia: +5 CA e blocca la linea di
+## vista — rovine e guglie sono muri veri). E' terreno del campo, indipendente dallo scontro.
 func _aggiorna_copertura() -> void:
 	var celle: Dictionary = {}
+	for voce: Dictionary in _voci_fisse:
+		var c: Vector2i = _cella_copertura(voce["pos"])
+		var k: String = "%d,%d" % [c.x, c.y]
+		celle[k] = maxi(int(celle.get(k, 0)), clampi(int(voce.get("livello", 1)), 1, 2))
 	for voce: Dictionary in _voci:
 		var c: Vector2i = _cella_copertura(voce["pos"])
-		celle["%d,%d" % [c.x, c.y]] = 1
+		var k: String = "%d,%d" % [c.x, c.y]
+		celle[k] = maxi(int(celle.get(k, 0)), 1)
 	CoverManager.imposta_celle(celle)
+
+
+## L'arredo fisso del set (<cartella>/arredo.json): voci come il layout utente, piu' "livello"
+## di copertura opzionale. Vuoto o assente = nessun arredo (i set Castello/Banca ne fanno a meno).
+func _carica_arredo(cartella_set: String) -> void:
+	_voci_fisse.clear()
+	if cartella_set.is_empty():
+		return
+	var percorso: String = cartella_set.path_join("arredo.json")
+	if not FileAccess.file_exists(percorso):
+		return
+	var dati: Variant = JSON.parse_string(FileAccess.get_file_as_string(percorso))
+	if dati is not Array:
+		return
+	for voce: Variant in dati:
+		if voce is Dictionary and voce.has("file") and voce.has("x") and voce.has("y"):
+			_voci_fisse.append({
+				"file": String(voce["file"]),
+				"pos": Vector2(float(voce["x"]), float(voce["y"])),
+				"scala": float(voce.get("scala", 1.0)),
+				"rot": float(voce.get("rot", 0.0)),
+				"livello": int(voce.get("livello", 1)),
+			})
 
 
 func _cella_copertura(pos: Vector2) -> Vector2i:
