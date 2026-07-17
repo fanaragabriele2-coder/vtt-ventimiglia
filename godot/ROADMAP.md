@@ -787,6 +787,97 @@ di impatto. Ogni voce e' una sessione o poco piu'.
 
 ### 🌐 H6 — (rimandato) Multiplayer e mondo condiviso
 - [ ] **Multiplayer Supabase** e ruoli Master/giocatore — la rete (NetOutbox) e' predisposta.
+      (Ripreso e dettagliato in I6, PARTE 7.)
+
+---
+
+## PARTE 7 — Dal gioco COMPLETO al gioco RIFINITO
+
+Con H1–H5 il tavolo ha animazioni, suoni, meccaniche 5e/BG3, struttura e veste grafica.
+Questa parte e' la roadmap ONESTA di cio' che ancora manca o scricchiola — ordinata per
+impatto sul tavolo. Priorita' consigliata: I1 → I2 → I3; I4/I5 si possono spargere in mezzo;
+I6 per ultima. Ogni voce e' una sessione o poco piu'.
+
+### 🎯 I1 — QUALITA' DI VITA al tavolo (il prossimo passo consigliato)
+- [ ] **Percentuale di colpire alla BG3**: scelto il bersaglio, l'HUD mostra PRIMA del click
+      "68% — d20+6 vs CA 15 (copertura +2, vantaggio)" — tutti i numeri esistono gia'
+      (modalita_effettiva_per_attacco, CoverManager, condizioni): manca solo mostrarli.
+- [ ] **Template delle AREE prima del lancio**: l'anteprima sulla mappa del cerchio della
+      Palla di Fuoco, della LINEA del Fulmine e del raggio della Ragnatela mentre scegli il
+      bersaglio — oggi si lancia "alla cieca" e il fuoco amico si scopre dopo.
+- [ ] **Log di combattimento dedicato**: la chat unica affoga i tiri tra narrazione e viaggio;
+      un pannellino filtrabile (solo tiri / solo danni / tutto) con gli ultimi 30 eventi.
+- [ ] **Hotkey**: 1–9 per le azioni dell'HUD, SPAZIO per Termina turno, F5/F9 salva/carica
+      rapido, ESC chiude i pannelli aperti.
+- [ ] **Pannello OPZIONI**: volumi SEPARATI (Musica/Atmosfera/SFX/Voce — i bus esistono
+      gia'), toggle dello screen-shake (accessibilita' motion), scala della UI, schermo
+      intero che si RICORDA, velocita' della voce del Master.
+- [ ] **Accessibilita' daltonici**: i badge delle condizioni sui token sono SOLO colore —
+      aggiungere l'iniziale (P/S/A/F) o la mini-icona dentro al pallino.
+- [ ] **Annulla movimento**: in battaglia, un "riporta indietro" del trascinamento appena
+      fatto (prima di agire), coi metri restituiti — il tavolo vero lo concede sempre.
+
+### 🧰 I2 — ROBUSTEZZA: salvataggio totale, CI del motore, build
+- [ ] **Snapshot COMPLETO negli slot**: oggi diario, missioni, Spirito, reliquie e progresso
+      del racconto vivono in file per-campagna FUORI dagli slot (limite documentato nel
+      pannello Partite): caricare uno slot non li riavvolge. Dare a ogni manager il suo
+      get/hydrate_save_state e includerli.
+- [ ] **Autosave**: uno slot "auto" scritto a ogni arrivo/vittoria/level-up, col suo posto
+      nel pannello Partite.
+- [ ] **CI del motore**: il workflow GitHub attuale testa SOLO il monolite JS — aggiungere un
+      job Godot: gdparse/gdlint su scripts/, il simulatore di regressione su ENTRAMBE le
+      campagne, e un'apertura headless del progetto (godot --headless --import) che stani gli
+      errori di caricamento veri.
+- [ ] **Build automatiche**: c'e' solo il preset Windows — aggiungere Linux e Web, un job di
+      export sui tag, l'icona dell'eseguibile e una schermata di avvio.
+
+### ⚔️ I3 — PROFONDITA' di combattimento
+- [ ] **Boss a FASI**: a meta' HP il Balrog sferza ad AREA e s'infiamma, il Re Stregone urla
+      paura ad area al primo sangue, il Guardiano afferra e TRASCINA verso l'acqua — oggi i
+      boss sono sacchi di HP con comportamento fisso (EnemyAI ha gia' i "comportamenti":
+      mancano i trigger sugli HP).
+- [ ] **Abilita' mostruose**: rigenerazione del Troll (spenta da fuoco/acido — la Fiasca
+      d'Olio esiste apposta), ragnatele di Shelob in combattimento, il negromante che EVOCA
+      scheletri a meta' scontro.
+- [ ] **Slot e grimorio PER personaggio**: oggi seguono la scheda APERTA (limite documentato
+      in SpellBook/ProgressionManager) — spostarli nello stato per-PG come l'inventario, cosi'
+      mago E chierico castano nello stesso scontro ognuno coi suoi slot.
+- [ ] **Incantesimi di 3° livello**: Palla di Fuoco DENTRO il grimorio con slot L3 (oggi e'
+      un pulsante gratuito), Volare, Contro-incantesimo come REAZIONE (il prompt e' pronto).
+- [ ] **Sottoclassi al 3° e talenti al 4°**: la crescita di classe (H3) e' il gancio — Campione
+      /Maestro di Battaglia per il guerriero, Assassino/Mastro Ladro, scelte via ReactionPrompt.
+- [ ] **Nuove superfici**: GHIACCIO (TS DES o prono entrando), NEBBIA (svantaggio ai tiri a
+      distanza attraverso), ACQUA BENEDETTA (danno extra ai non-morti che ci stanno dentro).
+
+### 🗺 I4 — MONDO piu' vivo
+- [ ] **INTERNI collegati**: le battlemap del castello e della banca esistono come Set — dare
+      ai POI una PORTA che entra (mappa dentro mappa, con ritorno) invece di cambiare Set a mano.
+- [ ] **Pathfinding nel trascinamento**: il drag in battaglia va in linea retta — fargli
+      aggirare muri e superfici (A* sulle celle, il costo del passo gia' c'e') mostrando il
+      percorso vero.
+- [ ] **Vignette dei luoghi**: all'arrivo in un POI, una piccola illustrazione del posto
+      (generabile con la pipeline PIL dei ritratti) sopra l'annuncio.
+- [ ] **Accampamento con scelte**: turni di guardia (chi veglia tira Percezione), razioni che
+      contano, conversazioni del compagno al fuoco (CompanionManager ha gia' le battute).
+- [ ] **EDITOR di racconti in-game**: crea nodi, prove e boss dal gioco e salva in
+      user://storia_custom.json — StoryDirector multi-campagna li puo' GIA' caricare: manca
+      solo l'editor (e una voce nel selettore campagne).
+
+### 🔊 I5 — AUDIO 2.0
+- [ ] **Mixer nel pannello Opzioni**: quattro slider sui bus Musica/Ambience/SFX/Voce.
+- [ ] **Varianti sui colpi**: pitch e volume leggermente casuali a ogni riproduzione — dieci
+      spadate di fila non devono suonare come una mitraglietta dello stesso wav.
+- [ ] **Temi extra**: la taverna/mercante, una fanfara di vittoria LUNGA per i boss del
+      racconto, un tema del titolo per la schermata iniziale.
+- [ ] **Ducking completo**: sotto la voce del Master oggi si abbassano musica e atmosfera —
+      abbassare anche gli stinger.
+
+### 🌐 I6 — MULTIPLAYER (era H6)
+- [ ] **Passo 1 — hot-seat rifinito**: turni "passa il mouse" sul singolo tavolo + i dadi dal
+      telefono (DiceServer) gia' funzionanti — il multiplayer da divano, zero rete.
+- [ ] **Passo 2 — Supabase realtime**: il Master ospita, i giocatori vedono il tavolo e
+      muovono SOLO i propri token (NetOutbox e' predisposto; servono presenza, lock dei token
+      e replay degli eventi di GameState).
 
 ---
 
