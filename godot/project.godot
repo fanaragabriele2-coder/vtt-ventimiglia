@@ -65,6 +65,8 @@ MusicDirector="*res://scripts/autoload/music_director.gd"
 ReactionPrompt="*res://scripts/combat/reaction_prompt.gd"
 SpellBook="*res://scripts/combat/spell_book.gd"
 ClassFeats="*res://scripts/combat/class_feats.gd"
+EpilogueScreen="*res://scripts/ui/epilogue_screen.gd"
+TutorialDirector="*res://scripts/autoload/tutorial_director.gd"
 
 [audio]
 

@@ -19,8 +19,6 @@ extends Node
 signal nodo_presentato(dati: Dictionary)
 signal racconto_finito()
 
-const STORIA_PATH: String = "res://data/storia_terra_di_mezzo.json"
-const SALVATAGGIO: String = "user://storia_terra_di_mezzo.json"
 const NOMI_ABILITA: Dictionary = {
 	"str": "Forza", "dex": "Destrezza", "con": "Costituzione",
 	"int": "Intelligenza", "wis": "Saggezza", "cha": "Carisma",
@@ -33,20 +31,44 @@ var _premiati: Dictionary = {}
 var _attesa_vittoria: bool = false
 var _tentativi_riprova: int = 0   # riprove consecutive sullo stesso scontro (clemenza crescente)
 var _avviato: bool = false
+var _campagna: String = ""        # ogni campagna ha il SUO racconto e il SUO progresso
 
 
 func _ready() -> void:
-	if not FileAccess.file_exists(STORIA_PATH):
-		push_warning("StoryDirector: racconto non trovato: " + STORIA_PATH)
-		return
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(STORIA_PATH))
-	if parsed is not Dictionary:
-		push_warning("StoryDirector: racconto illeggibile")
-		return
-	_dati = parsed
-	_nodi = _dati.get("nodi", {})
 	CombatManager.victory.connect(_su_vittoria)
 	CombatManager.party_wiped.connect(_su_sconfitta)
+	# OGNI campagna ha il suo racconto (data/storia_<id>.json): si carica quello della campagna
+	# attiva e si ricarica al cambio (CampaignDirector pubblica "campagna:cambiata" — ma il SUO
+	# _ready e' gia' passato quando questo parte, quindi la prima lettura e' diretta).
+	GameState.event_published.connect(_su_evento_globale)
+	_carica_racconto(CampaignDirector.campagna_attuale_id())
+
+
+func _su_evento_globale(nome_evento: String, payload: Variant) -> void:
+	if nome_evento == "campagna:cambiata" and payload is Dictionary:
+		_carica_racconto(String((payload as Dictionary).get("id", "")))
+
+
+## Carica il racconto della campagna `id` (e il suo progresso salvato); azzera lo stato in corso.
+func _carica_racconto(id: String) -> void:
+	if id.is_empty() or id == _campagna:
+		return
+	var percorso: String = "res://data/storia_%s.json" % id
+	if not FileAccess.file_exists(percorso):
+		push_warning("StoryDirector: racconto non trovato: " + percorso)
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(percorso))
+	if parsed is not Dictionary:
+		push_warning("StoryDirector: racconto illeggibile: " + percorso)
+		return
+	_campagna = id
+	_dati = parsed
+	_nodi = _dati.get("nodi", {})
+	_nodo_corrente = ""
+	_premiati = {}
+	_attesa_vittoria = false
+	_tentativi_riprova = 0
+	_avviato = false
 	_carica()
 
 
@@ -242,6 +264,13 @@ func _su_sconfitta() -> void:
 	})
 
 
+## true se il nodo corrente e' un boss del racconto: lo schermo di morte (EpilogueScreen) puo'
+## offrire "Rialzatevi" sapendo che riprova() rimettera' in scena PROPRIO questo scontro.
+func riprova_disponibile() -> bool:
+	return _avviato and _nodi.has(_nodo_corrente) \
+		and (_nodi[_nodo_corrente] as Dictionary).has("combattimento")
+
+
 ## Riprende il boss fight del nodo corrente dopo una sconfitta (respawn dello scontro).
 func riprova() -> void:
 	if _nodi.has(_nodo_corrente) and (_nodi[_nodo_corrente] as Dictionary).has("combattimento"):
@@ -269,8 +298,13 @@ func riprova() -> void:
 		_processa_ingresso()
 
 
+## Il progresso vive in un file PER CAMPAGNA: tornare a Ventimiglia ritrova il SUO racconto.
+func _percorso_salvataggio() -> String:
+	return "user://storia_%s.json" % _campagna
+
+
 func _salva() -> void:
-	var file: FileAccess = FileAccess.open(SALVATAGGIO, FileAccess.WRITE)
+	var file: FileAccess = FileAccess.open(_percorso_salvataggio(), FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify({
 			"nodo": _nodo_corrente, "premiati": _premiati.keys(),
@@ -278,9 +312,9 @@ func _salva() -> void:
 
 
 func _carica() -> void:
-	if not FileAccess.file_exists(SALVATAGGIO):
+	if not FileAccess.file_exists(_percorso_salvataggio()):
 		return
-	var dati: Variant = JSON.parse_string(FileAccess.get_file_as_string(SALVATAGGIO))
+	var dati: Variant = JSON.parse_string(FileAccess.get_file_as_string(_percorso_salvataggio()))
 	if dati is Dictionary:
 		_nodo_corrente = String((dati as Dictionary).get("nodo", ""))
 		for id: Variant in (dati as Dictionary).get("premiati", []):

@@ -50,12 +50,50 @@ func list_slots() -> Array[String]:
 	return out
 
 
+## La targhetta della partita per il pannello degli slot: campagna e party a colpo d'occhio.
+func _riassunto_partita() -> Dictionary:
+	var eroi: PackedStringArray = []
+	for pg: CharacterData in CharacterManager.get_party():
+		eroi.append("%s L%d" % [pg.character_name, pg.level])
+	return {
+		"campagna": CampaignDirector.campagna_attuale_id(),
+		"party": " · ".join(eroi) if not eroi.is_empty() else "nessun eroe",
+	}
+
+
+## I metadati di uno slot per la schermata di caricamento, senza toccare il gioco:
+## { "esiste": bool, "salvatoIl": String, "campagna": String, "party": String }.
+func slot_info(slot_name: String) -> Dictionary:
+	var path: String = _slot_path(slot_name)
+	if not FileAccess.file_exists(path):
+		return { "esiste": false }
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not (parsed is Dictionary):
+		return { "esiste": false }
+	var r: Dictionary = (parsed as Dictionary).get("riassunto", {})
+	return {
+		"esiste": true,
+		"salvatoIl": String((parsed as Dictionary).get("savedAt", "?")),
+		"campagna": String(r.get("campagna", "?")),
+		"party": String(r.get("party", "?")),
+	}
+
+
+## Cancella uno slot dal disco (il pannello chiede conferma prima).
+func delete_slot(slot_name: String) -> bool:
+	var path: String = _slot_path(slot_name)
+	if not FileAccess.file_exists(path):
+		return false
+	return DirAccess.remove_absolute(path) == OK
+
+
 func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	# Il dungeon Nexus si salva "seme+delta": il MapManager pubblica il suo stato minimo in
 	# GameState (chiave "nexus.save") a ogni movimento — qui lo si raccoglie senza conoscerlo.
 	var nexus_stato: Variant = GameState.get_value("nexus.save")
 	var state: Dictionary = {
 		"savedAt": Time.get_datetime_string_from_system(),
+		"riassunto": _riassunto_partita(),
 		"character": CharacterManager.serialize_party(),
 		"inventory": InventoryManager.get_save_state(),
 		"progression": ProgressionManager.get_save_state(),

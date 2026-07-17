@@ -17,6 +17,7 @@ var _voce_btn: Button
 var _dadi_telefono_btn: Button
 var _storia_btn: Button
 var _musica_btn: Button
+var _partite_panel: SaveSlotsPanel
 var _master_tools: MasterToolsPanel
 var _chat_panel: MasterChatPanel
 var _story_panel: CampaignStoryPanel
@@ -196,8 +197,7 @@ func _build_toolbar() -> PanelContainer:
 	row.add_child(_separatore_toolbar())
 	row.add_child(_toolbar_button("📥 Importa token", _importa_token))
 	row.add_child(_toolbar_button("⛶ Schermo intero", _toggle_fullscreen))
-	row.add_child(_toolbar_button("💾 Salva", _save_game))
-	row.add_child(_toolbar_button("📂 Carica", _load_game))
+	row.add_child(_toolbar_button("💾 Partite", _apri_partite))
 	return panel
 
 
@@ -218,12 +218,17 @@ func _toggle_dice_server() -> void:
 	_dadi_telefono_btn.text = "📱 Dadi: ON" if DiceServer.e_attivo() else "📱 Dadi: OFF"
 
 
-func _save_game() -> void:
-	SaveManager.save_game()
-
-
-func _load_game() -> void:
-	SaveManager.load_game()
+## Il pannello degli SLOT di salvataggio (H4): tre slot + rapido, con targhetta e conferme.
+func _apri_partite() -> void:
+	if _partite_panel == null:
+		_partite_panel = SaveSlotsPanel.new()
+		add_child(_partite_panel)
+		_partite_panel.set_anchors_and_offsets_preset(
+			Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE, 0)
+	if _partite_panel.visible:
+		_partite_panel.hide()
+	else:
+		_partite_panel.apri()
 
 
 ## Importa i ritratti dei token dell'utente (es. la cartella "nemi" sul Desktop): selettore

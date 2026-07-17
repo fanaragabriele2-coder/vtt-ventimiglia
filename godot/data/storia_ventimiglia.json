@@ -1,0 +1,419 @@
+{
+ "_comment": "Racconto ramificato di Ventimiglia (H4) — stesso schema di storia_terra_di_mezzo: nodi con testo/opzioni (vai_a o prova{abilita,cd,successo,fallimento}), boss con combattimento[{name,count}]+intensita+dopo_vittoria+ricompensa, fine:true in coda. Caricato da StoryDirector quando la campagna attiva e' 'ventimiglia'.",
+ "titolo": "Il Canto Sommerso",
+ "nodo_iniziale": "prologo",
+ "nodi": {
+  "prologo": {
+   "testo": "Ventimiglia, un'alba color ferro. Alla Foce del Roya le barche rientrano con le reti vuote e gli occhi bassi: e' la terza notte che dal mare arriva un CANTO — basso, dolcissimo, sbagliato. Stanotte non e' tornata la barca di Lucia, la figlia del pescatore Bartolomeo. Sul molo, il vecchio stringe un lume e guarda l'acqua nera come si guarda una porta. Dietro di voi, nei vicoli della citta' vecchia, qualcuno ha gia' sprangato le finestre.",
+   "opzioni": [
+    {
+     "testo": "Interroga Bartolomeo con garbo: cosa ha sentito davvero?",
+     "prova": {
+      "etichetta": "Persuasione",
+      "abilita": "cha",
+      "cd": 12,
+      "successo": "prologo_pescatore",
+      "fallimento": "prologo_teso"
+     }
+    },
+    {
+     "testo": "Ascolta il mare: da DOVE viene il canto?",
+     "prova": {
+      "etichetta": "Percezione",
+      "abilita": "wis",
+      "cd": 12,
+      "successo": "prologo_ascolto",
+      "fallimento": "prologo_teso"
+     }
+    },
+    {
+     "testo": "Gira per le osterie del porto e compra qualche lingua sciolta",
+     "prova": {
+      "etichetta": "Indagine",
+      "abilita": "int",
+      "cd": 12,
+      "successo": "prologo_osterie",
+      "fallimento": "prologo_teso"
+     }
+    }
+   ]
+  },
+  "prologo_pescatore": {
+   "testo": "Bartolomeo parla a scatti, come chi teme di essere ascoltato dall'acqua. 'Lucia diceva che il canto usciva dal TEATRO ROMANO, di notte. E che al porto, quelli della barca grigia... scaricano casse che NON sono pesce.' Vi mette in mano una chiave di ferro: 'La porta bassa del molo. Andate stanotte. Riportatemela.'",
+   "opzioni": [
+    {
+     "testo": "Al molo, stanotte",
+     "vai_a": "molo_notte"
+    }
+   ]
+  },
+  "prologo_ascolto": {
+   "testo": "Chiudete gli occhi sul molo. Il canto non viene dal largo: RIMBALZA — parte da terra, dalla collina della citta' vecchia, e il mare lo restituisce. Qualcuno canta AL mare, non DAL mare. E sotto il canto, appena udibile, un coro di voci che non respirano.",
+   "opzioni": [
+    {
+     "testo": "Prima il porto: la barca grigia",
+     "vai_a": "molo_notte"
+    }
+   ]
+  },
+  "prologo_osterie": {
+   "testo": "Tre bicchieri dopo, un mozzo con l'occhio nero vi sputa il nome: 'La barca grigia del CORVO. Scarica di notte alla porta bassa del molo. E paga in monete VECCHIE, di quelle coi volti consumati... monete da morto.' Poi si fa il segno della croce col bicchiere e non parla piu'.",
+   "opzioni": [
+    {
+     "testo": "La porta bassa del molo, stanotte",
+     "vai_a": "molo_notte"
+    }
+   ]
+  },
+  "prologo_teso": {
+   "testo": "Le parole sbagliate al momento sbagliato: il molo vi volta le spalle, le porte si chiudono, un lume si spegne. Ma un bambino vi tira la manica: 'Cercate la barca grigia. Viene solo quando il canto e' forte.' Poi scappa via tra le reti.",
+   "opzioni": [
+    {
+     "testo": "Aspettate la notte al molo",
+     "vai_a": "molo_notte"
+    }
+   ]
+  },
+  "molo_notte": {
+   "testo": "Mezzanotte. La barca grigia scivola alla porta bassa senza un cigolio: quattro uomini scaricano casse lunghe — LUNGHE COME BARE. Dal telo di una spunta una mano grigia, e nessuno dei portuali fa una piega: hanno gli occhi vuoti di chi ascolta un canto che voi non sentite ancora.",
+   "opzioni": [
+    {
+     "testo": "Seguili nell'ombra fino al magazzino",
+     "prova": {
+      "etichetta": "Furtivita'",
+      "abilita": "dex",
+      "cd": 13,
+      "successo": "magazzino_ombra",
+      "fallimento": "vicolo_agguato"
+     }
+    },
+    {
+     "testo": "Sbarra loro la strada: fermi tutti, in nome della citta'",
+     "vai_a": "vicolo_agguato"
+    }
+   ]
+  },
+  "magazzino_ombra": {
+   "testo": "Dal buio di una gru li vedete entrare nel magazzino del Corvo. Dentro: casse aperte, sale grosso, corpi COMPOSTI come per un rito, e su ogni fronte una moneta antica. Un registro annota: 'AL TEATRO. PRIMA DELLA LUNA PIENA. IL CORO DEVE ESSERE COMPLETO.' Ma un portuale inciampa in un secchio: gli occhi vuoti si voltano tutti insieme verso di voi.",
+   "opzioni": [
+    {
+     "testo": "Vi hanno visti: mano alle armi",
+     "vai_a": "vicolo_agguato"
+    }
+   ]
+  },
+  "vicolo_agguato": {
+   "testo": "I contrabbandieri del Corvo vi chiudono nel vicolo, lame corte e facce di chi lo ha gia' fatto altre volte. 'Niente di personale,' dice il piu' alto, 'ma il Coro paga bene chi porta corpi FRESCHI.'",
+   "combattimento": [
+    {
+     "name": "Bandito",
+     "count": 2
+    }
+   ],
+   "intensita": "facile",
+   "dopo_vittoria": "casa_lucia",
+   "ricompensa": {
+    "items": [
+     "healingPotion"
+    ],
+    "gold": 18
+   }
+  },
+  "casa_lucia": {
+   "testo": "Sull'ultimo bandito trovate un pegno: il fazzoletto di Lucia, che Bartolomeo riconosce tremando. E una mappa rozza: il TEATRO ROMANO cerchiato tre volte, e una nota — 'se i lupi scendono dalle colline, e' il canto che li chiama'. Dalle alture, come a rispondere, arriva un ululato che non sembra fame: sembra OBBEDIENZA.",
+   "opzioni": [
+    {
+     "testo": "Dritti al Teatro Romano, non c'e' tempo",
+     "vai_a": "teatro_ingresso"
+    },
+    {
+     "testo": "Prima le colline: nessun branco alle spalle",
+     "vai_a": "colline_lupi"
+    }
+   ]
+  },
+  "colline_lupi": {
+   "testo": "Sui sentieri sopra Ventimiglia l'aria sa di pelo bagnato. Il branco vi aspetta al passo: occhi gialli in cerchio, e nel modo in cui si muovono c'e' un RITMO — lo stesso del canto. Non cacciano: ESEGUONO.",
+   "combattimento": [
+    {
+     "name": "Lupo",
+     "count": 2
+    }
+   ],
+   "intensita": "facile",
+   "dopo_vittoria": "colline_quiete",
+   "ricompensa": {
+    "items": [
+     "rations"
+    ],
+    "gold": 10
+   }
+  },
+  "colline_quiete": {
+   "testo": "Caduto l'ultimo lupo, il ritmo si spezza: le colline tornano colline. Da quassu' vedete il Teatro Romano — e il canto che ne sale come fumo freddo. Almeno, nessuno vi morde piu' le spalle.",
+   "opzioni": [
+    {
+     "testo": "Scendete al Teatro Romano",
+     "vai_a": "teatro_ingresso"
+    }
+   ]
+  },
+  "teatro_ingresso": {
+   "testo": "Il Teatro Romano di notte: gradinate di pietra bianca sotto la luna, e il canto che ORA si sente con le orecchie e con i denti. Viene da SOTTO. Tra le pietre del proscenio, una lastra piu' liscia delle altre respira aria fredda dalle fessure.",
+   "opzioni": [
+    {
+     "testo": "Trova il meccanismo della botola senza dare l'allarme",
+     "prova": {
+      "etichetta": "Indagine",
+      "abilita": "int",
+      "cd": 13,
+      "successo": "botola_silenziosa",
+      "fallimento": "teatro_scheletri"
+     }
+    },
+    {
+     "testo": "Fai leva e spalanca la lastra: chi e' sotto vi sentira' comunque",
+     "vai_a": "teatro_scheletri"
+    }
+   ]
+  },
+  "botola_silenziosa": {
+   "testo": "Un fregio ruota, la lastra scende senza un sospiro. Scalini consumati, e sulle pareti conchiglie incastonate nella pietra ROMANA: il Canto Sommerso e' vecchio quanto la citta'. Scendete non visti... ma sull'ultimo gradino montano la guardia ossa in armi.",
+   "opzioni": [
+    {
+     "testo": "Colpite per primi",
+     "vai_a": "teatro_scheletri"
+    }
+   ]
+  },
+  "teatro_scheletri": {
+   "testo": "Sotto il proscenio, la guardia del Coro: scheletri in elmi corrosi dal sale, alghe secche tra le costole — MARINAI ANNEGATI, richiamati a riva nota dopo nota. Alzano le lame tutti insieme, sullo stesso battere del canto.",
+   "combattimento": [
+    {
+     "name": "Scheletro",
+     "count": 2
+    }
+   ],
+   "intensita": "facile",
+   "dopo_vittoria": "cripta_canto",
+   "ricompensa": {
+    "items": [
+     "torch"
+    ],
+    "gold": 14
+   }
+  },
+  "cripta_canto": {
+   "testo": "Oltre la guardia, la cripta si apre in una vasca d'acqua di mare che NON dovrebbe essere qui, a mezza collina. Il canto ora e' dentro le vostre teste: promette riposo, promette il fondo, promette che l'acqua e' CALDA. Le ginocchia di qualcuno di voi gia' si piegano verso la vasca.",
+   "opzioni": [
+    {
+     "testo": "Stringete i denti: il canto non vi avra'",
+     "prova": {
+      "etichetta": "Volonta'",
+      "abilita": "wis",
+      "cd": 13,
+      "successo": "cripta_saldi",
+      "fallimento": "cripta_barcollanti"
+     }
+    }
+   ]
+  },
+  "cripta_saldi": {
+   "testo": "Vi piantate le unghie nei palmi e il canto scivola via come acqua sul ferro. Nella sala oltre la vasca, i cantori: cappe grigie, monete antiche cucite sugli orli, e ai loro piedi un annegato che si RIALZA, gonfio di mare. Vi vedono. Il canto diventa un ORDINE.",
+   "opzioni": [
+    {
+     "testo": "Spezzate il coro",
+     "vai_a": "cripta_cultisti"
+    }
+   ]
+  },
+  "cripta_barcollanti": {
+   "testo": "L'acqua vi arriva alle caviglie prima che un compagno vi strattoni indietro: il canto vi ha MORSI, e la testa vi gira ancora. I cantori vi accolgono a braccia aperte, come si accoglie chi torna a casa. L'annegato ai loro piedi si alza per abbracciarvi anche lui.",
+   "opzioni": [
+    {
+     "testo": "Combattete, storditi ma vivi",
+     "vai_a": "cripta_cultisti"
+    }
+   ]
+  },
+  "cripta_cultisti": {
+   "testo": "I cantori del Canto Sommerso non smettono di cantare NEMMENO combattendo: le lame escono dalle cappe a tempo di musica, e l'annegato avanza con la pazienza terribile di chi e' gia' morto una volta.",
+   "combattimento": [
+    {
+     "name": "Cultista",
+     "count": 2
+    },
+    {
+     "name": "Zombie",
+     "count": 1
+    }
+   ],
+   "intensita": "facile",
+   "dopo_vittoria": "mappa_grotte",
+   "ricompensa": {
+    "items": [
+     "healingPotion",
+     "oilFlask"
+    ],
+    "gold": 25
+   }
+  },
+  "mappa_grotte": {
+   "testo": "Sull'altare della cripta, una carta di pelle: le GROTTE DEI BALZI ROSSI, e dentro — disegnata con inchiostro che sa di pesce — una sala chiamata LA GOLA. 'Il Maestro del Coro prepara l'ultima marea. La figlia del pescatore ha la voce giusta: sara' la PRIMA NOTA.' Lucia e' viva. Per ora.",
+   "opzioni": [
+    {
+     "testo": "Via mare: una barca dritta ai Balzi Rossi, remando contro corrente",
+     "prova": {
+      "etichetta": "Atletica",
+      "abilita": "str",
+      "cd": 13,
+      "successo": "grotte_dal_mare",
+      "fallimento": "grotte_sentiero"
+     }
+    },
+    {
+     "testo": "Via terra: il sentiero a strapiombo sulla scogliera",
+     "prova": {
+      "etichetta": "Acrobazia",
+      "abilita": "dex",
+      "cd": 13,
+      "successo": "grotte_dal_sentiero",
+      "fallimento": "grotte_sentiero"
+     }
+    }
+   ]
+  },
+  "grotte_dal_mare": {
+   "testo": "Remate come dannati e la corrente vi sputa nella bocca della grotta con la marea giusta: entrate DALL'ACQUA, dove nessuna sentinella guarda. La Gola vi si apre davanti, rossa di ocra antica, e il canto qui dentro ha un'ECO che gli fa da coro.",
+   "opzioni": [
+    {
+     "testo": "Alla Gola, in silenzio",
+     "vai_a": "grotte_ierofante"
+    }
+   ]
+  },
+  "grotte_dal_sentiero": {
+   "testo": "Passo dopo passo sullo strapiombo, con il mare che sotto di voi mastica gli scogli. Dall'alto vedete le sentinelle ai fuochi PRIMA che loro vedano voi: scendete alle loro spalle, dentro la pancia rossa dei Balzi Rossi.",
+   "opzioni": [
+    {
+     "testo": "Alle loro spalle: alla Gola",
+     "vai_a": "grotte_ierofante"
+    }
+   ]
+  },
+  "grotte_sentiero": {
+   "testo": "La corrente (o lo strapiombo) vince: arrivate ai Balzi Rossi fradici, graffiati e SENZA sorpresa dalla vostra parte. Alla bocca della grotta le sentinelle hanno gia' le lame in mano e il canto alle spalle.",
+   "opzioni": [
+    {
+     "testo": "Non resta che il ferro",
+     "vai_a": "grotte_ierofante"
+    }
+   ]
+  },
+  "grotte_ierofante": {
+   "testo": "La Gola: una sala d'ocra rossa dove il mare entra cantando. Sul pulpito di roccia, il MAESTRO DEL CORO — cappa grigia, moneta d'oro sull'occhio sinistro — dirige con due dita ossa e cantori insieme. 'Arrivate TARDI,' sorride, 'il coro e' quasi completo.' Le sue guardie scendono dalle nicchie.",
+   "combattimento": [
+    {
+     "name": "Cultista",
+     "count": 2
+    },
+    {
+     "name": "Scheletro",
+     "count": 1
+    }
+   ],
+   "intensita": "equo",
+   "dopo_vittoria": "gola_rivelazione",
+   "ricompensa": {
+    "items": [
+     "chainShirt",
+     "acidVial"
+    ],
+    "gold": 40
+   }
+  },
+  "gola_rivelazione": {
+   "testo": "Il Maestro cade... e RIDE, con la moneta che gli rotola via dall'occhio: un buco asciutto, vecchio di secoli. 'Io sono solo il diapason. L'ULTIMA MAREA sale al FORTE DELL'ANNUNZIATA: da lassu' il canto prendera' tutta la costa. E la prima nota... ha la voce di una ragazza.' Il corpo si sbriciola in sale. Fuori, il mare comincia a salire CONTRO il vento.",
+   "opzioni": [
+    {
+     "testo": "Corsa al Forte, senza fiato ne' soste",
+     "prova": {
+      "etichetta": "Resistenza",
+      "abilita": "con",
+      "cd": 12,
+      "successo": "forte_porta",
+      "fallimento": "forte_sfiniti"
+     }
+    }
+   ]
+  },
+  "forte_sfiniti": {
+   "testo": "Arrivate al Forte dell'Annunziata con i polmoni in fiamme e le gambe di pietra: la salita vi ha spremuti. Sopra i bastioni il cielo e' SBAGLIATO — nuvole ferme in cerchio, e il canto cosi' forte che le pozzanghere tremano a tempo.",
+   "opzioni": [
+    {
+     "testo": "Dentro, con quel che resta",
+     "vai_a": "forte_porta"
+    }
+   ]
+  },
+  "forte_porta": {
+   "testo": "Il portone del Forte e' spalancato come una bocca. Nel cortile, il CORO COMPLETO: cantori in cerchio, mercenari pagati in monete da morto, e legata alla vera del pozzo — Lucia, viva, con gli occhi chiusi e le labbra che GIA' si muovono sulla prima nota. Sopra il pozzo, l'acqua sale da sola, colonna nera contro le stelle.",
+   "opzioni": [
+    {
+     "testo": "Assalto frontale: spezzate il cerchio prima della nota",
+     "vai_a": "forte_finale"
+    },
+    {
+     "testo": "Il cunicolo di sortita: entrate nel cerchio da DENTRO",
+     "prova": {
+      "etichetta": "Furtivita'",
+      "abilita": "dex",
+      "cd": 13,
+      "successo": "forte_sorpresa",
+      "fallimento": "forte_finale"
+     }
+    }
+   ]
+  },
+  "forte_sorpresa": {
+   "testo": "Il cunicolo dei vecchi soldati vi sputa nel cortile ALLE SPALLE del coro: per un istante siete l'unica cosa al mondo che il canto non ha previsto. Il primo colpo e' vostro, e vale doppio.",
+   "opzioni": [
+    {
+     "testo": "ORA: per Lucia e per la citta'",
+     "vai_a": "forte_finale"
+    }
+   ]
+  },
+  "forte_finale": {
+   "testo": "Il coro serra i ranghi: i mercenari del Corvo — un ORCO da sfondamento pagato a peso d'oro e il suo sergente — caricano per comprare al canto gli ultimi versi, mentre l'ultimo cantore tiene la nota che fa TREMARE il pozzo. L'acqua nera e' quasi alla cima. Lucia apre la bocca.",
+   "combattimento": [
+    {
+     "name": "Orco",
+     "count": 1
+    },
+    {
+     "name": "Hobgoblin",
+     "count": 1
+    },
+    {
+     "name": "Cultista",
+     "count": 1
+    }
+   ],
+   "intensita": "equo",
+   "dopo_vittoria": "epilogo_alba",
+   "ricompensa": {
+    "items": [
+     "scrollLightning",
+     "healingPotion"
+    ],
+    "gold": 60
+   }
+  },
+  "epilogo_alba": {
+   "testo": "L'ultimo cantore cade e la nota si SPEZZA a meta': la colonna d'acqua crolla nel pozzo con un tonfo che sa di sconfitta, e le nuvole ricominciano a camminare. Lucia apre gli occhi — i SUOI occhi — e piange senza sapere perche'. All'alba Ventimiglia riapre le finestre una a una; Bartolomeo vi riabbraccia la figlia davanti, e il mare, per la prima volta in settimane, fa solo il rumore del mare. Sul molo qualcuno giura che pagherebbe per una canzone. Nessuno ride.",
+   "fine": true,
+   "opzioni": []
+  }
+ }
+}

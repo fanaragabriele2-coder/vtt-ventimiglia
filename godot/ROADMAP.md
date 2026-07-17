@@ -740,17 +740,30 @@ di impatto. Ogni voce e' una sessione o poco piu'.
       subiti, 3 round). Al level-up le classi crescono: il mago al 3° impara Fulmine+Ragnatela
       e apre uno slot L2, il chierico guadagna un L1 in piu'.
 
-### 🧱 H4 — STRUTTURA: robustezza e longevita'
-- [ ] **Salvataggi multipli con slot** e schermata di caricamento (oggi il progresso e' per
-      campagna in user://, ma senza gestione di piu' partite/slot).
-- [ ] **Schermo di morte e ripresa** curato (oltre al riprova della storia): un epilogo se il
-      party cade davvero, con le gesta dal Diario.
-- [ ] **Bilanciamento continuo**: il simulatore di partita completa (tools, Python) e' un test
-      di regressione — rilanciarlo a ogni modifica del bestiario/storia per non reintrodurre muri.
-- [ ] **Seconda campagna giocabile a fondo** (Ventimiglia ha i POI ma non un racconto ramificato
-      come la Terra di Mezzo): darle il suo StoryDirector con boss e prove.
-- [ ] **Tutorial/onboarding**: le prime schermate spiegano poco; un breve "primo scontro guidato"
-      che introduce movimento, attacco, azioni bonus e viaggio a dadi.
+### 🧱 H4 — STRUTTURA: robustezza e longevita' ✅ FATTA
+- [x] **Salvataggi multipli con slot**: pannello "💾 Partite" in toolbar (SaveSlotsPanel) — tre
+      slot + salvataggio rapido, ognuno con la sua TARGHETTA (quando, campagna, eroi e livelli),
+      Salva/Carica/Elimina con conferma (riusa il prompt delle reazioni). SaveManager esteso con
+      slot_info/delete_slot e il riassunto scritto nel salvataggio.
+- [x] **Schermo di morte con epilogo** (nuovo autoload EpilogueScreen): al TPK cala il buio e
+      compaiono le GESTA della Compagnia (le ultime pagine del Diario di viaggio), musica di
+      terrore. Due strade: "⟲ Rialzatevi" (la clemenza progressiva di StoryDirector.riprova se
+      c'e' un boss del racconto in corso, altrimenti una cura di misericordia a meta' forze) e
+      "Accetta la fine".
+- [x] **Bilanciamento continuo**: il simulatore di partita completa e' ora in
+      tools/simula_campagna.py (test di regressione, `python3 tools/simula_campagna.py
+      [campagna]`): Terra di Mezzo 95% di completamento (invariato), la nuova Ventimiglia
+      600/600 con ~4.7 riprove e livello finale ~2 (scala da campagna d'esordio).
+- [x] **Seconda campagna giocabile a fondo**: StoryDirector ora e' MULTI-CAMPAGNA (racconto e
+      progresso per campagna, ricarica su "campagna:cambiata") e Ventimiglia ha il suo racconto
+      ramificato — "IL CANTO SOMMERSO": 29 nodi, 6 scontri, prove di dado, dal molo della Foce
+      del Roya al Teatro Romano, dalle grotte dei Balzi Rossi al Forte dell'Annunziata (grafo
+      validato: nessun nodo irraggiungibile, nessun vicolo cieco).
+- [x] **Tutorial/onboarding** (nuovo autoload TutorialDirector): alla prima partita il tavolo
+      OFFRE la guida (prompt con conto alla rovescia); se accetti, una card in alto ti porta in
+      5 passi — viaggio a dadi, marcia, uno scontro di prova con un goblin bilanciato al minimo,
+      l'attacco, la vittoria (e la mappa dei pulsanti del tavolo). Avanza DA SOLA sugli eventi
+      veri del gioco e non si ripresenta mai piu' (user://tutorial_fatto.json).
 
 ### 🎨 H5 — RIFINITURA VISIVA
 - [ ] **Ritratti veri di eroi e nemici** (i token attuali sono distintivi generati): render
