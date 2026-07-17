@@ -12,6 +12,7 @@ import json
 import math
 import os
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 BASE = os.path.join(os.path.dirname(__file__), "..")
@@ -27,19 +28,57 @@ RARITA = {  # (metallo, gemma, alone)
 }
 
 
+RNG_ICONE = np.random.default_rng(20260717)
+
+
 def base(rarita):
+	"""v2 (H5): CARD di pergamena scura con grana, smusso interno e alone di rarita' — la
+	forma dell'oggetto ci si appoggia sopra come su una pagina d'inventario dipinta."""
 	img = Image.new("RGBA", (L, L), (0, 0, 0, 0))
 	d = ImageDraw.Draw(img)
+	# pergamena scura con GRANA (rumore caldo) e vignetta ai bordi
+	card = np.zeros((L, L, 4), dtype=np.float32)
+	y, x = np.mgrid[0:L, 0:L].astype(np.float32)
+	bordo = np.minimum.reduce([x, y, L - 1 - x, L - 1 - y]) / (L * 0.5)
+	tinta = np.clip(0.72 + 0.28 * np.clip(bordo * 2.2, 0, 1), 0, 1)
+	rumore = RNG_ICONE.normal(0, 6, size=(L, L))
+	for i, v in enumerate((66, 56, 42)):
+		card[..., i] = np.clip(v * tinta + rumore, 0, 255)
+	card[..., 3] = 255
+	pil_card = Image.fromarray(card.astype(np.uint8), "RGBA")
+	# angoli arrotondati via maschera
+	mask = Image.new("L", (L, L), 0)
+	ImageDraw.Draw(mask).rounded_rectangle([2, 2, L - 2, L - 2], radius=18, fill=255)
+	pil_card.putalpha(mask)
+	img.alpha_composite(pil_card)
+	# alone radiale del colore di rarita' dietro la forma
 	alone = RARITA.get(rarita, RARITA["comune"])[2]
-	# alone radiale morbido del colore di rarita'
 	glow = Image.new("RGBA", (L, L), (0, 0, 0, 0))
 	dg = ImageDraw.Draw(glow)
-	dg.ellipse([16, 16, L - 16, L - 16], fill=alone + (70,))
-	glow = glow.filter(ImageFilter.GaussianBlur(14))
-	img.alpha_composite(glow)
-	# cornice tonda scura
-	d.ellipse([8, 8, L - 8, L - 8], outline=(20, 18, 16, 210), width=3)
+	dg.ellipse([20, 20, L - 20, L - 20], fill=alone + (90,))
+	img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(16)))
+	# smusso: luce in alto-sx, ombra in basso-dx, cornice fine
+	d = ImageDraw.Draw(img)
+	d.rounded_rectangle([2, 2, L - 2, L - 2], radius=18, outline=(18, 15, 12, 235), width=3)
+	d.rounded_rectangle([5, 5, L - 5, L - 5], radius=15,
+		outline=RARITA.get(rarita, RARITA["comune"])[2] + (120,), width=2)
+	d.arc([5, 5, L - 5, L - 5], 200, 320, fill=(255, 240, 210, 60), width=2)
 	return img, d
+
+
+def rifinisci(img, forma):
+	"""Ombra portata + gradiente di luce sulla FORMA, poi composito sulla card."""
+	alpha = forma.split()[3]
+	ombra = Image.new("RGBA", (L, L), (0, 0, 0, 0))
+	ombra.putalpha(alpha.point(lambda a: int(a * 0.55)))
+	img.alpha_composite(ombra.filter(ImageFilter.GaussianBlur(5)), (5, 7))
+	# luce verticale sul metallo/corpo della forma (piu' chiara in alto)
+	arr = np.array(forma).astype(np.float32)
+	y = np.mgrid[0:L, 0:L][0].astype(np.float32) / L
+	fattore = (1.14 - 0.3 * y)[..., None]
+	arr[..., :3] = np.clip(arr[..., :3] * fattore, 0, 255)
+	img.alpha_composite(Image.fromarray(arr.astype(np.uint8), "RGBA"))
+	return img
 
 
 def gemma(d, rarita):
@@ -172,10 +211,13 @@ def main():
 			LIQUIDO = (150, 225, 60, 230)
 		else:
 			LIQUIDO = (120, 200, 150, 220)
-		img, d = base(rarita)
-		disegna(shape_di(o), met, d)
-		gemma(d, rarita)
-		img.save(os.path.join(OUT, o["id"] + ".png"), optimize=True)
+		card, _ = base(rarita)
+		# la FORMA vive su uno strato suo: cosi' le si da' ombra portata e luce (rifinisci)
+		forma = Image.new("RGBA", (L, L), (0, 0, 0, 0))
+		df = ImageDraw.Draw(forma)
+		disegna(shape_di(o), met, df)
+		gemma(df, rarita)
+		rifinisci(card, forma).save(os.path.join(OUT, o["id"] + ".png"), optimize=True)
 	print("Fatto.")
 
 

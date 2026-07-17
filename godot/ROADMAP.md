@@ -765,13 +765,25 @@ di impatto. Ogni voce e' una sessione o poco piu'.
       l'attacco, la vittoria (e la mappa dei pulsanti del tavolo). Avanza DA SOLA sugli eventi
       veri del gioco e non si ripresenta mai piu' (user://tutorial_fatto.json).
 
-### 🎨 H5 — RIFINITURA VISIVA
-- [ ] **Ritratti veri di eroi e nemici** (i token attuali sono distintivi generati): render
-      Blender o pacchetti CC0 in user://tokens — la pipeline fuzzy c'e' gia'.
-- [ ] **Icone oggetti "dipinte"** che sostituiscano le forme generate (stessa cartella
-      user://items, stessi id).
-- [ ] **Font a tema fantasy** per titoli ed etichette (oggi il font di sistema).
-- [ ] **Cursori e cornici** coerenti con l'estetica del Tavolo Oscuro.
+### 🎨 H5 — RIFINITURA VISIVA ✅ FATTA
+- [x] **Ritratti dipinti di eroi e nemici** (tools/genera_ritratti_token.py): i 39 token
+      inclusi non sono piu' distintivi con l'iniziale ma BUSTI in flat-painterly — fondale a
+      gradiente nel colore del personaggio, silhouette a strati (cappucci, elmi, teschi, musi,
+      corna), luce di bordo, occhi incandescenti per Nazgul/spettri/non-morti, il Balrog col
+      fuoco DIETRO la sagoma, vignetta e grana pittorica. I PNG dell'utente in user://tokens
+      continuano a vincere (per chi vuole i render Blender veri).
+- [x] **Icone oggetti "dipinte" v2**: card di pergamena scura con grana e smusso, OMBRA
+      PORTATA sotto la forma, gradiente di luce sul metallo, alone e cornice del colore di
+      rarita' — rigenerate tutte e 40 (stessi id, stessa cartella user://items per le proprie).
+- [x] **Font a tema** (SIL OFL, licenze incluse in assets/fonts): ALEGREYA — serif libresco e
+      leggibilissimo — su TUTTA la UI (tema della finestra radice) e su tutto il testo
+      disegnato in mappa (ThemeDB.fallback_font: nomi, danni, luoghi); CINZEL (capitali
+      romane) esposto da TavoloTheme.font_titoli() per le intestazioni. Caricati come byte
+      grezzi: zero dipendenza dall'import.
+- [x] **Cursori e cornice del Tavolo Oscuro**: freccia scura bordata d'oro e guanto che
+      indica (generati, assets/ui) al posto dei cursori di sistema; TavoloFrame incornicia lo
+      schermo con un doppio filo d'oro e fregi ad arco+rombo agli angoli, come il bordo di un
+      tomo rilegato (trasparente al mouse, si adatta al ridimensionamento).
 
 ### 🌐 H6 — (rimandato) Multiplayer e mondo condiviso
 - [ ] **Multiplayer Supabase** e ruoli Master/giocatore — la rete (NetOutbox) e' predisposta.

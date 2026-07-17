@@ -67,6 +67,8 @@ SpellBook="*res://scripts/combat/spell_book.gd"
 ClassFeats="*res://scripts/combat/class_feats.gd"
 EpilogueScreen="*res://scripts/ui/epilogue_screen.gd"
 TutorialDirector="*res://scripts/autoload/tutorial_director.gd"
+TavoloTheme="*res://scripts/autoload/tavolo_theme.gd"
+TavoloFrame="*res://scripts/ui/tavolo_frame.gd"
 
 [audio]
 
