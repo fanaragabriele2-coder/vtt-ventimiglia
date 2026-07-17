@@ -16,6 +16,11 @@ const DURATA: float = 0.26
 static func entra(control: Control, dal_basso: bool = true) -> void:
 	if control == null or not control.is_inside_tree():
 		return
+	# Il whoosh d'apertura (H2): cercato a runtime perche' da un metodo statico gli autoload
+	# non si toccano per nome — e se UiSfx non c'e', il pannello entra in silenzio, zero crash.
+	var sfx: Node = control.get_tree().root.get_node_or_null("UiSfx")
+	if sfx != null:
+		sfx.call("suona", "pannello")
 	var arrivo: Vector2 = control.position
 	var dy: float = SCIVOLO_PX if dal_basso else -SCIVOLO_PX
 	control.position = arrivo + Vector2(0.0, dy)

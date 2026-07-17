@@ -93,6 +93,10 @@ func _entra_in_regione(regione: Dictionary) -> void:
 	if not eventi.is_empty():
 		colore = " " + String(eventi[_rng.randi_range(0, eventi.size() - 1)])
 	GameState.announce("🗺 %s.%s" % [String(regione.get("nome", "Terre sconosciute")), colore])
+	# La voce del Master RACCONTA l'ingresso nella regione (H2): il viaggio arriva all'orecchio,
+	# non solo in chat. Tono cupo da solo nelle terre d'ombra (pericolo alto).
+	MasterVoice.parla("%s.%s" % [String(regione.get("nome", "Terre sconosciute")), colore],
+		"terrore" if int(regione.get("pericolo", 0)) >= 3 else "narrazione")
 	# Il METEO della regione (WorldWeather) e chiunque altro voglia reagire al cambio di zona.
 	GameState.publish("regione:cambiata", regione)
 	var scena: String = String(regione.get("scena", ""))
@@ -109,6 +113,7 @@ func _agguato(regione: Dictionary, intensita: String) -> void:
 		return
 	var nome_mostro: String = String(mostri[_rng.randi_range(0, mostri.size() - 1)])
 	GameState.announce("⚔ AGGUATO! Nemici vi piombano addosso lungo la strada!")
+	MasterVoice.parla("Agguato! Nemici vi piombano addosso lungo la strada!", "combattimento")
 	CompanionManager.commenta("agguato")
 	EncounterBalancer.spawn_bilanciato([{ "name": nome_mostro, "count": 2 }], intensita)
 

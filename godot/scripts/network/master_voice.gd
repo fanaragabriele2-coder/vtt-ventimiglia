@@ -24,6 +24,17 @@ signal voce_terminata
 ## deve inchiodare la voce per minuti (e il testo resta comunque leggibile in chat).
 const MAX_CARATTERI: int = 900
 
+## INTONAZIONI (H2): la stessa voce, tre atteggiamenti — { volume, pitch, rate }.
+## "narrazione" e' il racconto calmo; "combattimento" incalza (piu' rapido e acuto);
+## "terrore" e' l'ombra che parla (grave e lento). Scelti in automatico da _tono_per().
+const TONI: Dictionary = {
+	"narrazione": { "volume": 60, "pitch": 1.0, "rate": 1.0 },
+	"combattimento": { "volume": 63, "pitch": 1.07, "rate": 1.14 },
+	"terrore": { "volume": 64, "pitch": 0.85, "rate": 0.9 },
+}
+## Parole che tradiscono un'ombra grande nel racconto: la voce si incupisce da sola.
+const PAROLE_TERRORE: Array[String] = ["nazgul", "balrog", "stregone", "spettro", "sauron"]
+
 var _attiva: bool = true
 var _disponibile: bool = false
 var _voce_id: String = ""
@@ -93,17 +104,32 @@ func ferma() -> void:
 
 ## Accoda una battuta da leggere (interrupt=false: si mette in fila, non taglia quella in corso).
 ## Testo ripulito da emoji/markup e troncato a una frase intera entro MAX_CARATTERI.
-func parla(testo: String) -> void:
+## `tono`: "narrazione" (default), "combattimento" o "terrore" — cambia volume/pitch/velocita'.
+func parla(testo: String, tono: String = "narrazione") -> void:
 	if not is_attiva():
 		return
 	var pulito: String = _ripulisci(testo)
 	if pulito.is_empty():
 		return
-	DisplayServer.tts_speak(pulito, _voce_id, 60, 1.0, 1.0, _nuovo_utterance_id(), false)
+	var p: Dictionary = TONI.get(tono, TONI["narrazione"])
+	DisplayServer.tts_speak(pulito, _voce_id, int(p["volume"]), float(p["pitch"]),
+		float(p["rate"]), _nuovo_utterance_id(), false)
+
+
+## Il tono giusto per un testo: cupo se nel racconto compare un'ombra grande, incalzante se c'e'
+## uno scontro in corso, calmo altrimenti.
+func _tono_per(testo: String) -> String:
+	var basso: String = testo.to_lower()
+	for parola: String in PAROLE_TERRORE:
+		if basso.contains(parola):
+			return "terrore"
+	if CombatManager.is_active():
+		return "combattimento"
+	return "narrazione"
 
 
 func _on_master_complete(narration: String, _commands: Array) -> void:
-	parla(narration)
+	parla(narration, _tono_per(narration))
 
 
 ## Il comando strutturato "speak" del Master (una battuta a voce mirata): la si legge SUBITO,

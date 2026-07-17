@@ -11,6 +11,13 @@ extends Node
 const CARTELLA: String = "res://assets/sfx"
 const VOCI: Array[String] = [
 	"colpo", "mancato", "freccia", "magia", "critico", "cura", "dadi", "sconfitta", "vittoria",
+	"spada", "mazza", "arco", "armatura",   # H2: il colpo suona come l'ARMA e come il BERSAGLIO
+]
+## CA da cui il bersaglio "suona" corazzato: il colpo fa CLANK sull'acciaio, non il tonfo carne.
+const CA_CORAZZA: int = 15
+## Chi mena di piatto: classi e mostri che colpiscono CONTUNDENTE (mazza, non lama).
+const CONTUNDENTI: Array[String] = [
+	"chierico", "troll", "ogre", "golem", "mazza", "martello", "clava", "guardiano",
 ]
 const VOLUME_DB: float = -9.0
 const DIM_POOL: int = 4
@@ -59,16 +66,44 @@ func is_enabled() -> bool:
 	return _abilitato
 
 
-## Il suono giusto per l'esito di un attacco: mancato -> whoosh; a segno -> freccia se
-## l'attaccante tira da lontano (gittata > 1), altrimenti il thud della mischia; il critico
-## ha il suo squillo SOPRA il colpo (due layer: botta + campana).
+## Il suono giusto per l'esito di un attacco (H2: per TIPO D'ARMA e BERSAGLIO):
+## - mancato -> whoosh;
+## - a distanza -> il TWANG dell'arco al lancio;
+## - a segno -> il colpo suona come il bersaglio: CLANK sull'armatura (CA alta) oppure il suono
+##   dell'arma sulla carne — lama (spada) o botta contundente (mazza) a seconda dell'attaccante;
+## - il critico ha il suo CRACK sopra il colpo (layer aggiuntivo).
 func _su_attacco(result: Dictionary) -> void:
 	if bool(result.get("outOfRange", false)):
 		return  # il colpo non e' mai partito: silenzio
+	var attaccante: String = String(result.get("attacker", ""))
+	var gittata: int = CombatManager.attack_range_of(attaccante)
 	if not bool(result.get("hit", false)):
 		suona("mancato")
 		return
-	var gittata: int = CombatManager.attack_range_of(String(result.get("attacker", "")))
-	suona("freccia" if gittata > 1 else "colpo")
+	if gittata > 1:
+		suona("arco")   # il twang della corda; l'impatto sotto e' quello del bersaglio
+	var bersaglio: Dictionary = CombatManager.get_combatant(String(result.get("target", "")))
+	if int(bersaglio.get("armorClass", 10)) >= CA_CORAZZA:
+		suona("armatura")
+	elif gittata > 1:
+		suona("freccia")   # freccia nella carne: il vecchio impatto secco
+	else:
+		suona("mazza" if _e_contundente(attaccante) else "spada")
 	if bool(result.get("critical", false)):
 		suona("critico")
+
+
+## L'attaccante colpisce CONTUNDENTE? Si decide dal nome del combattente (troll, ogre...) o,
+## per i PG, dalla classe sulla scheda (il chierico mena di mazza, per voto).
+func _e_contundente(attacker_id: String) -> bool:
+	var indizi: String = String(CombatManager.get_combatant(attacker_id).get("name", "")).to_lower()
+	var char_id: String = CombatManager.character_id_di(attacker_id)
+	if not char_id.is_empty():
+		for pg: CharacterData in CharacterManager.get_party():
+			if pg.id == char_id:
+				indizi += " " + pg.class_name_label.to_lower()
+				break
+	for parola: String in CONTUNDENTI:
+		if indizi.contains(parola):
+			return true
+	return false

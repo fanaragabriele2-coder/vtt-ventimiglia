@@ -72,6 +72,7 @@ func compra(mercante_id: String, item_id: String) -> bool:
 		nome, prezzo, ProgressionManager.oro_totale(),
 	])
 	GameState.publish("oggetto:raccolto", { "id": item_id, "nome": nome })
+	GameState.publish("oro:speso", { "quanto": prezzo })  # il tintinnio delle monete (UiSfx)
 	return true
 
 

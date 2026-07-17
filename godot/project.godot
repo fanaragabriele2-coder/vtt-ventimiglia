@@ -59,6 +59,9 @@ QuestManager="*res://scripts/autoload/quest_manager.gd"
 TokenDirector="*res://scripts/network/token_director.gd"
 CombatSfx="*res://scripts/autoload/combat_sfx.gd"
 ToastUi="*res://scripts/ui/toast_ui.gd"
+UiSfx="*res://scripts/autoload/ui_sfx.gd"
+TravelSfx="*res://scripts/autoload/travel_sfx.gd"
+MusicDirector="*res://scripts/autoload/music_director.gd"
 
 [audio]
 

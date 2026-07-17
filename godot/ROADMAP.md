@@ -690,20 +690,28 @@ di impatto. Ogni voce e' una sessione o poco piu'.
 - [x] **Dadi con impatto**: al risultato del 3D il numero fa un POP (nasce grande e rimbalza in
       scala) e cambia COLORE sul colpo di scena — ORO sul 20 naturale, ROSSO sull'1 naturale.
 
-### 🔊 H2 — SUONI: il gioco che si SENTE
-- [ ] **SFX di combattimento per tipo d'arma**: oggi c'e' un set base (CombatSfx). Aggiungere
-      colpo di spada/mazza/freccia distinti, il "twang" dell'arco a distanza, l'impatto sordo
-      sull'armatura vs il taglio sulla carne, il crack del critico.
-- [ ] **SFX d'interfaccia**: click dei pulsanti, apertura/chiusura pannelli, acquisto dal
-      mercante (tintinnio d'oro), level-up (fanfara), oggetto raccolto.
-- [ ] **SFX degli eventi di viaggio**: passi sulla marcia, tuono in pioggia, corni di Rohan,
-      i tamburi di Moria che crescono avvicinandosi — agganciati agli eventi gia' esistenti
-      (regione:cambiata, agguati, riposo).
-- [ ] **Musica adattiva**: un tema per l'esplorazione, uno per la battaglia, uno per i momenti
-      di terrore (Nazgul/Balrog), con crossfade — l'ambience procedurale (AmbienceManager) c'e',
-      manca la MELODIA. Sintetizzabile o importabile da pacchetti CC0.
-- [ ] **Voce del Master piu' viva**: la TTS c'e' (MasterVoice); dare intonazioni diverse per
-      narrazione / combattimento / boss, e leggere anche gli eventi di viaggio.
+### 🔊 H2 — SUONI: il gioco che si SENTE ✅ FATTA
+- [x] **SFX di combattimento per tipo d'arma**: 13 nuovi stinger sintetizzati
+      (tools/genera_sfx_h2.py, zero licenze). Il colpo ora suona come l'ARMA e come il
+      BERSAGLIO: twang dell'arco a distanza, lama (spada) vs botta contundente (mazza, per
+      chierici/troll/ogre) in mischia, CLANK sull'armatura (CA≥15) vs l'impatto sulla carne,
+      il crack del critico sopra tutto.
+- [x] **SFX d'interfaccia** (nuovo autoload UiSfx): CLICK su ogni pulsante del gioco
+      (agganciato in automatico via node_added, zero cablaggi), whoosh d'apertura dei pannelli
+      (da UiFx), tintinnio d'ORO all'acquisto, FANFARA sul level-up, chime sull'oggetto raccolto.
+- [x] **SFX degli eventi di viaggio** (nuovo autoload TravelSfx): PASSI a ogni tappa di marcia,
+      TUONO entrando nelle regioni di pioggia, i TAMBURI di Moria, il CORNO su Rohan/Pelennor
+      e all'arrivo a destinazione — tutto agganciato agli eventi esistenti.
+- [x] **Musica adattiva** (nuovo autoload MusicDirector): tre TEMI sintetizzati all'avvio come
+      il resto dell'audio procedurale — "esplorazione" (arpeggio pentatonico in RE minore su
+      drone), "battaglia" (tamburi di guerra + motivo incalzante), "terrore" (droni che battono
+      a 0.5 Hz, tritono che si gonfia, battito di cuore — parte da solo con Nazgul/Balrog/
+      Re Stregone/spettri). Crossfade tra i temi, ducking sotto la voce del Master, loop senza
+      cuciture (droni armonizzati + ricucitura coda-su-testa).
+- [x] **Voce del Master piu' viva**: tre INTONAZIONI (narrazione calma / combattimento incalzante
+      / terrore grave e lento) scelte da sole dal contesto (scontro attivo, ombre grandi nel
+      testo); la voce ora RACCONTA anche il viaggio — l'ingresso nelle regioni (cupa nelle terre
+      d'ombra) e gli agguati lungo la strada.
 
 ### ⚙️ H3 — MECCANICHE: completare il sistema di gioco 5e/BG3
 - [ ] **Incantesimi veri per il mago e il chierico**: oggi Palla di Fuoco e Benedizione. Aggiungere
