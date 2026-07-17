@@ -119,6 +119,13 @@ func can_afford(key: String) -> bool:
 	return bool(_action_economy.get(key, false))
 
 
+## Ridona una risorsa gia' spesa nel turno (l'AZIONE IMPETUOSA del guerriero, H3).
+func restore_action_resource(key: String) -> void:
+	if _action_economy.has(key):
+		_action_economy[key] = true
+		action_economy_changed.emit(get_action_economy())
+
+
 ## Reset a inizio turno: azione/bonus/reazione tornano disponibili, movimento azzerato.
 func reset_turn() -> void:
 	_action_economy = { "action": true, "bonusAction": true, "reaction": true, "movementMetersUsed": 0.0 }
@@ -334,10 +341,13 @@ func toggle_prepared_spell(spell_id: String) -> bool:
 	return false
 
 
-## Imposta max o remaining di uno slot di livello. Porting di setSpellSlot.
+## Imposta max o remaining di uno slot di livello. Porting di setSpellSlot. Impostare il "max"
+## di un livello NUOVO lo crea (la crescita di classe al level-up sblocca gli slot di 2° livello).
 func set_spell_slot(level: int, field: String, value: int) -> bool:
 	if not _spell_slots.has(level):
-		return false
+		if field != "max" or value <= 0:
+			return false
+		_spell_slots[level] = { "max": 0, "remaining": 0 }
 	var slot: Dictionary = _spell_slots[level]
 	if field == "max":
 		slot["max"] = clampi(value, 0, 9)

@@ -27,6 +27,7 @@ var _scatti: Dictionary = {}        # id -> true: passo raddoppiato in questo tu
 var _metri: Dictionary = {}         # id -> metri di passo gia' spesi nel turno
 var _ispirazioni: Dictionary = {}   # id -> true: vantaggio al prossimo attacco
 var _situazionali: Dictionary = {}  # id -> "advantage"/"disadvantage" al prossimo attacco
+var _scudi: Dictionary = {}         # id -> true: SCUDO attivo (+5 CA fino al suo prossimo turno)
 var _forzato: bool = false          # spostamento forzato in corso: non provoca opportunita'
 var _in_reazione: bool = false      # attacco di opportunita' in corso (guardia di rientro)
 
@@ -44,6 +45,7 @@ func _reset() -> void:
 	_scatti.clear()
 	_metri.clear()
 	_situazionali.clear()
+	_scudi.clear()
 
 
 ## All'inizio del TUO turno scadono gli stati "fino al tuo prossimo turno" e il passo si azzera.
@@ -51,7 +53,52 @@ func _su_turno(combatant_id: String, _round: int) -> void:
 	_disimpegnati.erase(combatant_id)
 	_schivate.erase(combatant_id)
 	_scatti.erase(combatant_id)
+	_scudi.erase(combatant_id)
 	_metri[combatant_id] = 0.0
+
+
+# --- Reazioni e SCUDO (l'incantesimo di reazione, offerto col prompt di SpellBook) ---
+
+## La reazione di questo combattente e' ancora libera in questo round?
+func reazione_disponibile(id: String) -> bool:
+	if int(_reazioni.get(id, -1)) == int(CombatManager.get_state()["round"]):
+		return false
+	if id == CombatManager.pc_attivo_id() and not InventoryManager.can_afford("reaction"):
+		return false
+	return true
+
+
+func spendi_reazione(id: String) -> void:
+	_reazioni[id] = int(CombatManager.get_state()["round"])
+	if id == CombatManager.pc_attivo_id():
+		InventoryManager.spend_action_resource("reaction")
+
+
+func attiva_scudo(id: String) -> void:
+	_scudi[id] = true
+	GameState.announce("🛡 %s alza lo SCUDO arcano come reazione: +5 CA fino al suo turno!"
+		% _nome(id))
+
+
+func scudo_attivo(id: String) -> bool:
+	return _scudi.has(id)
+
+
+## Bonus di CA momentanei consultati da resolve_attack (oggi: solo lo Scudo).
+func bonus_ca(id: String) -> int:
+	return 5 if _scudi.has(id) else 0
+
+
+## Filtro sul danno IN ARRIVO (consultato da apply_damage_to_combatant): la FURIA del barbaro
+## dimezza i colpi mentre brucia. Ritorna il danno effettivo.
+func filtra_danno(id: String, danno: int) -> int:
+	if danno > 1 and ConditionsManager.ha_condizione(id, "furia"):
+		@warning_ignore("integer_division")
+		var ridotto: int = maxi(1, danno / 2)
+		GameState.announce("💢 La FURIA di %s assorbe il colpo: %d invece di %d danni."
+			% [_nome(id), ridotto, danno])
+		return ridotto
+	return danno
 
 
 # --- Le tre azioni tattiche ---
@@ -123,6 +170,8 @@ func passo_di(id: String) -> float:
 
 
 func metri_rimasti(id: String) -> float:
+	if ConditionsManager.ha_condizione(id, "afferrato"):
+		return 0.0  # intrappolato (Ragnatela, presa): niente passo finche' non si libera
 	return maxf(0.0, passo_di(id) - float(_metri.get(id, 0.0)))
 
 

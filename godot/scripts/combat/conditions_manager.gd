@@ -11,21 +11,77 @@ extends Node
 signal condition_applied(combatant_id: String, key: String, duration_rounds: int)
 signal condition_removed(combatant_id: String, key: String)
 
-const DURATA_DEFAULT: Dictionary = { "prono": 1, "stordito": 1, "avvelenato": 3 }
-const ICONE: Dictionary = { "prono": "🩹", "stordito": "💫", "avvelenato": "☠️" }
-const ETICHETTE: Dictionary = { "prono": "Prono", "stordito": "Stordito", "avvelenato": "Avvelenato" }
-const NARRAZIONE_APPLICATA: Dictionary = { "prono": "cade prono", "stordito": "e' stordito", "avvelenato": "e' avvelenato" }
-const NARRAZIONE_RIMOSSA: Dictionary = { "prono": "si rialza", "stordito": "non e' piu' stordito", "avvelenato": "non e' piu' avvelenato" }
+const DURATA_DEFAULT: Dictionary = {
+	"prono": 1, "stordito": 1, "avvelenato": 3, "spaventato": 2, "afferrato": 2, "furia": 3,
+}
+const ICONE: Dictionary = {
+	"prono": "🩹", "stordito": "💫", "avvelenato": "☠️", "spaventato": "😱",
+	"afferrato": "🕸", "furia": "💢",
+}
+const ETICHETTE: Dictionary = {
+	"prono": "Prono", "stordito": "Stordito", "avvelenato": "Avvelenato",
+	"spaventato": "Spaventato", "afferrato": "Afferrato", "furia": "Furia",
+}
+const NARRAZIONE_APPLICATA: Dictionary = {
+	"prono": "cade prono", "stordito": "e' stordito", "avvelenato": "e' avvelenato",
+	"spaventato": "e' SPAVENTATO: il terrore gli lega il braccio",
+	"afferrato": "e' AFFERRATO: non puo' muoversi", "furia": "entra in FURIA",
+}
+const NARRAZIONE_RIMOSSA: Dictionary = {
+	"prono": "si rialza", "stordito": "non e' piu' stordito",
+	"avvelenato": "non e' piu' avvelenato", "spaventato": "ritrova il coraggio",
+	"afferrato": "si libera", "furia": "si placa",
+}
+## Colore del BADGE disegnato sul token (WorldTokens/WorldEnemyTokens) per ogni condizione.
+const COLORI: Dictionary = {
+	"prono": Color(0.85, 0.55, 0.25), "stordito": Color(0.95, 0.85, 0.3),
+	"avvelenato": Color(0.4, 0.8, 0.35), "spaventato": Color(0.7, 0.45, 0.9),
+	"afferrato": Color(0.75, 0.75, 0.78), "furia": Color(0.9, 0.25, 0.2),
+}
+## Nemici che AVVELENANO col morso (TS COS CD 11) o SPAVENTANO al colpo (TS SAG CD 12).
+const VELENOSI: Array[String] = ["ragno", "shelob", "vedova"]
+const TERRIFICANTI: Array[String] = ["nazgul", "spettro", "stregone", "ombra"]
 
 var _condizioni: Dictionary = {}   # combattente_id -> { chiave -> {"duration":int, "appliedAt":int} }
 
 
 func _ready() -> void:
 	CombatManager.turn_changed.connect(_on_turn_changed)
+	# I mostri che AVVELENANO o TERRORIZZANO infliggono la condizione quando il colpo va a segno.
+	CombatManager.attack_resolved.connect(_su_attacco_risolto)
 
 
 func _on_turn_changed(_combatant_id: String, _round_number: int) -> void:
 	pulisci_scadute()
+
+
+## Un colpo a segno di un mostro speciale su un PG: tiro salvezza o condizione.
+## Il ragno avvelena (COS CD 11), le ombre grandi spaventano (SAG CD 12).
+func _su_attacco_risolto(result: Dictionary) -> void:
+	if not bool(result.get("hit", false)):
+		return
+	var bersaglio: String = String(result.get("target", ""))
+	if not bersaglio.begins_with("pc-"):
+		return
+	var attaccante: String = String(result.get("attacker", ""))
+	var nome: String = _nome(attaccante).to_lower()
+	for parola: String in VELENOSI:
+		if nome.contains(parola) and not ha_condizione(bersaglio, "avvelenato"):
+			_infliggi_con_ts(bersaglio, "avvelenato", "con", 11)
+			return
+	for parola: String in TERRIFICANTI:
+		if nome.contains(parola) and not ha_condizione(bersaglio, "spaventato"):
+			_infliggi_con_ts(bersaglio, "spaventato", "wis", 12)
+			return
+
+
+func _infliggi_con_ts(bersaglio: String, chiave: String, abilita: String, dc: int) -> void:
+	var ts: Dictionary = CombatManager.saving_throw(bersaglio, abilita, dc)
+	if bool(ts["success"]):
+		GameState.announce("💪 %s resiste (%d vs CD %d): niente %s." % [
+			_nome(bersaglio), int(ts["total"]), dc, ETICHETTE.get(chiave, chiave)])
+	else:
+		applica_condizione(bersaglio, chiave)
 
 
 func _round_corrente() -> int:
@@ -46,9 +102,12 @@ func durata_default(chiave: String) -> int:
 
 
 ## Effetto sul tiro per colpire, date le condizioni attive di attaccante e bersaglio.
+## Anche AFFERRATO si colpisce con vantaggio (e' fermo); SPAVENTATO attacca con svantaggio.
 static func effetto_su_attacco(chiavi_attaccante: Array, chiavi_bersaglio: Array) -> Dictionary:
-	var vantaggio: bool = chiavi_bersaglio.has("prono") or chiavi_bersaglio.has("stordito")
-	var svantaggio: bool = chiavi_attaccante.has("prono") or chiavi_attaccante.has("avvelenato")
+	var vantaggio: bool = chiavi_bersaglio.has("prono") or chiavi_bersaglio.has("stordito") \
+		or chiavi_bersaglio.has("afferrato")
+	var svantaggio: bool = chiavi_attaccante.has("prono") or chiavi_attaccante.has("avvelenato") \
+		or chiavi_attaccante.has("spaventato")
 	return { "vantaggio": vantaggio, "svantaggio": svantaggio }
 
 

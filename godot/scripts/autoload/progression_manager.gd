@@ -178,7 +178,47 @@ func _apply_level_up(character_id: String, from_level: int, to_level: int) -> vo
 	GameState.announce("⭐ LIVELLO %d! %s sale di livello: +%d HP max, competenza +%d." % [
 		to_level, _name_of(character_id), hp_gain, prof,
 	])
+	for lv: int in range(from_level + 1, to_level + 1):
+		_crescita_di_classe(c, lv)
 	leveled_up.emit(character_id, from_level, to_level, hp_gain)
+
+
+## La CRESCITA DI CLASSE (H3): ai livelli chiave le classi sbloccano le loro capacita' vere.
+## Il mago al 3° impara FULMINE e RAGNATELA e apre uno slot di 2° livello; il chierico guadagna
+## un 1° livello in piu' (slot e grimorio si toccano solo se e' la scheda APERTA).
+func _crescita_di_classe(c: CharacterData, livello: int) -> void:
+	if c == null:
+		return
+	var classe: String = c.class_name_label.to_lower()
+	var annunci: Dictionary = {
+		"guerriero": { 2: "⚔ %s impara l'AZIONE IMPETUOSA: una volta per scontro recupera "
+			+ "l'azione del turno (menu ⚡ Bonus)." },
+		"barbaro": { 2: "💢 La FURIA di %s ora e' vera: +2 danni in mischia e meta' danni "
+			+ "subiti per 3 round (menu ⚡ Bonus)." },
+		"ladro": { 2: "🗡 %s affina l'ATTACCO FURTIVO: +1d6 danni quando colpisce con "
+			+ "vantaggio (fiancheggia, bersagli a terra o intrappolati)." },
+		"mago": { 3: "🌩 %s scrive FULMINE e RAGNATELA nel grimorio e apre uno slot di "
+			+ "2° livello (pulsante 📖 Magie)." },
+		"chierico": { 3: "✨ La fede di %s cresce: uno slot di 1° livello in piu'." },
+	}
+	var per_classe: Dictionary = annunci.get(classe, {})
+	if per_classe.has(livello):
+		GameState.announce(String(per_classe[livello]) % c.character_name)
+	# Slot e incantesimi si applicano SOLO alla scheda aperta: il grimorio in InventoryManager
+	# e' quello del PG attivo (gli altri lo erediteranno alla loro prossima crescita da attivi).
+	var attivo: CharacterData = CharacterManager.get_active()
+	if attivo == null or attivo.id != c.id:
+		return
+	if classe == "mago" and livello == 3:
+		InventoryManager.add_spell("lightningBolt")
+		InventoryManager.add_spell("web")
+		InventoryManager.set_spell_prepared("lightningBolt", true)
+		InventoryManager.set_spell_prepared("web", true)
+		InventoryManager.set_spell_slot(2, "max", 1)
+		InventoryManager.set_spell_slot(2, "remaining", 1)
+	elif classe == "chierico" and livello == 3:
+		var slot1: Dictionary = InventoryManager.get_spell_slots().get(1, { "max": 2 })
+		InventoryManager.set_spell_slot(1, "max", int(slot1.get("max", 2)) + 1)
 
 
 func _name_of(character_id: String) -> String:

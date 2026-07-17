@@ -62,6 +62,9 @@ ToastUi="*res://scripts/ui/toast_ui.gd"
 UiSfx="*res://scripts/autoload/ui_sfx.gd"
 TravelSfx="*res://scripts/autoload/travel_sfx.gd"
 MusicDirector="*res://scripts/autoload/music_director.gd"
+ReactionPrompt="*res://scripts/combat/reaction_prompt.gd"
+SpellBook="*res://scripts/combat/spell_book.gd"
+ClassFeats="*res://scripts/combat/class_feats.gd"
 
 [audio]
 

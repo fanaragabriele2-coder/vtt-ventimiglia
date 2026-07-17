@@ -485,7 +485,7 @@ func apply_damage_to_combatant(combatant_id: String, amount: int, source_id: Str
 	var combatant: Dictionary = get_combatant(combatant_id)
 	if combatant.is_empty():
 		return false
-	var damage: int = clampi(amount, 0, 9999)
+	var damage: int = TacticalRules.filtra_danno(combatant_id, clampi(amount, 0, 9999))
 	var was_defeated: bool = bool(combatant["defeated"])
 	var era_gia_a_zero: bool = combatant["kind"] == "pc" and int(combatant["hitPoints"]) <= 0
 
@@ -790,7 +790,7 @@ func resolve_attack(attacker_id: String, target_id: String, mode: String = "norm
 	var copertura: int = 0
 	if attack_range_of(attacker_id) > 1:
 		copertura = CoverManager.bonus_ca(attacker_id, target_id)
-	var ca_bersaglio: int = int(target["armorClass"]) + copertura
+	var ca_bersaglio: int = int(target["armorClass"]) + copertura + TacticalRules.bonus_ca(target_id)
 	# 1 naturale sbaglia sempre; 20 naturale colpisce sempre (e critica); altrimenti d20+bonus vs CA.
 	var hit: bool = not bool(d20["naturalOne"]) and (critical or attack_total >= ca_bersaglio)
 	if copertura > 0 and not hit:

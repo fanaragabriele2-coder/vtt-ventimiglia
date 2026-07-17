@@ -111,11 +111,20 @@ def disegna(shape, met, d):
 		d.line([(40, 96), (78, 40)], fill=met + (255,), width=6)  # grimaldello
 		d.ellipse([34, 90, 50, 106], outline=met + (255,), width=5)
 		d.line([(58, 92), (86, 56)], fill=(180, 180, 186, 220), width=4)
+	elif shape == "scroll":
+		d.rectangle([cx - 26, 30, cx + 26, 98], fill=(226, 210, 170, 255),
+		            outline=(120, 96, 60, 255))  # foglio
+		d.rectangle([cx - 30, 24, cx + 30, 36], fill=(150, 116, 72, 255))  # rullo in alto
+		d.rectangle([cx - 30, 92, cx + 30, 104], fill=(150, 116, 72, 255))  # rullo in basso
+		for yy in range(46, 88, 10):  # righe di scrittura arcana
+			d.line([(cx - 18, yy), (cx + 18, yy)], fill=(90, 70, 120, 200), width=2)
 
 
 def shape_di(o):
 	t = o.get("type", "")
 	i = (o.get("id", "") + " " + o.get("name", "")).lower()
+	if t == "scroll":
+		return "scroll"
 	if t == "shield":
 		return "shield"
 	if t == "armor":
@@ -153,9 +162,16 @@ def main():
 		rarita = o.get("rarity", "comune")
 		met, gem, _ = RARITA.get(rarita, RARITA["comune"])
 		RARITA_G = gem + (255,)
-		# liquido pozione: rosso cura, verde-oro elisir
-		LIQUIDO = (200, 60, 60, 220) if "cura" in o.get("name", "").lower() \
-			or o.get("id") == "healingPotion" else (120, 200, 150, 220)
+		# liquido pozione: rosso cura, ambra olio, verde acido, verde-oro elisir
+		nome_l = o.get("name", "").lower()
+		if "cura" in nome_l or o.get("id") == "healingPotion":
+			LIQUIDO = (200, 60, 60, 220)
+		elif "olio" in nome_l:
+			LIQUIDO = (235, 175, 60, 230)
+		elif "acido" in nome_l:
+			LIQUIDO = (150, 225, 60, 230)
+		else:
+			LIQUIDO = (120, 200, 150, 220)
 		img, d = base(rarita)
 		disegna(shape_di(o), met, d)
 		gemma(d, rarita)

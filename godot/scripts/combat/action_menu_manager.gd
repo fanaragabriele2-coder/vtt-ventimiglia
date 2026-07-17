@@ -120,6 +120,14 @@ func esegui(opzione: Dictionary, target_id: String = "") -> bool:
 			return _effetto_attacco_secondario(opzione, target_id)
 		"movimento":
 			return _effetto_movimento(opzione)
+		"furia":
+			return ClassFeats.attiva_furia()
+		"azioneExtra":
+			return ClassFeats.azione_impetuosa()
+		"lancioOggetto":
+			return _effetto_lancio(opzione, target_id)
+		"pergamena":
+			return _effetto_pergamena(opzione, target_id)
 		_:
 			var desc: String = String(opzione.get("descrizione", ""))
 			GameState.announce("✦ %s%s" % [String(opzione["etichetta"]), (" — " + desc) if not desc.is_empty() else ""])
@@ -162,4 +170,71 @@ func _effetto_attacco_secondario(opzione: Dictionary, target_id: String) -> bool
 
 func _effetto_movimento(opzione: Dictionary) -> bool:
 	GameState.announce("💨 %s: guadagni movimento extra." % String(opzione["etichetta"]))
+	return true
+
+
+# --- Oggetti da BATTAGLIA (H3): lanciare olio/acido, leggere pergamene — azione piena ---
+
+## Le opzioni "usa oggetto" in combattimento dal popup 🧪 dell'HUD: fiasche da LANCIO
+## (throwDamage nel catalogo) e PERGAMENE (scrollSpell). Il bere pozioni resta nel menu Bonus.
+func opzioni_oggetti_combattimento() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Dictionary in InventoryManager.get_inventory():
+		var def: Dictionary = InventoryManager.item_definition(String(entry["catalogId"]))
+		if not String(def.get("throwDamage", "")).is_empty():
+			out.append({
+				"id": "lancia-" + String(entry["inventoryId"]),
+				"etichetta": "Lancia " + String(def["name"]), "kind": "action",
+				"fonte": "inventario", "effetto": "lancioOggetto",
+				"descrizione": String(def.get("properties", "")),
+				"inventoryId": String(entry["inventoryId"]), "catalogId": String(entry["catalogId"]),
+				"formula": String(def["throwDamage"]), "save": String(def.get("throwSave", "")),
+				"superficie": String(def.get("throwSurface", "")),
+			})
+		elif not String(def.get("scrollSpell", "")).is_empty():
+			out.append({
+				"id": "leggi-" + String(entry["inventoryId"]),
+				"etichetta": "Leggi " + String(def["name"]), "kind": "action",
+				"fonte": "inventario", "effetto": "pergamena",
+				"descrizione": String(def.get("properties", "")),
+				"inventoryId": String(entry["inventoryId"]), "spell": String(def["scrollSpell"]),
+			})
+	return out
+
+
+## LANCIO di una fiasca (olio/acido) sul bersaglio: TS DES CD 12 dimezza; l'olio incendia la
+## cella (superficie di fuoco). L'oggetto si consuma comunque: e' volato via.
+func _effetto_lancio(opzione: Dictionary, target_id: String) -> bool:
+	if target_id.is_empty():
+		GameState.announce("🧪 Scegli un bersaglio per il lancio.")
+		return true
+	var danno: int = _tira(String(opzione.get("formula", "2d4")))
+	var riga: String = ""
+	if not String(opzione.get("save", "")).is_empty():
+		var ts: Dictionary = CombatManager.saving_throw(target_id, String(opzione["save"]), 12)
+		if bool(ts["success"]):
+			@warning_ignore("integer_division")
+			danno = maxi(1, danno / 2)
+			riga = " (schiva in parte: danno dimezzato)"
+	CombatManager.apply_damage_to_combatant(target_id, danno, CombatManager.pc_attivo_id())
+	var cella: Variant = CombatManager.get_combatant_cell(target_id)
+	if String(opzione.get("superficie", "")) == "fuoco" and cella != null:
+		SurfacesManager.crea_superficie("fuoco", (cella as Vector2i).x, (cella as Vector2i).y, 0)
+	GameState.announce("🧪 %s: %d danni%s." % [String(opzione["etichetta"]), danno, riga])
+	if opzione.has("inventoryId"):
+		InventoryManager.drop_item(String(opzione["inventoryId"]))
+	return true
+
+
+## PERGAMENA: lancia l'incantesimo scritto SENZA slot (SpellBook, gratis) e si consuma —
+## ma solo se il lancio va in porto (bersaglio valido): una pergamena non si spreca sul nulla.
+func _effetto_pergamena(opzione: Dictionary, target_id: String) -> bool:
+	var esito: Dictionary = SpellBook.lancia(
+		CombatManager.pc_attivo_id(), String(opzione.get("spell", "")), target_id, true)
+	if not bool(esito.get("ok", false)):
+		GameState.announce("📜 " + String(esito.get("motivo", "La pergamena resta arrotolata.")))
+		return true
+	if opzione.has("inventoryId"):
+		InventoryManager.drop_item(String(opzione["inventoryId"]))
+	GameState.announce("📜 %s: la pergamena si incenerisce nell'aria." % String(opzione["etichetta"]))
 	return true

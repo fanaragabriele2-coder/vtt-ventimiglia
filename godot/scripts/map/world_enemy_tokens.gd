@@ -43,6 +43,11 @@ func configura(rect_mondo: Rect2, camera: Camera2D, party: WorldTokens) -> void:
 	CombatManager.combatant_position_changed.connect(_su_cella_cambiata)
 	# Lampo bianco quando un nemico INCASSA un colpo (game feel: il danno si vede sul token).
 	CombatManager.combatant_damaged.connect(_su_danno_flash)
+	# I BADGE delle condizioni (avvelenato, afferrato...) compaiono/spariscono col loro stato.
+	ConditionsManager.condition_applied.connect(
+		func(_id: String, _k: String, _d: int) -> void: queue_redraw())
+	ConditionsManager.condition_removed.connect(
+		func(_id: String, _k: String) -> void: queue_redraw())
 	set_process(true)
 
 
@@ -206,6 +211,22 @@ func _offset_respiro(combatant_id: String, r: float) -> Vector2:
 	return Vector2(0.0, sin(_respiro * 2.6 + fase) * r * 0.06)
 
 
+## BADGE delle CONDIZIONI sopra il token (H3): un pallino colorato per ognuna — verde veleno,
+## viola paura, grigio ragnatela… (colori da ConditionsManager.COLORI, stessa legenda del party).
+func _disegna_condizioni(combatant_id: String, pos: Vector2, r: float) -> void:
+	if not CombatManager.is_active():
+		return
+	var chiavi: Array[String] = ConditionsManager.chiavi_attive(combatant_id)
+	if chiavi.is_empty():
+		return
+	var passo: float = r * 0.42
+	var inizio: Vector2 = pos + Vector2(-passo * 0.5 * float(chiavi.size() - 1), -r * 1.45)
+	for i: int in range(chiavi.size()):
+		var p: Vector2 = inizio + Vector2(passo * float(i), 0.0)
+		draw_circle(p, r * 0.17, Color(0, 0, 0, 0.8))
+		draw_circle(p, r * 0.12, ConditionsManager.COLORI.get(chiavi[i], Color.WHITE))
+
+
 ## I CADUTI in dissolvenza: il token ruota su se stesso, si stringe e svanisce (~0.9s) —
 ## disegnati SOTTO i vivi, che gli passano sopra.
 func _disegna_morenti(r: float) -> void:
@@ -248,6 +269,7 @@ func _draw() -> void:
 		if _flash.has(id):
 			var qf: float = clampf(float(_flash[id]) / DURATA_FLASH, 0.0, 1.0)
 			draw_circle(pos, r * 1.08, Color(1, 1, 1, (1.0 - qf) * 0.65))
+		_disegna_condizioni(id, pos, r)
 		if _camera.zoom.x >= ZOOM_NOME:
 			var dim_nome: int = int(maxf(16.0, r * 0.46))
 			var y_nome: float = r * 1.5 + dim_nome

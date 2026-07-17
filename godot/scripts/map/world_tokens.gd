@@ -63,6 +63,11 @@ func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
 	CombatManager.combatant_position_changed.connect(_su_cella_pg_cambiata)
 	# Lampo bianco quando un PG INCASSA un colpo (game feel: il danno si vede sul gettone).
 	CombatManager.combatant_damaged.connect(_su_danno_flash)
+	# I BADGE delle condizioni (avvelenato, spaventato…) compaiono/spariscono col loro stato.
+	ConditionsManager.condition_applied.connect(
+		func(_id: String, _k: String, _d: int) -> void: queue_redraw())
+	ConditionsManager.condition_removed.connect(
+		func(_id: String, _k: String) -> void: queue_redraw())
 	set_process(true)
 
 
@@ -299,6 +304,7 @@ func _draw() -> void:
 		if _flash.has(String(g["id"])):
 			var qf: float = clampf(float(_flash[String(g["id"])]) / DURATA_FLASH, 0.0, 1.0)
 			draw_circle(pos, r * 1.08, Color(1, 1, 1, (1.0 - qf) * 0.65))
+		_disegna_condizioni(PC_PREFISSO + String(g["id"]), pos, r)
 		if _camera.zoom.x >= ZOOM_NOME:
 			var dim_nome: int = int(maxf(18.0, r * 0.5))
 			var y_nome: float = r * 1.5 + dim_nome
@@ -308,6 +314,22 @@ func _draw() -> void:
 				HORIZONTAL_ALIGNMENT_CENTER, r * 8.0, dim_nome, Color(0.95, 0.92, 0.85))
 	if _trascinato >= 0 and CombatManager.is_active():
 		_disegna_anteprima_movimento(font)
+
+
+## BADGE delle CONDIZIONI sopra il gettone (H3): un pallino colorato per ognuna (colori da
+## ConditionsManager.COLORI, stessa legenda dei nemici).
+func _disegna_condizioni(combatant_id: String, pos: Vector2, r: float) -> void:
+	if not CombatManager.is_active():
+		return
+	var chiavi: Array[String] = ConditionsManager.chiavi_attive(combatant_id)
+	if chiavi.is_empty():
+		return
+	var passo: float = r * 0.42
+	var inizio: Vector2 = pos + Vector2(-passo * 0.5 * float(chiavi.size() - 1), -r * 1.45)
+	for i: int in range(chiavi.size()):
+		var p: Vector2 = inizio + Vector2(passo * float(i), 0.0)
+		draw_circle(p, r * 0.17, Color(0, 0, 0, 0.8))
+		draw_circle(p, r * 0.12, ConditionsManager.COLORI.get(chiavi[i], Color.WHITE))
 
 
 ## ANTEPRIMA DEL MOVIMENTO (in battaglia): mentre trascini un token vedi il percorso e i METRI

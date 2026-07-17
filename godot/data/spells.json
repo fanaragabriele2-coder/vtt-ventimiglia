@@ -1,115 +1,133 @@
 {
-  "_comment": "Grimorio — porting di spellCatalog del Modulo 05 (JS). castingTime: action|bonusAction|reaction. Caricato da InventoryManager.",
-  "spells": [
-    {
-      "id": "fireBolt",
-      "name": "Fire Bolt",
-      "level": 0,
-      "school": "Evocazione",
-      "castingTime": "action",
-      "range": "36 m",
-      "effect": "1d10 fuoco"
-    },
-    {
-      "id": "rayOfFrost",
-      "name": "Ray of Frost",
-      "level": 0,
-      "school": "Evocazione",
-      "castingTime": "action",
-      "range": "18 m",
-      "effect": "1d8 freddo, -3 m velocita"
-    },
-    {
-      "id": "mageHand",
-      "name": "Mage Hand",
-      "level": 0,
-      "school": "Evocazione",
-      "castingTime": "action",
-      "range": "9 m",
-      "effect": "Mano spettrale"
-    },
-    {
-      "id": "guidance",
-      "name": "Guidance",
-      "level": 0,
-      "school": "Divinazione",
-      "castingTime": "action",
-      "range": "Contatto",
-      "effect": "+1d4 a una prova (concentrazione)",
-      "concentration": true
-    },
-    {
-      "id": "cureWounds",
-      "name": "Cure Wounds",
-      "level": 1,
-      "school": "Invocazione",
-      "castingTime": "action",
-      "range": "Contatto",
-      "effect": "Cura 1d8 + mod incantatore"
-    },
-    {
-      "id": "magicMissile",
-      "name": "Magic Missile",
-      "level": 1,
-      "school": "Invocazione",
-      "castingTime": "action",
-      "range": "36 m",
-      "effect": "3 dardi da 1d4+1"
-    },
-    {
-      "id": "shieldSpell",
-      "name": "Shield",
-      "level": 1,
-      "school": "Abiurazione",
-      "castingTime": "reaction",
-      "range": "Personale",
-      "effect": "+5 CA fino al turno"
-    },
-    {
-      "id": "burningHands",
-      "name": "Burning Hands",
-      "level": 1,
-      "school": "Evocazione",
-      "castingTime": "action",
-      "range": "Cono 4,5 m",
-      "effect": "3d6 fuoco"
-    },
-    {
-      "id": "healingWord",
-      "name": "Healing Word",
-      "level": 1,
-      "school": "Invocazione",
-      "castingTime": "bonusAction",
-      "range": "18 m",
-      "effect": "Cura 1d4 + mod incantatore"
-    },
-    {
-      "id": "bless",
-      "name": "Bless",
-      "level": 1,
-      "school": "Ammaliamento",
-      "castingTime": "action",
-      "range": "9 m",
-      "effect": "+1d4 ad attacchi e TS (concentrazione)",
-      "concentration": true
-    },
-    {
-      "id": "mistyStep",
-      "name": "Misty Step",
-      "level": 2,
-      "school": "Evocazione",
-      "castingTime": "bonusAction",
-      "range": "Personale",
-      "effect": "Teletrasporto 9 m"
-    },
-    {
-      "id": "scorchingRay",
-      "name": "Scorching Ray",
-      "level": 2,
-      "school": "Evocazione",
-      "castingTime": "action",
-      "range": "36 m",
-      "effect": "Tre raggi da 2d6 fuoco"
-    }
-  ]
+ "_comment": "Grimorio — porting di spellCatalog del Modulo 05 (JS). castingTime: action|bonusAction|reaction. Caricato da InventoryManager.",
+ "spells": [
+  {
+   "id": "fireBolt",
+   "name": "Fire Bolt",
+   "level": 0,
+   "school": "Evocazione",
+   "castingTime": "action",
+   "range": "36 m",
+   "effect": "1d10 fuoco"
+  },
+  {
+   "id": "rayOfFrost",
+   "name": "Ray of Frost",
+   "level": 0,
+   "school": "Evocazione",
+   "castingTime": "action",
+   "range": "18 m",
+   "effect": "1d8 freddo, -3 m velocita"
+  },
+  {
+   "id": "mageHand",
+   "name": "Mage Hand",
+   "level": 0,
+   "school": "Evocazione",
+   "castingTime": "action",
+   "range": "9 m",
+   "effect": "Mano spettrale"
+  },
+  {
+   "id": "guidance",
+   "name": "Guidance",
+   "level": 0,
+   "school": "Divinazione",
+   "castingTime": "action",
+   "range": "Contatto",
+   "effect": "+1d4 a una prova (concentrazione)",
+   "concentration": true
+  },
+  {
+   "id": "cureWounds",
+   "name": "Cure Wounds",
+   "level": 1,
+   "school": "Invocazione",
+   "castingTime": "action",
+   "range": "Contatto",
+   "effect": "Cura 1d8 + mod incantatore"
+  },
+  {
+   "id": "magicMissile",
+   "name": "Magic Missile",
+   "level": 1,
+   "school": "Invocazione",
+   "castingTime": "action",
+   "range": "36 m",
+   "effect": "3 dardi da 1d4+1"
+  },
+  {
+   "id": "shieldSpell",
+   "name": "Shield",
+   "level": 1,
+   "school": "Abiurazione",
+   "castingTime": "reaction",
+   "range": "Personale",
+   "effect": "+5 CA fino al turno"
+  },
+  {
+   "id": "burningHands",
+   "name": "Burning Hands",
+   "level": 1,
+   "school": "Evocazione",
+   "castingTime": "action",
+   "range": "Cono 4,5 m",
+   "effect": "3d6 fuoco"
+  },
+  {
+   "id": "healingWord",
+   "name": "Healing Word",
+   "level": 1,
+   "school": "Invocazione",
+   "castingTime": "bonusAction",
+   "range": "18 m",
+   "effect": "Cura 1d4 + mod incantatore"
+  },
+  {
+   "id": "bless",
+   "name": "Bless",
+   "level": 1,
+   "school": "Ammaliamento",
+   "castingTime": "action",
+   "range": "9 m",
+   "effect": "+1d4 ad attacchi e TS (concentrazione)",
+   "concentration": true
+  },
+  {
+   "id": "mistyStep",
+   "name": "Misty Step",
+   "level": 2,
+   "school": "Evocazione",
+   "castingTime": "bonusAction",
+   "range": "Personale",
+   "effect": "Teletrasporto 9 m"
+  },
+  {
+   "id": "scorchingRay",
+   "name": "Scorching Ray",
+   "level": 2,
+   "school": "Evocazione",
+   "castingTime": "action",
+   "range": "36 m",
+   "effect": "Tre raggi da 2d6 fuoco"
+  },
+  {
+   "id": "lightningBolt",
+   "name": "Fulmine",
+   "level": 2,
+   "school": "Invocazione",
+   "castingTime": "action",
+   "range": "Linea 18 m",
+   "effect": "4d6 fulmine a TUTTI sulla linea, TS DES dimezza"
+  },
+  {
+   "id": "web",
+   "name": "Ragnatela",
+   "level": 2,
+   "school": "Evocazione",
+   "castingTime": "action",
+   "range": "18 m",
+   "effect": "Area (r.1): TS FOR o AFFERRATO per 2 round"
+  }
+ ]
 }

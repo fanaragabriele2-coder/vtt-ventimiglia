@@ -18,7 +18,11 @@ var _dash_button: Button
 var _dodge_button: Button
 var _fireball_button: Button
 var _bless_button: Button
+var _spells_button: Button
+var _items_button: Button
 var _bonus_popup: PopupPanel
+var _spell_popup: PopupPanel
+var _items_popup: PopupPanel
 var _cards: Dictionary = {}   # combatant_id -> PanelContainer (per l'evidenziazione di turno)
 var _current_id: String = ""
 
@@ -128,9 +132,22 @@ func _build_ui() -> void:
 	_bless_button.tooltip_text = "Concentrazione: fino a 3 alleati (te compreso) tirano +1d4 " \
 		+ "per colpire finche' reggi la concentrazione (subire danno puo' spezzarla)."
 	actions.add_child(_bless_button)
+	# GRIMORIO (H3): il popup degli incantesimi con gli SLOT veri, per mago e chierico.
+	_spells_button = _make_action("📖 Magie", Color(0.28, 0.2, 0.45), _on_spells_pressed)
+	_spells_button.visible = false
+	_spells_button.tooltip_text = "Il grimorio giocabile: incantesimi preparati e slot residui. " \
+		+ "Bersaglio dal selettore; le cure vanno da sole al PG piu' ferito."
+	actions.add_child(_spells_button)
+	# OGGETTI da battaglia (H3): lancia olio/acido, leggi pergamene (azione piena).
+	_items_button = _make_action("🧪 Oggetti", Color(0.3, 0.26, 0.12), _on_items_pressed)
+	_items_button.tooltip_text = "Usa un oggetto in battaglia: lancia una fiasca (olio, acido) " \
+		+ "o leggi una pergamena. Bere pozioni resta nel menu ⚡ Bonus."
+	actions.add_child(_items_button)
 	actions.add_child(_make_action("⏭ Termina turno", Color(0.16, 0.31, 0.16), _on_end_turn_pressed))
 
 	_build_bonus_popup()
+	_spell_popup = _crea_popup_scuro()
+	_items_popup = _crea_popup_scuro()
 
 
 func _make_action(text: String, tint: Color, handler: Callable) -> Button:
@@ -398,9 +415,13 @@ func _on_action_economy_changed(_economy: Dictionary) -> void:
 
 
 ## Solo nel turno di un PG si puo' agire dai pulsanti (nei turni dei PNG comanda l'IA nemica).
+## Un PG STORDITO non agisce affatto (condizione 5e): gli resta solo Termina turno.
 func _puo_agire() -> bool:
 	var c: Dictionary = CombatManager.get_combatant(_current_id)
 	if CombatManager.is_active() and not c.is_empty() and c["kind"] == "pc":
+		if ConditionsManager.ha_condizione(_current_id, "stordito"):
+			_last_event.text = "💫 Sei STORDITO: puoi solo terminare il turno."
+			return false
 		return true
 	_last_event.text = "Non e' il tuo turno."
 	return false
@@ -430,6 +451,10 @@ func _refresh_action_buttons() -> void:
 	_fireball_button.disabled = not ha_azione
 	_bless_button.visible = classe == "chierico"
 	_bless_button.disabled = not ha_azione
+	# Il GRIMORIO compare per le classi incantatrici; gli OGGETTI per tutti (serve l'azione).
+	_spells_button.visible = classe == "mago" or classe == "chierico"
+	_spells_button.disabled = not (ha_azione or ha_bonus)
+	_items_button.disabled = not ha_azione
 
 
 func _on_end_turn_pressed() -> void:
@@ -491,3 +516,92 @@ func _on_bonus_pressed() -> void:
 func _on_bonus_option_chosen(opzione: Dictionary) -> void:
 	ActionMenuManager.esegui(opzione, _selected_target_id())
 	_bonus_popup.hide()
+
+
+# --- Grimorio e oggetti da battaglia (H3) ---
+
+func _crea_popup_scuro() -> PopupPanel:
+	var popup := PopupPanel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.06)
+	sb.border_color = Color(0.78, 0.61, 0.24, 0.6)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	popup.add_theme_stylebox_override("panel", sb)
+	add_child(popup)
+	return popup
+
+
+## Riempie un popup con una colonna di pulsanti-voce; `vuoto` e' il messaggio senza opzioni.
+func _apri_popup_voci(popup: PopupPanel, voci: Array[Dictionary], vuoto: String,
+		sotto: Button, scelto: Callable) -> void:
+	for child: Node in popup.get_children():
+		child.queue_free()
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	popup.add_child(col)
+	if voci.is_empty():
+		var lbl := Label.new()
+		lbl.text = vuoto
+		col.add_child(lbl)
+	for v: Dictionary in voci:
+		var btn := Button.new()
+		btn.text = String(v["testo"])
+		btn.custom_minimum_size = Vector2(300, 40)
+		btn.tooltip_text = String(v.get("tooltip", ""))
+		btn.disabled = bool(v.get("spento", false))
+		btn.pressed.connect(scelto.bind(v))
+		col.add_child(btn)
+	popup.position = Vector2i(sotto.get_screen_position()) + Vector2i(0, -260)
+	popup.popup()
+
+
+func _on_spells_pressed() -> void:
+	if not _puo_agire():
+		return
+	var eco: Dictionary = InventoryManager.get_action_economy()
+	var voci: Array[Dictionary] = []
+	for s: Dictionary in SpellBook.lanciabili():
+		var bonus: bool = String(s["costo"]) == "bonusAction"
+		var risorsa_ok: bool = bool(eco.get("bonusAction" if bonus else "action", false))
+		var slot: String = "∞" if int(s["livello"]) == 0 else str(int(s["slotResidui"]))
+		voci.append({
+			"testo": "%s  [L%d · slot %s · %s]" % [String(s["nome"]), int(s["livello"]),
+				slot, "bonus" if bonus else "azione"],
+			"tooltip": String(s["descrizione"]),
+			"spento": not risorsa_ok or int(s["slotResidui"]) <= 0,
+			"id": String(s["id"]), "bonus": bonus,
+		})
+	_apri_popup_voci(_spell_popup, voci, "Nessun incantesimo pronto nel grimorio.",
+		_spells_button, _on_spell_chosen)
+
+
+func _on_spell_chosen(voce: Dictionary) -> void:
+	_spell_popup.hide()
+	var esito: Dictionary = SpellBook.lancia(_actor_id(), String(voce["id"]), _selected_target_id())
+	if not bool(esito.get("ok", false)):
+		_last_event.text = String(esito.get("motivo", "L'incantesimo non parte."))
+		return
+	InventoryManager.spend_action_resource("bonusAction" if bool(voce["bonus"]) else "action")
+
+
+func _on_items_pressed() -> void:
+	if not _puo_agire():
+		return
+	var voci: Array[Dictionary] = []
+	for o: Dictionary in ActionMenuManager.opzioni_oggetti_combattimento():
+		voci.append({
+			"testo": String(o["etichetta"]), "tooltip": String(o.get("descrizione", "")),
+			"opzione": o,
+		})
+	_apri_popup_voci(_items_popup, voci, "Nessun oggetto da battaglia nello zaino "
+		+ "(olio, acido, pergamene…).", _items_button, _on_item_chosen)
+
+
+func _on_item_chosen(voce: Dictionary) -> void:
+	_items_popup.hide()
+	ActionMenuManager.esegui(voce["opzione"], _selected_target_id())

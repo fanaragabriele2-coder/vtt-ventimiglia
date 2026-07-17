@@ -713,18 +713,32 @@ di impatto. Ogni voce e' una sessione o poco piu'.
       testo); la voce ora RACCONTA anche il viaggio — l'ingresso nelle regioni (cupa nelle terre
       d'ombra) e gli agguati lungo la strada.
 
-### ⚙️ H3 — MECCANICHE: completare il sistema di gioco 5e/BG3
-- [ ] **Incantesimi veri per il mago e il chierico**: oggi Palla di Fuoco e Benedizione. Aggiungere
-      Dardo Incantato, Cura Ferite, Scudo, Fulmine, Ragnatela (area/superficie), con gli SLOT gia'
-      presenti (InventoryManager.spell_slots) — un piccolo grimorio giocabile.
-- [ ] **Reazioni interattive**: l'attacco di opportunita' scatta da solo; dare al giocatore la
-      SCELTA di usare la reazione (parata, incantesimo di reazione) con un prompt breve.
-- [ ] **Condizioni di stato complete**: avvelenato, spaventato, prono, afferrato, stordito
-      (ConditionsManager c'e' come impianto) con icone sul token e effetti sui tiri.
-- [ ] **Oggetti consumabili in combattimento dal token**: bere una pozione, lanciare olio/acido,
-      usare una pergamena — l'inventario e le figure ci sono, manca l'azione "usa" in battaglia.
-- [ ] **Progressione delle abilita' di classe** al level-up (non solo HP/competenza): Azione
-      Impetuosa del guerriero, Attacco Furtivo del ladro, Furia del barbaro.
+### ⚙️ H3 — MECCANICHE: completare il sistema di gioco 5e/BG3 ✅ FATTA
+- [x] **Incantesimi veri** (nuovo autoload SpellBook + pulsante 📖 Magie nell'HUD): Dardo di
+      Fuoco (attacco magico), Dardo Incantato (3 dardi infallibili), Cura Ferite (contatto, al
+      PG piu' ferito — i morenti si rialzano), Parola Guaritrice (bonus, a distanza), FULMINE
+      (4d6 a tutti sulla LINEA, TS DES dimezza) e RAGNATELA (area: TS FOR o afferrato) — con
+      gli SLOT veri della scheda: si valida prima, si consuma poi (mai slot sprecati). CD e
+      attacco magico dalla scheda (8+prof+INT il mago, SAG il chierico).
+- [x] **Reazioni interattive** (nuovo autoload ReactionPrompt): quando un nemico attacca il
+      mago, un PROMPT breve con conto alla rovescia chiede se lanciare SCUDO (+5 CA fino al
+      suo turno, 1 slot L1 + la reazione) — l'IA nemica e' asincrona e ASPETTA la risposta.
+      Il +5 entra nella CA di resolve_attack via TacticalRules.bonus_ca.
+- [x] **Condizioni di stato complete**: spaventato (svantaggio ai suoi attacchi) e afferrato
+      (niente movimento: drag bloccato, l'IA intrappolata prova a strapparsi con FOR CD 12)
+      si aggiungono a prono/stordito/avvelenato; lo STORDITO ora salta davvero il turno (IA e
+      pulsanti). BADGE colorati sopra ogni token (legenda unica in ConditionsManager.COLORI).
+      I mostri le INFLIGGONO: i ragni avvelenano (TS COS 11), Nazgul/spettri/Re Stregone
+      spaventano (TS SAG 12).
+- [x] **Oggetti consumabili in battaglia** (pulsante 🧪 Oggetti nell'HUD): lancia la Fiasca
+      d'Olio (2d4 fuoco + la cella resta in fiamme) o la Fiala d'Acido (2d6, TS DES dimezza),
+      leggi la Pergamena del Fulmine (l'incantesimo SENZA slot, si consuma solo se il lancio
+      parte). In vendita all'emporio di Brea, con le loro figure (icone generate).
+- [x] **Abilita' di classe vere** (nuovo autoload ClassFeats + crescita al level-up): AZIONE
+      IMPETUOSA del guerriero (1/scontro recupera l'azione), ATTACCO FURTIVO del ladro (+1d6
+      quando colpisce con vantaggio), FURIA del barbaro (+2 danni in mischia, META' danni
+      subiti, 3 round). Al level-up le classi crescono: il mago al 3° impara Fulmine+Ragnatela
+      e apre uno slot L2, il chierico guadagna un L1 in piu'.
 
 ### 🧱 H4 — STRUTTURA: robustezza e longevita'
 - [ ] **Salvataggi multipli con slot** e schermata di caricamento (oggi il progresso e' per

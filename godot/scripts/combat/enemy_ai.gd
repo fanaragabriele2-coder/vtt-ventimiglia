@@ -61,7 +61,7 @@ func _on_turn_changed(combatant_id: String, round_number: int) -> void:
 	if attuale.is_empty() or bool(attuale.get("defeated", false)):
 		CombatManager.next_turn()
 		return
-	_agisci_nemico(attuale)
+	await _agisci_nemico(attuale)
 
 
 static func chebyshev(a: Vector2i, b: Vector2i) -> int:
@@ -139,6 +139,11 @@ func _bersaglio_per_comportamento(comp: String, stato: Dictionary, npc_id: Strin
 
 
 func _agisci_nemico(cur: Dictionary) -> void:
+	# STORDITO: il turno salta del tutto (condizione 5e semplificata alla BG3).
+	if ConditionsManager.ha_condizione(String(cur["id"]), "stordito"):
+		GameState.announce("💫 %s e' STORDITO: barcolla e perde il turno." % String(cur["name"]))
+		CombatManager.next_turn()
+		return
 	var stato: Dictionary = CombatManager.get_state()
 	var comp: String = _comportamento_di(cur)
 	var bersaglio: Dictionary = _bersaglio_per_comportamento(comp, stato, String(cur["id"]))
@@ -153,6 +158,25 @@ func _agisci_nemico(cur: Dictionary) -> void:
 	var npc_cell: Variant = CombatManager.get_combatant_cell(String(cur["id"]))
 	var pc_cell: Variant = CombatManager.get_combatant_cell(String(bersaglio["id"]))
 	var gittata: int = CombatManager.attack_range_of(String(cur["id"]))
+
+	# AFFERRATO (Ragnatela, prese): prova a strapparsi (FOR CD 12); se resta intrappolato non
+	# si muove — puo' solo colpire chi ha gia' a portata, poi il turno finisce.
+	if ConditionsManager.ha_condizione(String(cur["id"]), "afferrato"):
+		var fuga_ts: Dictionary = CombatManager.saving_throw(String(cur["id"]), "str", 12)
+		if bool(fuga_ts["success"]):
+			ConditionsManager.rimuovi_condizione(String(cur["id"]), "afferrato")
+			GameState.announce("🕸 %s si STRAPPA dai fili con la forza bruta!" % String(cur["name"]))
+		else:
+			var d: int = 999
+			if npc_cell != null and pc_cell != null:
+				d = chebyshev(npc_cell, pc_cell)
+			if d >= 1 and d <= gittata:
+				await _attacca(cur, bersaglio)
+			else:
+				GameState.announce("🕸 %s si dibatte nella ragnatela senza liberarsi."
+					% String(cur["name"]))
+			CombatManager.next_turn()
+			return
 
 	# CODARDO ferito (goblin, Grima): la sua storia dice che scappa — fugge invece di combattere.
 	# E scappa da FURBO: si DISIMPEGNA prima di correre (niente attacchi di opportunita').
@@ -180,14 +204,23 @@ func _agisci_nemico(cur: Dictionary) -> void:
 
 	if npc_cell != null and pc_cell != null:
 		if gittata > 1:
-			_agisci_a_distanza(cur, bersaglio, npc_cell, pc_cell, gittata)
+			await _agisci_a_distanza(cur, bersaglio, npc_cell, pc_cell, gittata)
 		else:
-			_agisci_in_mischia(cur, bersaglio, npc_cell, pc_cell, comp)
+			await _agisci_in_mischia(cur, bersaglio, npc_cell, pc_cell, comp)
 	else:
 		# Nessuna posizione nota (nessun token piazzato): il PNG attacca comunque.
-		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
+		await _attacca(cur, bersaglio)
 
 	CombatManager.next_turn()
+
+
+## L'attacco di un PNG su un PG passa da qui: PRIMA si offre al difensore la REAZIONE (lo SCUDO
+## del mago, col prompt di SpellBook — l'IA e' asincrona e ASPETTA la scelta), poi si risolve.
+func _attacca(cur: Dictionary, bersaglio: Dictionary) -> void:
+	await SpellBook.offri_scudo(String(bersaglio["id"]), String(cur["name"]))
+	if not CombatManager.is_active():
+		return  # durante il prompt lo scontro puo' essere finito
+	CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
 
 
 ## Nemico da mischia: avanza (evitando le celle occupate) e colpisce se arriva adiacente.
@@ -234,7 +267,7 @@ func _agisci_in_mischia(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector
 				npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
 				dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else 999
 	if dist <= 1:
-		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
+		await _attacca(cur, bersaglio)
 	else:
 		GameState.announce("🛡 %s non riesce a raggiungere %s e resta in guardia." % [String(cur["name"]), String(bersaglio["name"])])
 
@@ -268,7 +301,7 @@ func _agisci_a_distanza(cur: Dictionary, bersaglio: Dictionary, npc_cell: Vector
 			npc_cell = CombatManager.get_combatant_cell(String(cur["id"]))
 			dist = chebyshev(npc_cell, pc_cell) if npc_cell != null else dist
 	if dist >= 1 and dist <= gittata:
-		CombatManager.resolve_attack(String(cur["id"]), String(bersaglio["id"]), "normal")
+		await _attacca(cur, bersaglio)
 	elif dist > gittata:
 		GameState.announce("🏹 %s non ha ancora %s a tiro." % [String(cur["name"]), String(bersaglio["name"])])
 

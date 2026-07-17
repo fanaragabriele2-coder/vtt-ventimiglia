@@ -1,21 +1,239 @@
 {
-	"_comment": "Catalogo oggetti — porting di itemCatalog del Modulo 05 (JS). Pesi in kg, danni/proprieta' D&D 5e. Caricato da InventoryManager.",
-	"items": [
-		{ "id": "longsword",    "name": "Spada Lunga",         "type": "weapon",     "weightKg": 1.4,  "stackable": false, "damage": "1d8", "properties": "Versatile 1d10",     "compatibleSlots": ["mainHand", "offHand"] },
-		{ "id": "shortsword",   "name": "Spada Corta",         "type": "weapon",     "weightKg": 0.9,  "stackable": false, "damage": "1d6", "properties": "Accurata, leggera",  "compatibleSlots": ["mainHand", "offHand"] },
-		{ "id": "dagger",       "name": "Pugnale",             "type": "weapon",     "weightKg": 0.45, "stackable": true,  "damage": "1d4", "properties": "Accurata, leggera, lancio", "compatibleSlots": ["mainHand", "offHand"] },
-		{ "id": "quarterstaff", "name": "Bastone Ferrato",     "type": "weapon",     "weightKg": 1.8,  "stackable": false, "damage": "1d6", "properties": "Versatile 1d8",      "compatibleSlots": ["mainHand", "offHand"] },
-		{ "id": "shortbow",     "name": "Arco Corto",          "type": "weapon",     "weightKg": 0.9,  "stackable": false, "damage": "1d6", "properties": "Munizioni, due mani", "compatibleSlots": ["mainHand"] },
-		{ "id": "arcaneFocus",  "name": "Focus Arcano",        "type": "focus",      "weightKg": 0.45, "stackable": false, "damage": "",    "properties": "Focus da incantatore", "compatibleSlots": ["mainHand", "offHand"] },
-		{ "id": "shield",       "name": "Scudo",               "type": "shield",     "weightKg": 2.7,  "stackable": false, "acBonus": 2,    "damage": "", "properties": "+2 CA",         "compatibleSlots": ["offHand"] },
-		{ "id": "leatherArmor", "name": "Armatura di Cuoio",   "type": "armor",      "weightKg": 4.5,  "stackable": false, "armorBase": 11, "dexCap": null, "properties": "Leggera",     "compatibleSlots": ["armor"] },
-		{ "id": "studdedLeather","name": "Cuoio Borchiato",    "type": "armor",      "weightKg": 5.9,  "stackable": false, "armorBase": 12, "dexCap": null, "properties": "Leggera",     "compatibleSlots": ["armor"] },
-		{ "id": "chainShirt",   "name": "Giaco di Maglia",     "type": "armor",      "weightKg": 9.1,  "stackable": false, "armorBase": 13, "dexCap": 2,    "properties": "Media, Des max +2", "compatibleSlots": ["armor"] },
-		{ "id": "chainMail",    "name": "Cotta di Maglia",     "type": "armor",      "weightKg": 24.9, "stackable": false, "armorBase": 16, "dexCap": 0,    "properties": "Pesante",     "compatibleSlots": ["armor"] },
-		{ "id": "healingPotion","name": "Pozione di Cura",     "type": "consumable", "weightKg": 0.25, "stackable": true,  "healing": "2d4+2", "damage": "", "properties": "Cura 2d4+2 HP", "compatibleSlots": [] },
-		{ "id": "rations",      "name": "Razioni",             "type": "gear",       "weightKg": 0.9,  "stackable": true,  "damage": "", "properties": "Una giornata di cibo", "compatibleSlots": [] },
-		{ "id": "rope",         "name": "Corda 15 m",          "type": "gear",       "weightKg": 4.5,  "stackable": false, "damage": "", "properties": "Canapa",          "compatibleSlots": [] },
-		{ "id": "torch",        "name": "Torcia",              "type": "gear",       "weightKg": 0.45, "stackable": true,  "damage": "1 fuoco", "properties": "Illumina 6 m", "compatibleSlots": [] },
-		{ "id": "thievesTools", "name": "Arnesi da Scasso",    "type": "tools",      "weightKg": 0.45, "stackable": false, "damage": "", "properties": "Strumenti",       "compatibleSlots": [] }
-	]
+ "_comment": "Catalogo oggetti — porting di itemCatalog del Modulo 05 (JS). Pesi in kg, danni/proprieta' D&D 5e. Caricato da InventoryManager.",
+ "items": [
+  {
+   "id": "longsword",
+   "name": "Spada Lunga",
+   "type": "weapon",
+   "weightKg": 1.4,
+   "stackable": false,
+   "damage": "1d8",
+   "properties": "Versatile 1d10",
+   "compatibleSlots": [
+    "mainHand",
+    "offHand"
+   ]
+  },
+  {
+   "id": "shortsword",
+   "name": "Spada Corta",
+   "type": "weapon",
+   "weightKg": 0.9,
+   "stackable": false,
+   "damage": "1d6",
+   "properties": "Accurata, leggera",
+   "compatibleSlots": [
+    "mainHand",
+    "offHand"
+   ]
+  },
+  {
+   "id": "dagger",
+   "name": "Pugnale",
+   "type": "weapon",
+   "weightKg": 0.45,
+   "stackable": true,
+   "damage": "1d4",
+   "properties": "Accurata, leggera, lancio",
+   "compatibleSlots": [
+    "mainHand",
+    "offHand"
+   ]
+  },
+  {
+   "id": "quarterstaff",
+   "name": "Bastone Ferrato",
+   "type": "weapon",
+   "weightKg": 1.8,
+   "stackable": false,
+   "damage": "1d6",
+   "properties": "Versatile 1d8",
+   "compatibleSlots": [
+    "mainHand",
+    "offHand"
+   ]
+  },
+  {
+   "id": "shortbow",
+   "name": "Arco Corto",
+   "type": "weapon",
+   "weightKg": 0.9,
+   "stackable": false,
+   "damage": "1d6",
+   "properties": "Munizioni, due mani",
+   "compatibleSlots": [
+    "mainHand"
+   ]
+  },
+  {
+   "id": "arcaneFocus",
+   "name": "Focus Arcano",
+   "type": "focus",
+   "weightKg": 0.45,
+   "stackable": false,
+   "damage": "",
+   "properties": "Focus da incantatore",
+   "compatibleSlots": [
+    "mainHand",
+    "offHand"
+   ]
+  },
+  {
+   "id": "shield",
+   "name": "Scudo",
+   "type": "shield",
+   "weightKg": 2.7,
+   "stackable": false,
+   "acBonus": 2,
+   "damage": "",
+   "properties": "+2 CA",
+   "compatibleSlots": [
+    "offHand"
+   ]
+  },
+  {
+   "id": "leatherArmor",
+   "name": "Armatura di Cuoio",
+   "type": "armor",
+   "weightKg": 4.5,
+   "stackable": false,
+   "armorBase": 11,
+   "dexCap": null,
+   "properties": "Leggera",
+   "compatibleSlots": [
+    "armor"
+   ]
+  },
+  {
+   "id": "studdedLeather",
+   "name": "Cuoio Borchiato",
+   "type": "armor",
+   "weightKg": 5.9,
+   "stackable": false,
+   "armorBase": 12,
+   "dexCap": null,
+   "properties": "Leggera",
+   "compatibleSlots": [
+    "armor"
+   ]
+  },
+  {
+   "id": "chainShirt",
+   "name": "Giaco di Maglia",
+   "type": "armor",
+   "weightKg": 9.1,
+   "stackable": false,
+   "armorBase": 13,
+   "dexCap": 2,
+   "properties": "Media, Des max +2",
+   "compatibleSlots": [
+    "armor"
+   ]
+  },
+  {
+   "id": "chainMail",
+   "name": "Cotta di Maglia",
+   "type": "armor",
+   "weightKg": 24.9,
+   "stackable": false,
+   "armorBase": 16,
+   "dexCap": 0,
+   "properties": "Pesante",
+   "compatibleSlots": [
+    "armor"
+   ]
+  },
+  {
+   "id": "healingPotion",
+   "name": "Pozione di Cura",
+   "type": "consumable",
+   "weightKg": 0.25,
+   "stackable": true,
+   "healing": "2d4+2",
+   "damage": "",
+   "properties": "Cura 2d4+2 HP",
+   "compatibleSlots": []
+  },
+  {
+   "id": "rations",
+   "name": "Razioni",
+   "type": "gear",
+   "weightKg": 0.9,
+   "stackable": true,
+   "damage": "",
+   "properties": "Una giornata di cibo",
+   "compatibleSlots": []
+  },
+  {
+   "id": "rope",
+   "name": "Corda 15 m",
+   "type": "gear",
+   "weightKg": 4.5,
+   "stackable": false,
+   "damage": "",
+   "properties": "Canapa",
+   "compatibleSlots": []
+  },
+  {
+   "id": "torch",
+   "name": "Torcia",
+   "type": "gear",
+   "weightKg": 0.45,
+   "stackable": true,
+   "damage": "1 fuoco",
+   "properties": "Illumina 6 m",
+   "compatibleSlots": []
+  },
+  {
+   "id": "thievesTools",
+   "name": "Arnesi da Scasso",
+   "type": "tools",
+   "weightKg": 0.45,
+   "stackable": false,
+   "damage": "",
+   "properties": "Strumenti",
+   "compatibleSlots": []
+  },
+  {
+   "id": "oilFlask",
+   "name": "Fiasca d'Olio",
+   "type": "consumable",
+   "weightKg": 0.5,
+   "stackable": true,
+   "healing": "",
+   "damage": "",
+   "throwDamage": "2d4",
+   "throwSave": "dex",
+   "throwSurface": "fuoco",
+   "properties": "Si LANCIA (azione): 2d4 fuoco, TS DES dimezza; la cella resta in fiamme",
+   "compatibleSlots": []
+  },
+  {
+   "id": "acidVial",
+   "name": "Fiala d'Acido",
+   "type": "consumable",
+   "weightKg": 0.25,
+   "stackable": true,
+   "healing": "",
+   "damage": "",
+   "throwDamage": "2d6",
+   "throwSave": "dex",
+   "throwSurface": "",
+   "properties": "Si LANCIA (azione): 2d6 acido, TS DES dimezza",
+   "compatibleSlots": []
+  },
+  {
+   "id": "scrollLightning",
+   "name": "Pergamena del Fulmine",
+   "type": "scroll",
+   "weightKg": 0.1,
+   "stackable": true,
+   "healing": "",
+   "damage": "",
+   "scrollSpell": "lightningBolt",
+   "rarity": "rara",
+   "properties": "Si LEGGE (azione): lancia FULMINE senza slot; la pergamena si consuma",
+   "compatibleSlots": []
+  }
+ ]
 }
