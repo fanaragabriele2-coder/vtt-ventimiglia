@@ -215,8 +215,14 @@ func _item_name(catalog_id: String) -> String:
 ## Raccoglie il bottino in coda: aggiunge gli oggetti allo zaino e l'oro alla progressione del PG
 ## attivo, poi annuncia in chat.
 func collect_loot(loot: Dictionary) -> void:
+	# Conteggio per id: un cartellino "×N" invece di N cartellini uguali in raffica.
+	var conteggio: Dictionary = {}
 	for item_id: Variant in loot.get("items", []):
-		InventoryManager.add_item(String(item_id), 1)
+		var sid: String = String(item_id)
+		InventoryManager.add_item(sid, 1)
+		conteggio[sid] = int(conteggio.get(sid, 0)) + 1
+	for sid: String in conteggio:
+		GameState.publish("oggetto:raccolto", { "id": sid, "n": conteggio[sid] })
 	var gold: int = int(loot.get("gold", 0))
 	if gold > 0:
 		var active: CharacterData = CharacterManager.get_active()

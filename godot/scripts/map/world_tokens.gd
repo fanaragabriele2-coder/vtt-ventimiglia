@@ -18,6 +18,7 @@ const RAGGIO_MONDO: float = 52.0
 const RAGGIO_SCHERMO_MIN: float = 14.0
 const ZOOM_NOME: float = 0.30    # sotto questo zoom i nomi spariscono (sarebbero coriandoli)
 const DURATA_SCATTO: float = 0.28
+const DURATA_FLASH: float = 0.26   # lampo bianco quando il PG incassa un colpo
 const PC_PREFISSO: String = "pc-"
 # Scala di combattimento del Mondo cucito: 1 cella = 128 px = 1,5 m (stessa del righello e dei
 # nemici evocati). E' FISSA e indipendente dalla griglia visiva (che puo' essere 64/128/256).
@@ -41,6 +42,8 @@ var _turno_corrente: String = ""           # id del combattente di turno (vincol
 var _ultimo_zoom: float = 0.0
 var _tween_viaggio: Tween
 var _scatti: Dictionary = {}   # id personaggio -> { "t": float, "dir": Vector2 } (affondo)
+var _flash: Dictionary = {}    # id personaggio -> t: lampo bianco del colpo incassato
+var _respiro: float = 0.0      # orologio del RESPIRO dei token in combattimento
 
 
 func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
@@ -58,7 +61,15 @@ func configura(rect_mondo: Rect2, camera: Camera2D) -> void:
 	# Spostamenti FORZATI dal gioco (una SPINTA che fa arretrare un PG): la cella di combattimento
 	# cambia senza un trascinamento — il gettone deve seguirla, come fanno i token nemici.
 	CombatManager.combatant_position_changed.connect(_su_cella_pg_cambiata)
+	# Lampo bianco quando un PG INCASSA un colpo (game feel: il danno si vede sul gettone).
+	CombatManager.combatant_damaged.connect(_su_danno_flash)
 	set_process(true)
+
+
+func _su_danno_flash(combatant_id: String, _amount: int, _hp: int) -> void:
+	if combatant_id.begins_with(PC_PREFISSO):
+		_flash[combatant_id.trim_prefix(PC_PREFISSO)] = 0.0
+		queue_redraw()
 
 
 func _su_cambio_turno(combatant_id: String, _round: int) -> void:
@@ -148,6 +159,15 @@ func _offset_scatto(id: String, r: float) -> Vector2:
 	return (_scatti[id]["dir"] as Vector2) * sin(p * PI) * r * 0.9
 
 
+## Oscillazione del RESPIRO in combattimento (ampiezza minima, fase per-token dall'id: non
+## respirano tutti all'unisono). Fuori combattimento i gettoni stanno fermi.
+func _offset_respiro(id: String, r: float) -> Vector2:
+	if not CombatManager.is_active():
+		return Vector2.ZERO
+	var fase: float = float(id.hash() % 628) / 100.0
+	return Vector2(0.0, sin(_respiro * 2.6 + fase) * r * 0.06)
+
+
 ## VIAGGIO NARRATO: tutto il party PLANA verso il punto (2.2s, disposto in cerchio all'arrivo).
 ## Un nuovo viaggio interrompe il precedente. All'arrivo: salvataggio + token_spostato per
 ## ogni PG (cosi' la nebbia si dirada a destinazione).
@@ -214,6 +234,17 @@ func _process(delta: float) -> void:
 				return float(_scatti[k]["t"]) >= DURATA_SCATTO):
 			_scatti.erase(id)
 		queue_redraw()
+	# RESPIRO in combattimento: i gettoni oscillano piano — il tavolo e' vivo, non congelato.
+	if CombatManager.is_active() and not _gettoni.is_empty():
+		_respiro += delta
+		queue_redraw()
+	if not _flash.is_empty():
+		for id: String in _flash.keys():
+			_flash[id] = float(_flash[id]) + delta
+		for id: String in _flash.keys().filter(func(k: String) -> bool:
+				return float(_flash[k]) >= DURATA_FLASH):
+			_flash.erase(id)
+		queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -244,7 +275,8 @@ func _draw() -> void:
 	var r: float = _raggio()
 	for i: int in range(_gettoni.size()):
 		var g: Dictionary = _gettoni[i]
-		var pos: Vector2 = (g["pos"] as Vector2) + _offset_scatto(String(g["id"]), r)
+		var pos: Vector2 = (g["pos"] as Vector2) + _offset_scatto(String(g["id"]), r) \
+			+ _offset_respiro(String(g["id"]), r)
 		var colore: Color = g["colore"]
 		# ARTE del token se esiste (ritratto col nome del PG, o arte della sua classe);
 		# altrimenti il gettone disegnato con l'iniziale.
@@ -263,6 +295,10 @@ func _draw() -> void:
 			var dim: int = int(r * 1.1)
 			draw_string(font, pos + Vector2(-r, r * 0.42), iniziale,
 				HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, dim, Color(0.1, 0.08, 0.05))
+		# LAMPO BIANCO del colpo incassato: velo sul gettone che svanisce in un quarto di secondo.
+		if _flash.has(String(g["id"])):
+			var qf: float = clampf(float(_flash[String(g["id"])]) / DURATA_FLASH, 0.0, 1.0)
+			draw_circle(pos, r * 1.08, Color(1, 1, 1, (1.0 - qf) * 0.65))
 		if _camera.zoom.x >= ZOOM_NOME:
 			var dim_nome: int = int(maxf(18.0, r * 0.5))
 			var y_nome: float = r * 1.5 + dim_nome

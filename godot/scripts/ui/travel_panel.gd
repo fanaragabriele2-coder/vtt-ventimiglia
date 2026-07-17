@@ -39,6 +39,7 @@ func _su_iniziato(dati: Dictionary) -> void:
 	_generazione += 1
 	_attesa_tiro = false
 	visible = true
+	UiFx.entra(self)
 	_titolo.text = "🧭 In marcia verso %s" % String(dati.get("nome", ""))
 	_barra.value = 0.0
 	var km: int = roundi(float(dati.get("distanza_km", 0.0)))

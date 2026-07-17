@@ -16,12 +16,17 @@ const RAGGIO_SCHERMO_MIN: float = 12.0
 const ZOOM_NOME: float = 0.30
 const COLORE: Color = Color(0.62, 0.16, 0.14)
 const DURATA_SCATTO: float = 0.28
+const DURATA_FLASH: float = 0.26   # lampo bianco quando il nemico incassa un colpo
+const DURATA_MORTE: float = 0.9    # dissolvenza+rotazione del caduto (non sparisce di colpo)
 
 var _rect: Rect2
 var _camera: Camera2D
 var _party: WorldTokens
 var _nemici: Dictionary = {}   # combatant_id -> { "nome": String, "pos": Vector2 }
 var _scatti: Dictionary = {}   # combatant_id -> { "t": float, "dir": Vector2 } (affondo d'attacco)
+var _flash: Dictionary = {}    # combatant_id -> t: lampo bianco del colpo incassato
+var _morenti: Array[Dictionary] = []   # { "nome", "pos", "t" }: token in dissolvenza di morte
+var _respiro: float = 0.0      # orologio del RESPIRO dei token in combattimento
 var _ultimo_zoom: float = 0.0
 
 
@@ -36,6 +41,8 @@ func configura(rect_mondo: Rect2, camera: Camera2D, party: WorldTokens) -> void:
 	# Il Mondo cucito e' L'UNICA mappa: quando l'IA muove un nemico (set_combatant_cell), il suo
 	# token DEVE muoversi qui — avanzate, fughe e fiancheggiamenti si vedono sulla mappa vera.
 	CombatManager.combatant_position_changed.connect(_su_cella_cambiata)
+	# Lampo bianco quando un nemico INCASSA un colpo (game feel: il danno si vede sul token).
+	CombatManager.combatant_damaged.connect(_su_danno_flash)
 	set_process(true)
 
 
@@ -98,8 +105,22 @@ func _su_cella_cambiata(combatant_id: String, cella: Vector2i) -> void:
 	queue_redraw()
 
 
+func _su_danno_flash(combatant_id: String, _amount: int, _hp: int) -> void:
+	if _nemici.has(combatant_id):
+		_flash[combatant_id] = 0.0
+		queue_redraw()
+
+
 func _su_combattente_sconfitto(combatant_id: String, _source_id: String) -> void:
 	_scatti.erase(combatant_id)
+	_flash.erase(combatant_id)
+	if _nemici.has(combatant_id):
+		# Il caduto non sparisce di colpo: passa tra i MORENTI e si dissolve ruotando (solo
+		# visivo — la sua cella di gioco si libera SUBITO, il tattico non aspetta la regia).
+		_morenti.append({
+			"nome": String(_nemici[combatant_id]["nome"]),
+			"pos": _nemici[combatant_id]["pos"], "t": 0.0,
+		})
 	if _nemici.erase(combatant_id):
 		# La cella del caduto si libera (prima lo faceva la mappa tattica, ora rimossa):
 		# fiancheggiamento e movimenti non devono piu' scansare un morto.
@@ -109,14 +130,21 @@ func _su_combattente_sconfitto(combatant_id: String, _source_id: String) -> void
 
 func _su_combattente_rimosso(combatant_id: String) -> void:
 	_scatti.erase(combatant_id)
+	_flash.erase(combatant_id)
 	if _nemici.erase(combatant_id):
 		queue_redraw()
 
 
 func _su_fine_scontro() -> void:
 	_scatti.clear()
+	_flash.clear()
 	if _nemici.is_empty():
 		return
+	# Anche chi resta in scena a fine scontro (fughe, scontri chiusi dal Master) si dissolve.
+	for id: String in _nemici.keys():
+		_morenti.append({
+			"nome": String(_nemici[id]["nome"]), "pos": _nemici[id]["pos"], "t": 0.0,
+		})
 	_nemici.clear()
 	queue_redraw()
 
@@ -138,6 +166,23 @@ func _process(delta: float) -> void:
 				return float(_scatti[k]["t"]) >= DURATA_SCATTO):
 			_scatti.erase(id)
 		queue_redraw()
+	# RESPIRO in combattimento: i token oscillano piano — sono vivi, non pedine incollate.
+	if CombatManager.is_active() and not _nemici.is_empty():
+		_respiro += delta
+		queue_redraw()
+	if not _flash.is_empty():
+		for id: String in _flash.keys():
+			_flash[id] = float(_flash[id]) + delta
+		for id: String in _flash.keys().filter(func(k: String) -> bool:
+				return float(_flash[k]) >= DURATA_FLASH):
+			_flash.erase(id)
+		queue_redraw()
+	if not _morenti.is_empty():
+		for m: Dictionary in _morenti:
+			m["t"] = float(m["t"]) + delta
+		_morenti = _morenti.filter(func(m: Dictionary) -> bool:
+			return float(m["t"]) < DURATA_MORTE)
+		queue_redraw()
 
 
 func _raggio() -> float:
@@ -152,14 +197,42 @@ func _offset_scatto(combatant_id: String, r: float) -> Vector2:
 	return (_scatti[combatant_id]["dir"] as Vector2) * sin(p * PI) * r * 0.9
 
 
+## Oscillazione del RESPIRO in combattimento (ampiezza minima, fase per-token dall'id: non
+## respirano tutti all'unisono come un balletto). Fuori combattimento i token stanno fermi.
+func _offset_respiro(combatant_id: String, r: float) -> Vector2:
+	if not CombatManager.is_active():
+		return Vector2.ZERO
+	var fase: float = float(combatant_id.hash() % 628) / 100.0
+	return Vector2(0.0, sin(_respiro * 2.6 + fase) * r * 0.06)
+
+
+## I CADUTI in dissolvenza: il token ruota su se stesso, si stringe e svanisce (~0.9s) —
+## disegnati SOTTO i vivi, che gli passano sopra.
+func _disegna_morenti(r: float) -> void:
+	for m: Dictionary in _morenti:
+		var q: float = clampf(float(m["t"]) / DURATA_MORTE, 0.0, 1.0)
+		var alfa: float = 1.0 - q * q
+		draw_set_transform(m["pos"] as Vector2, 0.9 * q, Vector2.ONE * (1.0 - 0.25 * q))
+		var tex: Texture2D = TokenArt.per_nome(String(m["nome"]))
+		if tex != null:
+			var lato: float = r * 2.4
+			draw_texture_rect(tex, Rect2(-Vector2(lato, lato) * 0.5, Vector2(lato, lato)),
+				false, Color(1, 1, 1, alfa))
+		else:
+			draw_circle(Vector2.ZERO, r, Color(COLORE, alfa))
+	draw_set_transform(Vector2.ZERO)
+
+
 func _draw() -> void:
-	if _camera == null or _nemici.is_empty():
+	if _camera == null or (_nemici.is_empty() and _morenti.is_empty()):
 		return
 	var font: Font = ThemeDB.fallback_font
 	var r: float = _raggio()
+	_disegna_morenti(r)
 	for id: String in _nemici.keys():
 		var voce: Dictionary = _nemici[id]
-		var pos: Vector2 = (voce["pos"] as Vector2) + _offset_scatto(id, r)
+		var pos: Vector2 = (voce["pos"] as Vector2) + _offset_scatto(id, r) \
+			+ _offset_respiro(id, r)
 		var nome: String = String(voce["nome"])
 		var tex: Texture2D = TokenArt.per_nome(nome)
 		if tex != null:
@@ -171,6 +244,10 @@ func _draw() -> void:
 			draw_circle(pos, r * 0.78, COLORE.lightened(0.16))
 			draw_string(font, pos + Vector2(-r, r * 0.42), nome.left(1).to_upper(),
 				HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, int(r * 1.1), Color(0.95, 0.9, 0.88))
+		# LAMPO BIANCO del colpo incassato: un velo sul token che svanisce in un quarto di secondo.
+		if _flash.has(id):
+			var qf: float = clampf(float(_flash[id]) / DURATA_FLASH, 0.0, 1.0)
+			draw_circle(pos, r * 1.08, Color(1, 1, 1, (1.0 - qf) * 0.65))
 		if _camera.zoom.x >= ZOOM_NOME:
 			var dim_nome: int = int(maxf(16.0, r * 0.46))
 			var y_nome: float = r * 1.5 + dim_nome

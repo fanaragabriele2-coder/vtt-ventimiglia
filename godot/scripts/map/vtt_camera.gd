@@ -16,6 +16,7 @@ var _target_pos: Vector2 = Vector2.ZERO
 var _target_zoom: float = 1.2
 var _dragging: bool = false
 var _limiti: Rect2 = Rect2()      # bounds del mondo (in pixel); Rect2() = nessun limite
+var _scossa: float = 0.0          # ampiezza residua dello SCREEN SHAKE (px schermo), decade da sola
 # Limite minimo di zoom EFFETTIVO: parte da ZOOM_MIN ma adatta_a() lo abbassa quando inquadra un
 # mondo piu' grande dello schermo — altrimenti il primo colpo di rotellina dopo l'inquadratura
 # scatterebbe di colpo da ~0.05 a 0.4 (13x in un frame) invece di zoomare dolcemente.
@@ -34,6 +35,20 @@ func _process(delta: float) -> void:
 	position = position.lerp(_target_pos, t)
 	var z: float = lerpf(zoom.x, _target_zoom, t)
 	zoom = Vector2(z, z)
+	# SCREEN SHAKE (colpi critici): tremolio casuale sull'offset — non tocca il bersaglio della
+	# camera, quindi non litiga con l'inseguimento ne' coi limiti. Decade esponenzialmente.
+	if _scossa > 0.3:
+		offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _scossa / zoom.x
+		_scossa *= exp(-7.0 * delta)
+	elif offset != Vector2.ZERO:
+		_scossa = 0.0
+		offset = Vector2.ZERO
+
+
+## Scuote lo schermo (colpo critico, caduta rovinosa): `intensita` in pixel-schermo (~12–20).
+## Chiamate ravvicinate non si sommano all'infinito: vince la scossa piu' forte.
+func scuoti(intensita: float) -> void:
+	_scossa = maxf(_scossa, intensita)
 
 
 func _unhandled_input(event: InputEvent) -> void:

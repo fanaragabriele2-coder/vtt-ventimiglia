@@ -27,6 +27,7 @@ func apri(mercante: Dictionary) -> void:
 	_saluto.text = String(mercante.get("saluto", ""))
 	_riempi_listino(mercante)
 	visible = true
+	UiFx.entra(self)
 
 
 func _riempi_listino(mercante: Dictionary) -> void:

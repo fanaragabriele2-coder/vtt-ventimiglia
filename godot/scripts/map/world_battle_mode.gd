@@ -32,6 +32,8 @@ var _nemici: WorldEnemyTokens
 var _arena: Rect2
 var _attivo: bool = false
 var _turno_id: String = ""   # il combattente di turno: sotto di lui il CERCHIO DI LUCE
+var _iris: float = 0.0       # 0->1 all'inizio scontro: la penombra CALA in dissolvenza (regia)
+var _iris_tween: Tween
 
 
 func configura(rect_mondo: Rect2, camera: VTTCamera, party: WorldTokens,
@@ -58,7 +60,21 @@ func _su_inizio() -> void:
 		AmbienceManager.imposta_scena("battaglia")
 	GameState.announce("⚔ La regia si stringe sull'arena: griglia tattica, coperture e "
 		+ "alture in evidenza.")
+	# IRIS d'apertura: la penombra attorno all'arena SALE in ~0.6s invece di comparire di scatto —
+	# la mappa "si chiude" sullo scontro come un sipario di luce.
+	_iris = 0.0
+	if _iris_tween != null and _iris_tween.is_valid():
+		_iris_tween.kill()
+	_iris_tween = create_tween()
+	_iris_tween.tween_method(_imposta_iris, 0.0, 1.0, 0.6) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	queue_redraw()
+
+
+func _imposta_iris(v: float) -> void:
+	_iris = v
+	if _attivo:
+		queue_redraw()
 
 
 func _su_fine() -> void:
@@ -176,9 +192,10 @@ func _disegna_penombra() -> void:
 		Vector2(_arena.position.x - _rect.position.x, _arena.size.y))
 	var destra := Rect2(Vector2(_arena.end.x, _arena.position.y),
 		Vector2(_rect.end.x - _arena.end.x, _arena.size.y))
+	var col: Color = Color(COL_PENOMBRA, COL_PENOMBRA.a * _iris)  # sale con l'iris d'apertura
 	for velo: Rect2 in [sopra, sotto, sinistra, destra]:
 		if velo.size.x > 0.0 and velo.size.y > 0.0:
-			draw_rect(velo, COL_PENOMBRA)
+			draw_rect(velo, col)
 
 
 ## Griglia tattica SOLO dentro l'arena, allineata alle celle di combattimento del mondo.

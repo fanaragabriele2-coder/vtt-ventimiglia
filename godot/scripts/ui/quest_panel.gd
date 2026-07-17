@@ -29,6 +29,7 @@ func apri_luogo(luogo: String) -> void:
 	_titolo.text = "📜 Missioni — %s" % luogo
 	visible = true
 	_riempi()
+	UiFx.entra(self)
 
 
 ## Registro di tutte le missioni note (dal pulsante 📜 della toolbar).
@@ -37,6 +38,7 @@ func apri_registro() -> void:
 	_titolo.text = "📜 Registro delle missioni"
 	visible = true
 	_riempi()
+	UiFx.entra(self)
 
 
 func _riempi() -> void:

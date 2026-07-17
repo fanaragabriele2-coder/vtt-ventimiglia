@@ -15,7 +15,8 @@ func _ready() -> void:
 	TravelJournal.diario_aggiornato.connect(_riempi)
 	visibility_changed.connect(func() -> void:
 		if visible:
-			_riempi())
+			_riempi()
+			UiFx.entra(self))
 
 
 func _riempi() -> void:

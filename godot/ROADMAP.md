@@ -670,22 +670,25 @@ simulazione, regole BG3, mappa che si trasforma in battaglia, viaggio a dadi, me
 Fardello/Speranza, meteo). Ecco cosa resta per renderlo un prodotto rifinito al 100%, in ordine
 di impatto. Ogni voce e' una sessione o poco piu'.
 
-### 🎬 H1 — ANIMAZIONI: il gioco che si MUOVE
-- [ ] **Sprite animati dei combattenti**: oggi i token sono immagini fisse con un affondo. Dare
-      a ogni token un leggero "respiro" (bob sinusoidale), un lampo bianco quando e' colpito,
-      una dissolvenza+rotazione quando muore (invece di sparire di colpo), un tremito sullo
-      schermo (screen shake) sui colpi critici.
-- [ ] **Numeri di danno stilizzati**: i numeri volanti ci sono (WorldCombatFX) ma spartani —
-      renderli piu' grossi, con colore per tipo (rosso taglio, arancione fuoco, viola veleno),
-      un arco di salita e una dissolvenza; i CRITICI piu' grandi e dorati.
-- [ ] **Transizioni di pannello**: pannelli (scheda, mercante, diario, storia) che entrano con
-      uno slide+fade invece di apparire; il cambio Esplorazione↔Battaglia con un breve
-      "iris"/vignetta che si stringe.
-- [ ] **Pickup toast**: quando RACCOGLI un oggetto, un cartellino con la sua FIGURA + nome che
-      sale e svanisce ("hai ottenuto: Cotta di Mithril"), oltre alla riga in chat — l'icona
-      c'e' gia' (ItemArt), manca il popup.
-- [ ] **Dadi con impatto**: al risultato del 3D, un piccolo zoom + suono metallico; il 20 e
-      l'1 naturali con un flash dedicato (gia' annunciati, manca il feedback visivo forte).
+### 🎬 H1 — ANIMAZIONI: il gioco che si MUOVE ✅ FATTA
+- [x] **Sprite animati dei combattenti**: ogni token ora RESPIRA in combattimento (bob
+      sinusoidale con fase per-token, non all'unisono), fa un LAMPO BIANCO quando incassa un
+      colpo (WorldTokens/WorldEnemyTokens su combatant_damaged) e, quando muore, non sparisce
+      di colpo ma si DISSOLVE ruotando e stringendosi (~0.9s, lista `_morenti`) mentre la sua
+      cella di gioco si libera SUBITO. I colpi CRITICI fanno tremare lo schermo
+      (VTTCamera.scuoti — offset casuale con decadimento esponenziale, ~0.6s).
+- [x] **Numeri di danno stilizzati**: i numeri volanti ora nascono GRANDI e si assestano
+      (schiaffo d'impatto), salgono ad ARCO smorzato invece che lineare, DERIVANO di lato (due
+      colpi ravvicinati non si impilano) e sfumano; i CRITICI piu' grandi e dorati ("CRIT! -N").
+- [x] **Transizioni di pannello**: bottega, missioni, diario e viaggio entrano con uno
+      SLIDE+FADE (helper unico `UiFx.entra`); il passaggio Esplorazione→Battaglia ha un IRIS
+      d'apertura — la penombra attorno all'arena SALE in dissolvenza (~0.6s) invece di comparire
+      di scatto.
+- [x] **Pickup toast**: quando RACCOGLI un oggetto (bottino, acquisto, ricompensa di missione)
+      un cartellino con la sua FIGURA + nome ("Hai ottenuto: …") sale e svanisce, bordato del
+      colore della rarita' e impilabile (nuovo autoload `ToastUi`, evento "oggetto:raccolto").
+- [x] **Dadi con impatto**: al risultato del 3D il numero fa un POP (nasce grande e rimbalza in
+      scala) e cambia COLORE sul colpo di scena — ORO sul 20 naturale, ROSSO sull'1 naturale.
 
 ### 🔊 H2 — SUONI: il gioco che si SENTE
 - [ ] **SFX di combattimento per tipo d'arma**: oggi c'e' un set base (CombatSfx). Aggiungere

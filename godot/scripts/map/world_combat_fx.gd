@@ -22,6 +22,8 @@ const DURATA_PROIETTILE: float = 0.20
 const DURATA_SCINTILLA: float = 0.34
 const DURATA_NUMERO: float = 0.95
 const SALITA_NUMERO_PX: float = 46.0
+const DERIVA_NUMERO_PX: float = 16.0   # deriva orizzontale casuale: due colpi non si sovrappongono
+const SCOSSA_CRITICO: float = 16.0     # ampiezza dello screen shake sui colpi critici (px schermo)
 const COL_DANNO: Color = Color(0.92, 0.26, 0.22)
 const COL_CRIT: Color = Color(1.0, 0.83, 0.28)
 const COL_CURA: Color = Color(0.40, 0.85, 0.45)
@@ -77,6 +79,9 @@ func _su_attacco(result: Dictionary) -> void:
 		return
 	if bool(result.get("critical", false)):
 		_crit_bersaglio[bersaglio] = true
+		# Il colpo critico SI SENTE: lo schermo trema (VTTCamera decade la scossa da sola).
+		if _camera is VTTCamera:
+			(_camera as VTTCamera).scuoti(SCOSSA_CRITICO)
 	var pos_att_v: Variant = _posizione(attaccante)
 	if pos_att_v == null:
 		_scintille.append({ "pos": pos_ber, "t": 0.0, "crit": bool(result.get("critical", false)) })
@@ -106,7 +111,7 @@ func _su_danno(combatant_id: String, amount: int, _hp: int) -> void:
 func _crea_numero_danno(pos: Vector2, combatant_id: String, amount: int) -> void:
 	var crit: bool = _crit_bersaglio.erase(combatant_id)
 	_numeri.append({
-		"pos": pos, "t": 0.0, "crit": crit,
+		"pos": pos, "t": 0.0, "crit": crit, "dx": randf_range(-1.0, 1.0),
 		"testo": ("CRIT! -%d" % amount) if crit else "-%d" % amount,
 		"colore": COL_CRIT if crit else COL_DANNO,
 	})
@@ -117,7 +122,10 @@ func _su_cura(combatant_id: String, amount: int, _hp: int) -> void:
 	var pos: Variant = _posizione(combatant_id)
 	if pos == null:
 		return
-	_numeri.append({ "pos": pos, "t": 0.0, "testo": "+%d" % amount, "colore": COL_CURA })
+	_numeri.append({
+		"pos": pos, "t": 0.0, "dx": randf_range(-1.0, 1.0),
+		"testo": "+%d" % amount, "colore": COL_CURA,
+	})
 	_riavvia()
 
 
@@ -193,9 +201,16 @@ func _draw() -> void:
 		var crit: bool = bool(n.get("crit", false))
 		var colore: Color = n["colore"]
 		colore.a = 1.0 - qn * qn
-		var dim: int = int((26.0 if crit else 20.0) * s)
+		# STILE del numero: nasce GRANDE e si assesta (schiaffo d'impatto nel primo ~18%), sale ad
+		# ARCO smorzato (rapido all'inizio, plana alla fine) e DERIVA di lato — colpi ravvicinati
+		# sullo stesso bersaglio non si impilano l'uno sull'altro.
+		var schiaffo: float = 1.0 + 0.5 * maxf(0.0, 1.0 - qn / 0.18)
+		var salita: float = 1.0 - pow(1.0 - qn, 2.4)
+		var dim: int = int((30.0 if crit else 21.0) * s * schiaffo)
 		var largh: float = 240.0 * s
-		var base: Vector2 = (n["pos"] as Vector2) + Vector2(0.0, -SALITA_NUMERO_PX * s * qn - 20.0 * s)
+		var deriva: float = float(n.get("dx", 0.0)) * DERIVA_NUMERO_PX * s * salita
+		var base: Vector2 = (n["pos"] as Vector2) \
+			+ Vector2(deriva, -SALITA_NUMERO_PX * s * salita - 20.0 * s)
 		var pos: Vector2 = base - Vector2(largh * 0.5, 0.0)
 		draw_string(font, pos + Vector2(1.5 * s, 1.5 * s), String(n["testo"]),
 			HORIZONTAL_ALIGNMENT_CENTER, largh, dim, Color(0, 0, 0, colore.a * 0.8))

@@ -96,9 +96,32 @@ func _concludi() -> void:
 		totale += r
 	_etichetta.text = str(totale)
 	_dettaglio.text = _testo_dettaglio(singoli)
+	_impatto_risultato(singoli)
 	_annuncia(totale, singoli)
 	tiro_completato.emit(_facce_correnti, totale, singoli)
 	_chiudi_dopo(CHIUSURA_AUTO)
+
+
+## IMPATTO del risultato: il numero fa un POP (nasce grande, rimbalza in scala) e cambia COLORE
+## sul colpo di scena — ORO sul 20 naturale, ROSSO sull'1 naturale (un solo d20). Il colore torna
+## dorato al lancio successivo (tira() non lo tocca, ma il pop lo riscrive comunque).
+func _impatto_risultato(singoli: PackedInt32Array) -> void:
+	var colore := Color(0.94, 0.83, 0.53)
+	var contorno := Color(0, 0, 0, 0.85)
+	if _facce_correnti == 20 and singoli.size() == 1:
+		if singoli[0] == 20:
+			colore = Color(1.0, 0.87, 0.3)
+			contorno = Color(0.8, 0.55, 0.1, 0.95)   # alone d'oro: il CRITICO si vede da lontano
+		elif singoli[0] == 1:
+			colore = Color(0.95, 0.34, 0.3)
+			contorno = Color(0.4, 0.05, 0.05, 0.95)   # rosso cupo: il fallimento critico
+	_etichetta.add_theme_color_override("font_color", colore)
+	_etichetta.add_theme_color_override("font_outline_color", contorno)
+	_etichetta.pivot_offset = _etichetta.size * 0.5
+	_etichetta.scale = Vector2(1.6, 1.6)
+	var tw: Tween = _etichetta.create_tween()
+	tw.tween_property(_etichetta, "scale", Vector2.ONE, 0.34) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _testo_dettaglio(singoli: PackedInt32Array) -> String:

@@ -71,6 +71,7 @@ func compra(mercante_id: String, item_id: String) -> bool:
 	GameState.announce("🛒 Comprato: %s per %d oro (restano %d monete)." % [
 		nome, prezzo, ProgressionManager.oro_totale(),
 	])
+	GameState.publish("oggetto:raccolto", { "id": item_id, "nome": nome })
 	return true
 
 
