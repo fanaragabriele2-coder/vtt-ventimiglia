@@ -1,0 +1,212 @@
+{
+	"_comment": "REGIONI VIVE del Mondo cucito Terra di Mezzo. Ogni regione: centro (x,y in pixel-mappa), raggio, pericolo 0-3 (alza il rischio di agguati in marcia e al campo), scena ambience (citta=vento, mare=acqua, dungeon=drone cupo, battaglia=tamburi, vuoto=nessun cambio), mostri del posto (nomi ESATTI di monsters.json, pescati per gli agguati) ed eventi di colore annunciati entrando. La regione di una posizione e' quella col centro piu' vicino entro il raggio; fuori da tutte vale il fallback. Campo 'meteo' (pioggia|cenere|nebbia|sereno): il tempo della regione, reso da WorldWeather quando la marcia ci entra.",
+	"fallback": {
+		"nome": "Terre Selvagge",
+		"pericolo": 1,
+		"scena": "citta",
+		"mostri": [
+			"Orco di Isengard",
+			"Goblin di Moria"
+		],
+		"eventi": [
+			"Brughiere sconfinate e vento tra le pietre: siete soli, o cosi' sembra.",
+			"Vecchie strade del Nord, sepolte dall'erba, corrono verso nessun dove."
+		],
+		"meteo": "pioggia"
+	},
+	"regioni": [
+		{
+			"nome": "Brea e le Terre di Mezzo occidentali",
+			"x": 1536,
+			"y": 1380,
+			"raggio": 420,
+			"pericolo": 0,
+			"scena": "citta",
+			"mostri": [
+				"Orco di Isengard"
+			],
+			"eventi": [
+				"Fumo di camini e siepi curate: la gente di Brea vive come se l'Ombra fosse solo una diceria.",
+				"Un carro di contadini vi supera: vi guardano con sospetto, ma vi augurano buon viaggio."
+			],
+			"meteo": "sereno"
+		},
+		{
+			"nome": "Bosco Atro",
+			"x": 500,
+			"y": 480,
+			"raggio": 620,
+			"pericolo": 2,
+			"scena": "dungeon",
+			"mostri": [
+				"Goblin di Moria",
+				"Orco di Isengard"
+			],
+			"eventi": [
+				"Gli alberi del Bosco Atro si chiudono sopra di voi: la luce muore a mezzogiorno.",
+				"Ragnatele spesse come corde pendono tra i rami. Qualcosa le ha tessute. Qualcosa di grosso.",
+				"Occhi gialli vi contano dal sottobosco, e spariscono quando alzate la torcia."
+			],
+			"meteo": "nebbia"
+		},
+		{
+			"nome": "Campi di Rohan",
+			"x": 1600,
+			"y": 380,
+			"raggio": 620,
+			"pericolo": 1,
+			"scena": "citta",
+			"mostri": [
+				"Uomo Selvaggio di Dunland",
+				"Orco di Isengard"
+			],
+			"eventi": [
+				"Erba fino alla cintola e cielo largo come il mare: siete nella Marca dei Cavalieri.",
+				"Mandrie di cavalli all'orizzonte: i signori di Rohan vegliano anche quando non li vedete.",
+				"Un corno lontano, tre note: i Rohirrim si chiamano di colle in colle."
+			],
+			"meteo": "sereno"
+		},
+		{
+			"nome": "Nen Hithoel",
+			"x": 2600,
+			"y": 430,
+			"raggio": 520,
+			"pericolo": 1,
+			"scena": "mare",
+			"mostri": [
+				"Corsaro di Umbar",
+				"Uruk-hai"
+			],
+			"eventi": [
+				"Il grande lago Nen Hithoel riflette un cielo di piombo tra le braccia dell'Emyn Muil.",
+				"Relitti di barche elfiche marciscono sulla riva: qualcuno e' passato di qui, in fretta."
+			],
+			"meteo": "pioggia"
+		},
+		{
+			"nome": "Guado di Bruinen",
+			"x": 2720,
+			"y": 1470,
+			"raggio": 520,
+			"pericolo": 1,
+			"scena": "mare",
+			"mostri": [
+				"Orco di Isengard",
+				"Goblin di Moria"
+			],
+			"eventi": [
+				"Il Bruinen corre chiaro e freddo: oltre il guado comincia la terra protetta degli Elfi.",
+				"L'acqua del fiume sembra vegliare: qui l'antica magia non e' un ricordo."
+			],
+			"meteo": "sereno"
+		},
+		{
+			"nome": "Soglie di Moria",
+			"x": 500,
+			"y": 1500,
+			"raggio": 560,
+			"pericolo": 3,
+			"scena": "dungeon",
+			"mostri": [
+				"Goblin di Moria",
+				"Troll delle Caverne"
+			],
+			"eventi": [
+				"La parete grigia di Moria vi sovrasta: sotto la montagna, il buio ha fame.",
+				"Tamburi. Lontani, sotto la roccia. Doom. Doom.",
+				"Ossa di nani e frecce spezzate tra i sassi: qui la montagna non perdona."
+			],
+			"meteo": "nebbia"
+		},
+		{
+			"nome": "Emyn Muil",
+			"x": 460,
+			"y": 2620,
+			"raggio": 560,
+			"pericolo": 2,
+			"scena": "dungeon",
+			"mostri": [
+				"Uruk-hai",
+				"Orco di Isengard"
+			],
+			"eventi": [
+				"Un labirinto di lame di pietra: l'Emyn Muil taglia gli stivali e la pazienza.",
+				"Ogni cresta e' uguale alla precedente: senza una guida, qui si gira in tondo per giorni."
+			],
+			"meteo": "nebbia"
+		},
+		{
+			"nome": "Campi del Pelennor",
+			"x": 1500,
+			"y": 2620,
+			"raggio": 560,
+			"pericolo": 2,
+			"scena": "battaglia",
+			"mostri": [
+				"Uruk-hai",
+				"Arciere Haradrim",
+				"Capitano Uruk-hai"
+			],
+			"eventi": [
+				"I campi che furono d'oro sono neri di cenere: qui si decide la sorte degli Uomini.",
+				"Colonne di fumo salgono verso Minas Tirith: la citta' bianca resiste, per ora.",
+				"Il terreno trema del passo dei Mumakil, da qualche parte oltre il fumo."
+			],
+			"meteo": "cenere"
+		},
+		{
+			"nome": "Paludi Morte",
+			"x": 2620,
+			"y": 2720,
+			"raggio": 520,
+			"pericolo": 3,
+			"scena": "dungeon",
+			"mostri": [
+				"Spettro della Palude"
+			],
+			"eventi": [
+				"Acqua nera e immobile a perdita d'occhio: sotto la superficie, visi pallidi dormono.",
+				"Piccole fiamme si accendono sull'acqua morta. Non seguitele. Per nulla al mondo.",
+				"Il fango tira le caviglie come mani. Forse SONO mani."
+			],
+			"meteo": "nebbia"
+		},
+		{
+			"nome": "Cirith Ungol",
+			"x": 2950,
+			"y": 2400,
+			"raggio": 470,
+			"pericolo": 3,
+			"scena": "dungeon",
+			"mostri": [
+				"Uruk-hai",
+				"Arciere Haradrim"
+			],
+			"eventi": [
+				"Il passo sale tra guglie nere: l'aria sa di veleno rappreso e di cose antiche.",
+				"Bozzoli avvizziti crocchiano sotto i piedi. Qualcosa, quassu', mangia da secoli."
+			],
+			"meteo": "cenere"
+		},
+		{
+			"nome": "Il Morannon",
+			"x": 900,
+			"y": 2950,
+			"raggio": 520,
+			"pericolo": 3,
+			"scena": "battaglia",
+			"mostri": [
+				"Uruk-hai",
+				"Troll delle Caverne",
+				"Corsaro di Umbar"
+			],
+			"eventi": [
+				"I Cancelli Neri sbarrano la gola tra i monti: oltre, l'Occhio non dorme mai.",
+				"Colonne d'orchi marciano all'orizzonte, migliaia di torce nella polvere.",
+				"La terra stessa qui e' ostile: cenere, spine di ferro e pozze che bruciano."
+			],
+			"meteo": "cenere"
+		}
+	]
+}

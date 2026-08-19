@@ -2,3 +2,10 @@ node_modules/
 *.log
 dist/
 legacy/
+
+# Cache d'import dell'editor Godot: rigenerata in automatico all'apertura del progetto,
+# non va mai versionata (per lo stesso motivo gli zip di consegna la escludono sempre).
+# I file *.import sono i metadati per-asset che Godot scrive ACCANTO al sorgente (non solo
+# dentro .godot/): stessa storia, stessa esclusione.
+godot/.godot/
+godot/**/*.import

@@ -1,0 +1,50 @@
+{
+	"_comment": "QUEST della Terra di Mezzo. Ogni NPC sta in un LUOGO della mappa (nome esatto di un'etichetta): il suo marker '!' compare accanto al posto, si parla (e si riscuote) solo da vicino. tipo 'caccia': abbatti 'quanti' nemici con catalogId 'bersaglio' (id di monsters.json), il conteggio corre da solo in combattimento. tipo 'visita': raggiungi il luogo 'bersaglio'. Completata la quest, si TORNA dall'NPC a riscuotere la ricompensa (items/oro/XP).",
+	"quests": [
+		{
+			"id": "strade-sicure",
+			"npc": "Omorzo Cactaceo, oste del Puledro Impennato",
+			"luogo": "Brea",
+			"titolo": "Strade sicure fino a Brea",
+			"descrizione": "«Forestieri! Gli orchi di Isengard battono le strade e i carri non arrivano piu'. Ripulite la zona da TRE di quei tagliagole e al vostro ritorno berrete e mangerete a spese della casa — con qualcosa di sonante per il disturbo.»",
+			"tipo": "caccia", "bersaglio": "orco-isengard", "quanti": 3,
+			"ricompensa": { "items": ["healingPotion"], "gold": 40, "xp": 120 }
+		},
+		{
+			"id": "lupi-della-marca",
+			"npc": "Éomund, scudiero di Rohan",
+			"luogo": "Campi di Rohan",
+			"titolo": "I selvaggi di Dunland",
+			"descrizione": "«Gli uomini di Dunland bruciano le fattorie ai confini della Marca, aizzati da Isengard. Il mio eored e' a sud col re: abbattetene TRE e Rohan sapra' ricompensare il vostro coraggio.»",
+			"tipo": "caccia", "bersaglio": "uomo-selvaggio", "quanti": 3,
+			"ricompensa": { "items": ["r-cuoio-rinforzato"], "gold": 60, "xp": 150 }
+		},
+		{
+			"id": "occhi-su-moria",
+			"npc": "Lindir, sentinella elfica",
+			"luogo": "Guado di Bruinen",
+			"titolo": "Occhi sul Cancello Ovest",
+			"descrizione": "«Da settimane nessun viandante torna da ovest, e le acque portano voci cattive. Andate fino al Cancello Ovest di Moria e guardate con i VOSTRI occhi cio' che vi si muove davanti: la notizia, qualunque sia, vale una ricompensa.»",
+			"tipo": "visita", "bersaglio": "Cancello Ovest di Moria",
+			"ricompensa": { "items": ["r-pozione-maggiore"], "gold": 30, "xp": 100 }
+		},
+		{
+			"id": "difesa-pelennor",
+			"npc": "Beregond, capitano della Guardia",
+			"luogo": "Campi del Pelennor",
+			"titolo": "Alleggerite l'assedio",
+			"descrizione": "«Ogni Uruk che cade fuori dalle mura e' una scala in meno contro di esse. Abbattetene QUATTRO sul campo e la Citta' Bianca vi paghera' come paga i suoi migliori: in oro, e in cio' che tiene vivi.»",
+			"tipo": "caccia", "bersaglio": "uruk-hai", "quanti": 4,
+			"ricompensa": { "items": ["e-elisir-rinascita"], "gold": 100, "xp": 200 }
+		},
+		{
+			"id": "luci-morte",
+			"npc": "Anborn, vecchio pescatore dell'Anduin",
+			"luogo": "Nen Hithoel",
+			"titolo": "Le luci che chiamano",
+			"descrizione": "«Mio nipote ha seguito le luci nelle Paludi, come suo padre prima di lui. Nessuno torna. Spegnete DUE di quegli spettri d'acqua morta e vi daro' tutto l'oro che ho messo da parte: a me ormai serve solo pace.»",
+			"tipo": "caccia", "bersaglio": "spettro-palude", "quanti": 2,
+			"ricompensa": { "items": ["healingPotion"], "gold": 50, "xp": 130 }
+		}
+	]
+}

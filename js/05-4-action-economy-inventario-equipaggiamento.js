@@ -1105,9 +1105,39 @@
         return true;
       }
 
+      // Registra nuovi oggetti nel catalogo a runtime (usato dall'Armeria, modulo 41, per armi/
+      // armature/amuleti con rarita'). Aggiorna sia il catalogo interno sia la copia pubblica
+      // (usata per i nomi dal sistema di loot) e la select "Aggiungi oggetto". Id gia' presenti
+      // vengono ignorati (idempotente).
+      function registerCatalogItems(items) {
+        if (!Array.isArray(items)) {
+          return 0;
+        }
+        let aggiunti = 0;
+        items.forEach(function registraVoce(item) {
+          if (!item || !item.id || !item.name) {
+            return;
+          }
+          const esiste = itemCatalog.some(function (c) { return c.id === item.id; });
+          if (esiste) {
+            return;
+          }
+          const voce = cloneData(item);
+          if (!Array.isArray(voce.compatibleSlots)) { voce.compatibleSlots = []; }
+          itemCatalog.push(voce);
+          window.UltimateVTTInventory.itemCatalog.push(cloneData(voce));
+          aggiunti += 1;
+        });
+        if (aggiunti > 0) {
+          renderInventorySelect();
+        }
+        return aggiunti;
+      }
+
       window.UltimateVTTInventory = {
         equipmentSlotDefinitions: cloneData(equipmentSlotDefinitions),
         itemCatalog: cloneData(itemCatalog),
+        registerCatalogItems: registerCatalogItems,
         spellCatalog: cloneData(spellCatalog),
         getState: function getInventoryState() {
           return cloneData(inventoryState);

@@ -18,15 +18,15 @@
           desc:"d10 HP, mischia robusta" },
         { id:"barbaro", name:"Barbaro", hitDie:12, saves:["str","con"], skills:["athletics","intimidation"],
           arr:{str:15,con:14,dex:13,wis:10,cha:8,int:8},
-          equip:[{c:"longsword",q:1,slot:"mainHand"},{c:"dagger",q:2},{c:"leatherArmor",q:1,slot:"armor"},{c:"healingPotion",q:2},{c:"rations",q:5}],
+          equip:[{c:"longsword",q:1,slot:"mainHand"},{c:"dagger",q:2,slot:"offHand"},{c:"leatherArmor",q:1,slot:"armor"},{c:"healingPotion",q:2},{c:"rations",q:5}],
           desc:"d12 HP, ira e forza" },
         { id:"ladro", name:"Ladro", hitDie:8, saves:["dex","int"], skills:["stealth","sleightOfHand"],
           arr:{dex:15,int:14,con:13,wis:12,cha:10,str:8},
-          equip:[{c:"shortsword",q:1,slot:"mainHand"},{c:"dagger",q:2},{c:"leatherArmor",q:1,slot:"armor"},{c:"thievesTools",q:1},{c:"healingPotion",q:1},{c:"rope",q:1}],
+          equip:[{c:"shortsword",q:1,slot:"mainHand"},{c:"dagger",q:2,slot:"offHand"},{c:"leatherArmor",q:1,slot:"armor"},{c:"thievesTools",q:1},{c:"healingPotion",q:1},{c:"rope",q:1}],
           desc:"d8 HP, furtivita e colpi precisi" },
         { id:"ranger", name:"Ranger", hitDie:10, saves:["str","dex"], skills:["survival","nature"],
           arr:{dex:15,con:14,wis:13,str:12,int:10,cha:8},
-          equip:[{c:"shortbow",q:1,slot:"mainHand"},{c:"shortsword",q:1},{c:"leatherArmor",q:1,slot:"armor"},{c:"healingPotion",q:1},{c:"rations",q:5}],
+          equip:[{c:"shortbow",q:1,slot:"mainHand"},{c:"shortsword",q:1,slot:"offHand"},{c:"leatherArmor",q:1,slot:"armor"},{c:"healingPotion",q:1},{c:"rations",q:5}],
           desc:"d10 HP, distanza e natura" },
         { id:"mago", name:"Mago", hitDie:6, saves:["int","wis"], skills:["arcana","investigation"],
           arr:{int:15,con:14,dex:13,wis:12,cha:10,str:8}, spellcaster:true,
@@ -169,9 +169,16 @@
         bAdd.onclick=function(){ var b=buildFromForm(); if(b){ party.push(b); renderCreate(); } };
         var bStart=el("button","vsm-btn go","🎲  INIZIA L'AVVENTURA");
         bStart.onclick=function(){
-          var solo=buildFromForm();
           var list=party.slice();
-          if(solo) list.push(solo);
+          // Il form corrente conta come personaggio SOLO se non e' gia' stato esplicitamente
+          // aggiunto al party (altrimenti "INIZIA L'AVVENTURA" aggiungeva sempre un PG in piu',
+          // preso da qualunque razza/classe/nome fosse rimasta nel form, anche dopo che l'utente
+          // aveva gia' creato il party voluto con "AGGIUNGI AL PARTY" — es. 2 PG creati apposta
+          // diventavano 3, col terzo "a caso" mai richiesto).
+          if(!list.length){
+            var solo=buildFromForm();
+            if(solo) list.push(solo);
+          }
           if(!list.length){ msg("Crea almeno un personaggio."); return; }
           startAdventure(list);
         };

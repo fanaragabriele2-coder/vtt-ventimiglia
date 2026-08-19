@@ -1,0 +1,32 @@
+[
+	{
+		"nome": "Cortile",
+		"x": 1024,
+		"y": 1152
+	},
+	{
+		"nome": "Sala del Trono",
+		"x": 1024,
+		"y": 469
+	},
+	{
+		"nome": "La Breccia",
+		"x": 1792,
+		"y": 1152
+	},
+	{
+		"nome": "Prigione",
+		"x": 3115,
+		"y": 1152
+	},
+	{
+		"nome": "Catacombe",
+		"x": 2987,
+		"y": 683
+	},
+	{
+		"nome": "Camera Rituale",
+		"x": 2560,
+		"y": 683
+	}
+]

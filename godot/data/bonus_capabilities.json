@@ -1,0 +1,99 @@
+{
+ "_comment": "Capacita' di classe/razza per il menu Azione Bonus dinamico — porting di CAPACITA_CLASSE/CAPACITA_RAZZA del Modulo 38. effetto: come si risolve (curaSe|annuncio|movimento); kind: risorsa spesa.",
+ "classe": {
+  "guerriero": [
+   {
+    "id": "second-wind",
+    "etichetta": "Recupero Energie",
+    "kind": "bonusAction",
+    "effetto": "curaSe",
+    "formula": "1d10",
+    "scalaLivello": true,
+    "descrizione": "Recuperi 1d10 + livello HP."
+   },
+   {
+    "id": "action-surge",
+    "etichetta": "Azione Impetuosa",
+    "kind": "bonusAction",
+    "effetto": "azioneExtra",
+    "descrizione": "Una volta per scontro: RECUPERI l'azione di questo turno (attacca due volte, o attacca e Scatta)."
+   }
+  ],
+  "barbaro": [
+   {
+    "id": "rage",
+    "etichetta": "Ira",
+    "kind": "bonusAction",
+    "effetto": "furia",
+    "descrizione": "FURIA per 3 round: +2 danni in mischia e META' danni subiti. Il sangue chiama sangue."
+   }
+  ],
+  "ladro": [
+   {
+    "id": "cunning-action",
+    "etichetta": "Azione Scaltra (Scatto)",
+    "kind": "bonusAction",
+    "effetto": "movimento",
+    "descrizione": "Scatto/Disimpegno/Nascondersi come azione bonus."
+   }
+  ],
+  "ranger": [
+   {
+    "id": "hunters-mark",
+    "etichetta": "Marchio del Cacciatore",
+    "kind": "bonusAction",
+    "effetto": "annuncio",
+    "descrizione": "Marchi un bersaglio: danni extra sui tuoi colpi."
+   }
+  ],
+  "mago": [
+   {
+    "id": "misty-step",
+    "etichetta": "Passo Nebbioso",
+    "kind": "bonusAction",
+    "effetto": "movimento",
+    "descrizione": "Ti teletrasporti per un breve tratto (movimento extra)."
+   }
+  ],
+  "chierico": [
+   {
+    "id": "healing-word",
+    "etichetta": "Parola Guaritrice",
+    "kind": "bonusAction",
+    "effetto": "curaSe",
+    "formula": "1d4",
+    "scalaLivello": false,
+    "descrizione": "Curi 1d4 + mod. a distanza."
+   }
+  ]
+ },
+ "razza": {
+  "mezzorco": [
+   {
+    "id": "relentless",
+    "etichetta": "Tenacia Feroce",
+    "kind": "bonusAction",
+    "effetto": "annuncio",
+    "descrizione": "La tua ferocia ti tiene in piedi: pronto a resistere."
+   }
+  ],
+  "elfo": [
+   {
+    "id": "trance-focus",
+    "etichetta": "Concentrazione Elfica",
+    "kind": "bonusAction",
+    "effetto": "annuncio",
+    "descrizione": "Ti concentri con lucidita' elfica sul prossimo colpo."
+   }
+  ],
+  "halfling": [
+   {
+    "id": "lucky-nudge",
+    "etichetta": "Fortuna Halfling",
+    "kind": "bonusAction",
+    "effetto": "annuncio",
+    "descrizione": "Sposti la fortuna a tuo favore."
+   }
+  ]
+ }
+}

@@ -1,0 +1,200 @@
+{
+	"_comment": "Tabelle XP e bottino — porting di XP_BY_NAME / LEVEL_XP / LOOT_BY_NAME del Modulo 15. xpByName: XP 5e per CR. levelXp: XP cumulativi per RAGGIUNGERE il livello (indice 0 = liv.1). lootByName: [catalogId, probabilita'].",
+	"xpByName": {
+		"Goblin": 50,
+		"Bandito": 25,
+		"Scheletro": 50,
+		"Lupo": 50,
+		"Orco": 100,
+		"Cultista": 25,
+		"Zombie": 50,
+		"Hobgoblin": 100,
+		"Goblin di Moria": 50,
+		"Uomo Selvaggio di Dunland": 50,
+		"Orco di Isengard": 100,
+		"Corsaro di Umbar": 100,
+		"Uruk-hai": 200,
+		"Arciere Haradrim": 200,
+		"Capitano Uruk-hai": 450,
+		"Spettro della Palude": 100,
+		"Troll delle Caverne": 700,
+		"Grima Vermilinguo": 100,
+		"Guardiano nell'Acqua": 1100,
+		"Khamûl lo Stregone Orientale": 1100,
+		"Akhorahil": 1100,
+		"Ren lo Sconvolto": 1100,
+		"Adûnaphel la Silente": 1100,
+		"Uvatha il Cavaliere": 1100,
+		"Hoarmurath di Dir": 1100,
+		"Dwar di Waw": 1100,
+		"Ji Indur Sventamorte": 1100,
+		"Saruman il Bianco": 3900,
+		"La Bocca di Sauron": 2300,
+		"Il Re Stregone di Angmar": 5900,
+		"Drago delle Montagne Grigie": 8400,
+		"Shelob": 5900,
+		"Balrog di Morgoth": 13000
+	},
+	"levelXp": [
+		0,
+		300,
+		900,
+		2700,
+		6500,
+		14000,
+		23000,
+		34000,
+		48000,
+		64000,
+		85000,
+		100000,
+		120000,
+		140000,
+		165000,
+		195000,
+		225000,
+		265000,
+		305000,
+		355000
+	],
+	"lootByName": {
+		"Goblin": [
+			[
+				"dagger",
+				0.6
+			],
+			[
+				"healingPotion",
+				0.25
+			],
+			[
+				"rations",
+				0.4
+			],
+			[
+				"torch",
+				0.3
+			]
+		],
+		"Bandito": [
+			[
+				"shortsword",
+				0.4
+			],
+			[
+				"dagger",
+				0.5
+			],
+			[
+				"healingPotion",
+				0.3
+			],
+			[
+				"rope",
+				0.2
+			],
+			[
+				"thievesTools",
+				0.15
+			]
+		],
+		"Scheletro": [
+			[
+				"shortbow",
+				0.35
+			],
+			[
+				"dagger",
+				0.4
+			],
+			[
+				"torch",
+				0.25
+			]
+		],
+		"Lupo": [
+			[
+				"rations",
+				0.6
+			]
+		],
+		"Orco": [
+			[
+				"longsword",
+				0.45
+			],
+			[
+				"chainShirt",
+				0.2
+			],
+			[
+				"healingPotion",
+				0.3
+			],
+			[
+				"rations",
+				0.4
+			]
+		],
+		"Cultista": [
+			[
+				"dagger",
+				0.5
+			],
+			[
+				"arcaneFocus",
+				0.25
+			],
+			[
+				"healingPotion",
+				0.35
+			]
+		],
+		"Zombie": [
+			[
+				"rations",
+				0.3
+			],
+			[
+				"torch",
+				0.2
+			]
+		],
+		"Hobgoblin": [
+			[
+				"shortsword",
+				0.45
+			],
+			[
+				"studdedLeather",
+				0.25
+			],
+			[
+				"shield",
+				0.3
+			],
+			[
+				"healingPotion",
+				0.4
+			]
+		]
+	},
+	"lootFallback": [
+		[
+			"healingPotion",
+			0.3
+		],
+		[
+			"dagger",
+			0.3
+		],
+		[
+			"rations",
+			0.4
+		],
+		[
+			"torch",
+			0.3
+		]
+	]
+}

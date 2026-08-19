@@ -1,0 +1,13 @@
+{
+	"_comment": "Razze — porting di RACES del Modulo 14 (creazione personaggio). bonus: punti aggiunti alle caratteristiche base scelte dal giocatore. speed in metri.",
+	"races": [
+		{ "id": "umano",     "name": "Umano",     "bonus": { "str": 1, "dex": 1, "con": 1, "int": 1, "wis": 1, "cha": 1 }, "speed": 9,   "desc": "+1 a tutte le caratteristiche" },
+		{ "id": "elfo",      "name": "Elfo",      "bonus": { "dex": 2 },               "speed": 9,   "skill": "perception",    "desc": "+2 DES, scurovisione, percezione" },
+		{ "id": "nano",      "name": "Nano",      "bonus": { "con": 2 },               "speed": 7.5, "desc": "+2 COS, scurovisione, resist. veleno" },
+		{ "id": "halfling",  "name": "Halfling",  "bonus": { "dex": 2 },               "speed": 7.5, "desc": "+2 DES, fortunato, agile" },
+		{ "id": "mezzorco",  "name": "Mezzorco",  "bonus": { "str": 2, "con": 1 },     "speed": 9,   "skill": "intimidation",  "desc": "+2 FOR +1 COS, resist. feroce" },
+		{ "id": "tiefling",  "name": "Tiefling",  "bonus": { "cha": 2, "int": 1 },     "speed": 9,   "desc": "+2 CAR +1 INT, resist. fuoco" },
+		{ "id": "draconide", "name": "Draconide", "bonus": { "str": 2, "cha": 1 },     "speed": 9,   "desc": "+2 FOR +1 CAR, soffio draconico" },
+		{ "id": "gnomo",     "name": "Gnomo",     "bonus": { "int": 2 },               "speed": 7.5, "desc": "+2 INT, scurovisione, astuzia" }
+	]
+}

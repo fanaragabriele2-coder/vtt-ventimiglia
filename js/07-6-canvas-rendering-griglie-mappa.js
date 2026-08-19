@@ -14,6 +14,69 @@
       const context = canvas.getContext("2d");
       const worldRenderers = [];
 
+      // ---------------------------------------------------------------------------------------
+      // CACHE OFFSCREEN dei layer statici (Task 3 — performance). Prima OGNI frame ridisegnava
+      // TUTTA la griglia cella per cella: 32x24 = 768 celle x (fillRect terreno + rumore
+      // procedurale + fillRect nebbia) = ~1600 operazioni canvas per frame, anche quando terreno
+      // e nebbia non erano cambiati affatto (es. durante il semplice drag di un token). Ora:
+      //   - il TERRENO + GRIGLIA vivono in un canvas offscreen, ridisegnato SOLO quando cambiano
+      //     davvero (rigenerazione, ostacoli dell'arena, palette, toggle griglia, resize);
+      //   - la NEBBIA vive in un secondo canvas offscreen, ridisegnata SOLO quando il Master
+      //     rivela/nasconde celle;
+      //   - il frame "caldo" si riduce a: 2 drawImage (blit accelerati dalla GPU: un canvas
+      //     world-size copiato con la trasformazione gia' attiva) + i token dinamici + il
+      //     riquadro hover. E' la differenza tra "ricalcolare la scena" e "incollare una foto".
+      // Le statistiche (frame totali vs ridisegni pieni) sono esposte via getRenderStats() sia
+      // per i test (verificano che la cache NON venga ributtata via a ogni frame) sia per la
+      // diagnostica dal vivo.
+      // ---------------------------------------------------------------------------------------
+      const cacheStatica = {
+        terreno: null, terrenoCtx: null, terrenoSporco: true,
+        nebbia: null, nebbiaCtx: null, nebbiaSporca: true,
+        larghezza: 0, altezza: 0, scala: 0
+      };
+      const renderStats = { frames: 0, terrainRedraws: 0, fogRedraws: 0 };
+
+      function invalidaTerreno() { cacheStatica.terrenoSporco = true; }
+      function invalidaNebbia() { cacheStatica.nebbiaSporca = true; }
+
+      function assicuraCanvasCache() {
+        const w = mapState.columns * mapState.gridSize;
+        const h = mapState.rows * mapState.gridSize;
+        const scala = mapState.viewport.scale;
+        // Dimensioni del mondo o scala cambiate (resize/griglia): le superfici vanno ricreate e
+        // ridisegnate — la larghezza delle linee di griglia dipende dalla scala per restare ~1px
+        // a schermo, quindi anche un semplice resize invalida il layer statico.
+        if (!cacheStatica.terreno || cacheStatica.larghezza !== w || cacheStatica.altezza !== h || Math.abs(cacheStatica.scala - scala) > 0.0001) {
+          cacheStatica.terreno = document.createElement("canvas");
+          cacheStatica.terreno.width = w; cacheStatica.terreno.height = h;
+          cacheStatica.terrenoCtx = cacheStatica.terreno.getContext("2d");
+          cacheStatica.nebbia = document.createElement("canvas");
+          cacheStatica.nebbia.width = w; cacheStatica.nebbia.height = h;
+          cacheStatica.nebbiaCtx = cacheStatica.nebbia.getContext("2d");
+          cacheStatica.larghezza = w; cacheStatica.altezza = h; cacheStatica.scala = scala;
+          cacheStatica.terrenoSporco = true;
+          cacheStatica.nebbiaSporca = true;
+        }
+      }
+
+      function aggiornaCacheStatiche() {
+        assicuraCanvasCache();
+        if (cacheStatica.terrenoSporco) {
+          cacheStatica.terrenoCtx.clearRect(0, 0, cacheStatica.larghezza, cacheStatica.altezza);
+          drawTerrainLayer(cacheStatica.terrenoCtx);
+          drawGridLayer(cacheStatica.terrenoCtx);
+          cacheStatica.terrenoSporco = false;
+          renderStats.terrainRedraws += 1;
+        }
+        if (cacheStatica.nebbiaSporca) {
+          cacheStatica.nebbiaCtx.clearRect(0, 0, cacheStatica.larghezza, cacheStatica.altezza);
+          drawFogLayer(cacheStatica.nebbiaCtx);
+          cacheStatica.nebbiaSporca = false;
+          renderStats.fogRedraws += 1;
+        }
+      }
+
       const terrainPalettes = {
         dungeon: {
           stone: "#2b2a2c",
@@ -194,6 +257,7 @@
             mapState.terrainCells.push(chooseTerrainForCell(x, y));
           }
         }
+        invalidaTerreno();
       }
 
       function fillFog(hidden) {
@@ -202,6 +266,7 @@
         for (let index = 0; index < mapState.columns * mapState.rows; index += 1) {
           mapState.fogCells.push(Boolean(hidden));
         }
+        invalidaNebbia();
       }
 
       function revealCircle(centerX, centerY, radius) {
@@ -214,8 +279,10 @@
 
       function initializeMapCells() {
         generateTerrain();
-        fillFog(true);
-        revealCircle(Math.floor(mapState.columns / 2), Math.floor(mapState.rows / 2), 5);
+        // La mappa parte tutta VISIBILE: la nebbia di guerra e' uno strumento che il Master attiva
+        // quando serve ("Tutto Buio" / pennello Nascondi), non un sipario nero che all'avvio copre
+        // quasi tutta la scena rendendo il tavolo illeggibile.
+        fillFog(false);
       }
 
       function resizeCanvasToDisplaySize() {
@@ -263,7 +330,24 @@
         return getTerrainAt(cellX, cellY) === "wall";
       }
 
-      function drawTerrainLayer() {
+      // Scrive il terreno di UNA cella (usato dall'arena tattica, modulo 40, per piazzare ostacoli
+      // e coperture a inizio combattimento). Terreni validi: stone/earth/water/wall.
+      function setTerrainAt(cellX, cellY, terrain) {
+        if (!isCellInBounds(cellX, cellY)) {
+          return false;
+        }
+        const valid = ["stone", "earth", "water", "wall"];
+        if (valid.indexOf(terrain) < 0) {
+          return false;
+        }
+        mapState.terrainCells[cellIndex(cellX, cellY)] = terrain;
+        invalidaTerreno();
+        return true;
+      }
+
+      // I layer statici disegnano su un context PASSATO (quello della cache offscreen): il
+      // frame caldo non li chiama piu' direttamente, li incolla gia' pronti con un drawImage.
+      function drawTerrainLayer(ctx) {
         const palette = terrainPalettes[mapState.terrainMode] || terrainPalettes.dungeon;
 
         for (let y = 0; y < mapState.rows; y += 1) {
@@ -274,59 +358,50 @@
             const drawX = x * mapState.gridSize;
             const drawY = y * mapState.gridSize;
 
-            context.fillStyle = adjustHexColor(baseColor, variation);
-            context.fillRect(drawX, drawY, mapState.gridSize, mapState.gridSize);
+            ctx.fillStyle = adjustHexColor(baseColor, variation);
+            ctx.fillRect(drawX, drawY, mapState.gridSize, mapState.gridSize);
 
             if (terrain === "water") {
-              context.fillStyle = "rgba(91, 183, 200, 0.12)";
-              context.fillRect(drawX + 3, drawY + 3, mapState.gridSize - 6, mapState.gridSize - 6);
+              ctx.fillStyle = "rgba(91, 183, 200, 0.12)";
+              ctx.fillRect(drawX + 3, drawY + 3, mapState.gridSize - 6, mapState.gridSize - 6);
             }
 
             if (terrain === "wall") {
-              context.fillStyle = "rgba(0, 0, 0, 0.28)";
-              context.fillRect(drawX + 4, drawY + 4, mapState.gridSize - 8, mapState.gridSize - 8);
+              ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+              ctx.fillRect(drawX + 4, drawY + 4, mapState.gridSize - 8, mapState.gridSize - 8);
             }
           }
         }
       }
 
-      function drawGridLayer() {
+      function drawGridLayer(ctx) {
         if (!mapState.showGrid) {
           return;
         }
 
-        context.save();
-        context.strokeStyle = "rgba(216, 199, 163, 0.24)";
-        context.lineWidth = 1 / Math.max(mapState.viewport.scale, 0.01);
+        ctx.save();
+        ctx.strokeStyle = "rgba(216, 199, 163, 0.24)";
+        ctx.lineWidth = 1 / Math.max(mapState.viewport.scale, 0.01);
 
         for (let x = 0; x <= mapState.columns; x += 1) {
           const worldX = x * mapState.gridSize;
-          context.beginPath();
-          context.moveTo(worldX, 0);
-          context.lineTo(worldX, mapState.viewport.worldHeight);
-          context.stroke();
+          ctx.beginPath();
+          ctx.moveTo(worldX, 0);
+          ctx.lineTo(worldX, mapState.viewport.worldHeight);
+          ctx.stroke();
         }
 
         for (let y = 0; y <= mapState.rows; y += 1) {
           const worldY = y * mapState.gridSize;
-          context.beginPath();
-          context.moveTo(0, worldY);
-          context.lineTo(mapState.viewport.worldWidth, worldY);
-          context.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, worldY);
+          ctx.lineTo(mapState.viewport.worldWidth, worldY);
+          ctx.stroke();
         }
 
-        context.fillStyle = "rgba(216, 199, 163, 0.46)";
-        context.font = "10px Arial, Helvetica, sans-serif";
-        context.textAlign = "left";
-        context.textBaseline = "top";
-
-        for (let labelY = 0; labelY < mapState.rows; labelY += 4) {
-          for (let labelX = 0; labelX < mapState.columns; labelX += 4) {
-            context.fillText(labelX + "," + labelY, labelX * mapState.gridSize + 4, labelY * mapState.gridSize + 4);
-          }
-        }
-
-        context.restore();
+        // Niente etichette di coordinate ("4,8") stampate sul terreno: erano rumore tecnico sopra
+        // la scena. La cella sotto il cursore resta leggibile nel readout in fondo agli strumenti.
+        ctx.restore();
       }
 
       function drawWorldRenderers() {
@@ -345,19 +420,21 @@
         });
       }
 
-      function drawFogLayer() {
+      function drawFogLayer(ctx) {
         if (!mapState.fogEnabled) {
           return;
         }
 
+        // Nebbia meno invasiva: le celle nascoste restano leggibili come "zona ignota" (non un nero
+        // pieno), quelle visibili non vengono scurite quasi per niente — la mappa resta luminosa.
         for (let y = 0; y < mapState.rows; y += 1) {
           for (let x = 0; x < mapState.columns; x += 1) {
             if (isFogHidden(x, y)) {
-              context.fillStyle = "rgba(0, 0, 0, 0.82)";
-              context.fillRect(x * mapState.gridSize, y * mapState.gridSize, mapState.gridSize, mapState.gridSize);
+              ctx.fillStyle = "rgba(4, 3, 6, 0.72)";
+              ctx.fillRect(x * mapState.gridSize, y * mapState.gridSize, mapState.gridSize, mapState.gridSize);
             } else {
-              context.fillStyle = "rgba(0, 0, 0, 0.08)";
-              context.fillRect(x * mapState.gridSize, y * mapState.gridSize, mapState.gridSize, mapState.gridSize);
+              ctx.fillStyle = "rgba(0, 0, 0, 0.02)";
+              ctx.fillRect(x * mapState.gridSize, y * mapState.gridSize, mapState.gridSize, mapState.gridSize);
             }
           }
         }
@@ -390,13 +467,20 @@
         context.translate(mapState.viewport.offsetX, mapState.viewport.offsetY);
         context.scale(mapState.viewport.scale, mapState.viewport.scale);
 
-        drawTerrainLayer();
-        drawGridLayer();
+        // Frame CALDO (Task 3): i layer statici arrivano gia' pronti dalle cache offscreen — due
+        // blit invece di ~1600 fillRect per frame. Solo i token (dinamici) e l'hover si disegnano
+        // dal vivo. Le cache si ridisegnano SOLO se qualcosa le ha invalidate (vedi invalidaTerreno
+        // / invalidaNebbia): durante un semplice drag di token, qui non si ricalcola nulla.
+        aggiornaCacheStatiche();
+        context.drawImage(cacheStatica.terreno, 0, 0);
         drawWorldRenderers();
-        drawFogLayer();
+        if (mapState.fogEnabled) {
+          context.drawImage(cacheStatica.nebbia, 0, 0);
+        }
         drawHoverCell();
 
         context.restore();
+        renderStats.frames += 1;
         renderMapSummary();
       }
 
@@ -466,6 +550,7 @@
         }
 
         if (changed) {
+          invalidaNebbia();
           requestRender();
         }
 
@@ -582,6 +667,8 @@
           gridSizeInput.addEventListener("change", function handleGridSizeChange() {
             mapState.gridSize = clampNumber(gridSizeInput.value, 32, 96, 48);
             gridSizeInput.value = String(mapState.gridSize);
+            invalidaTerreno();
+            invalidaNebbia();
             requestRender();
           });
         }
@@ -606,6 +693,7 @@
         if (showGridCheckbox) {
           showGridCheckbox.addEventListener("change", function handleGridToggle() {
             mapState.showGrid = Boolean(showGridCheckbox.checked);
+            invalidaTerreno();
             requestRender();
           });
         }
@@ -727,6 +815,12 @@
         getGridMetrics: getGridMetrics,
         requestRender: requestRender,
         renderCanvasNow: renderCanvasNow,
+        // Statistiche del rendering (Task 3): frame totali vs ridisegni PIENI dei layer statici.
+        // In un client sano frames cresce di continuo mentre terrainRedraws/fogRedraws restano
+        // quasi fermi: se crescono insieme, qualcosa sta invalidando le cache a ogni frame.
+        getRenderStats: function getRenderStats() {
+          return { frames: renderStats.frames, terrainRedraws: renderStats.terrainRedraws, fogRedraws: renderStats.fogRedraws };
+        },
         regenerateMap: regenerateMap,
         setFogMode: setFogMode,
         fillFog: function publicFillFog(hidden) {
@@ -745,6 +839,11 @@
         isFogHidden: isFogHidden,
         isTerrainBlocking: isTerrainBlocking,
         getTerrainAt: getTerrainAt,
+        setTerrainAt: function publicSetTerrainAt(cellX, cellY, terrain) {
+          const ok = setTerrainAt(cellX, cellY, terrain);
+          if (ok) { requestRender(); }
+          return ok;
+        },
         worldToScreen: worldToScreen,
         screenToWorld: screenToWorld,
         screenToCell: screenToCell,

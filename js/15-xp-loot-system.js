@@ -36,6 +36,12 @@
     var items = [];
     table.forEach(function(row){ if (Math.random() < row[1]) items.push(row[0]); });
     var ref = XP_BY_NAME[bn] || 30;
+    // ARMERIA (modulo 41): drop di armi/armature/amuleti con RARITA' scalata sulla forza del
+    // nemico — piu' e' forte (XP/CR alto), piu' e' probabile un oggetto raro/epico/leggendario.
+    try {
+      var A = window.UltimateVTTArmeria;
+      if (A && A.rollDropNemico) { A.rollDropNemico(ref).forEach(function(id){ items.push(id); }); }
+    } catch(eArm){}
     var gold = Math.floor(Math.random() * Math.max(3, ref / 8)) + 1;
     return { items: items, gold: gold, enemyName: bn };
   }
@@ -108,10 +114,14 @@
     announce("⭐ LIVELLO " + toLvl + "! " + nameById(id) + " sale di livello: +" + hpGain + " HP max, competenza +" + prof + ".");
   }
 
-  function gainXp(amount, reason){
+  // targetId: a chi accreditare l'XP. Se omesso ricade su activeId() (il PG attualmente mostrato in
+  // hotseat) — corretto per le ricompense dirette del Master (completeQuest, tag [XP:n] in chat),
+  // ma NON per un'uccisione in combattimento: li' l'XP deve andare a chi ha davvero sferrato il
+  // colpo, non a chi capita di essere visualizzato quando il polling se ne accorge (vedi onEnemyDefeated).
+  function gainXp(amount, reason, targetId){
     amount = Math.max(0, Math.round(amount || 0));
     if (!amount) return;
-    var id = activeId(); var p = getProg(id);
+    var id = targetId || activeId(); var p = getProg(id);
     var from = p.level;
     p.xp += amount;
     announce("✨ +" + amount + " XP" + (reason ? (" — " + reason) : "") + " (" + nameById(id) + ").");
@@ -128,10 +138,37 @@
     for (var i=0;i<cat.length;i++){ if (cat[i].id === catId) return cat[i].name; }
     return catId;
   }
-  function onEnemyDefeated(c){
-    gainXp(xpForEnemy(c), "sconfitto " + baseName(c.name));
+  function onEnemyDefeated(c, killerId){
+    gainXp(xpForEnemy(c), "sconfitto " + baseName(c.name), killerId);
     var loot = lootForEnemy(c);
     if (loot.items.length || loot.gold){ lootQueue.push(loot); showNextLoot(); }
+  }
+
+  // ---- attribuzione dell'uccisione: chi ha davvero sferrato il colpo, non chi e' attivo ora ----
+  // combatState.lastRoll.title e' impostato da OGNI risoluzione di attacco (sia il resolver classico
+  // a due fasi sia resolveAttack() della HUD BG3) nel formato "NomeAttaccante vs NomeBersaglio" —
+  // path-agnostico, stesso principio gia' usato dal modulo 29 per la memoria di combattimento.
+  function attaccanteDelBersaglio(lastRoll, nomeBersaglio){
+    var titolo = lastRoll && lastRoll.title;
+    if (typeof titolo !== "string" || !nomeBersaglio) return null;
+    var suffisso = " vs " + nomeBersaglio;
+    if (titolo.length <= suffisso.length || titolo.slice(-suffisso.length) !== suffisso) return null;
+    return titolo.slice(0, titolo.length - suffisso.length);
+  }
+  // Il tracker di combattimento (js/06) ha UN SOLO slot per PG, sempre con id fisso "pc-local":
+  // solo il NOME viene risincronizzato a chi e' attivo in hotseat (syncPlayerCombatantFromState),
+  // l'id no. Percio' NON si puo' usare l'id del combattente per accreditare l'XP (sarebbe sempre
+  // "pc-local", un id fantasma su cui nessuna scheda/barra XP e' mai mostrata): si risale invece al
+  // vero id di progressione cercando il NOME nel roster hotseat (window.partyData), l'unico posto
+  // dove nome e id-di-progressione reale sono entrambi presenti insieme.
+  function trovaMembroPerNome(nome){
+    if (!nome) return null;
+    var lista = window.partyData || [];
+    for (var i = 0; i < lista.length; i++){
+      var m = lista[i];
+      if (m && m.identity && m.identity.name === nome) return m.identity.id;
+    }
+    return null;
   }
   function collectLoot(loot){
     var inv = window.UltimateVTTInventory;
@@ -155,7 +192,7 @@
       "#vttXpBar .xb-lvl{font-weight:700;color:#c89b3c;}" +
       "#vttXpBar .xb-name{font-size:11px;color:#b99f6b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:96px;}" +
       "#vttXpBar .xb-track{height:9px;background:rgba(0,0,0,.5);border-radius:5px;overflow:hidden;border:1px solid rgba(216,199,163,.16);}" +
-      "#vttXpBar .xb-fill{height:100%;background:linear-gradient(90deg,#5bb7c8,#c89b3c);transition:width .4s;}" +
+      "#vttXpBar .xb-fill{height:100%;width:100%;transform-origin:left center;background:linear-gradient(90deg,#5bb7c8,#c89b3c);transition:transform .4s;}" +
       "#vttXpBar .xb-bot{display:flex;justify-content:space-between;font-size:10px;color:#b99f6b;margin-top:4px;}" +
       "#vttLootPop{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(6,5,4,.66);font-family:Arial,Helvetica,sans-serif;}" +
       "#vttLootPop.show{display:flex;}" +
@@ -175,7 +212,7 @@
     injectStyle();
     var d = document.createElement("div"); d.id = "vttXpBar";
     d.innerHTML = '<div class="xb-top"><span class="xb-lvl" id="xbLvl">Liv 1</span><span class="xb-name" id="xbName">Eroe</span></div>' +
-      '<div class="xb-track"><div class="xb-fill" id="xbFill" style="width:0%"></div></div>' +
+      '<div class="xb-track"><div class="xb-fill" id="xbFill" style="transform:scaleX(0)"></div></div>' +
       '<div class="xb-bot"><span id="xbXp">0 / 300 XP</span><span id="xbGold">🪙 0</span></div>';
     var host = document.querySelector(".topbar-center") || document.querySelector(".topbar") || document.body;
     host.appendChild(d);
@@ -188,7 +225,8 @@
     set("xbName", nameById(id));
     set("xbXp", p.level >= 20 ? "MAX" : (b.cur + " / " + b.need + " XP"));
     set("xbGold", "🪙 " + (p.gold || 0));
-    var f = document.getElementById("xbFill"); if (f) f.style.width = b.pct + "%";
+    /* scaleX invece di width (Task 5): la barra XP anima in compositing, senza reflow della topbar. */
+    var f = document.getElementById("xbFill"); if (f) f.style.transform = "scaleX(" + (b.pct/100) + ")";
   }
 
   function ensurePop(){
@@ -212,7 +250,20 @@
     var sub = document.getElementById("lpSub"); if (sub) sub.textContent = loot.enemyName + " sconfitto";
     var box = document.getElementById("lpItems");
     if (box){
-      var rows = (loot.items || []).map(function(id){ return '<div class="lp-item">⚔️ ' + itemName(id) + '</div>'; });
+      var rows = (loot.items || []).map(function(id){
+        // Colore per rarita' (Armeria, modulo 41): il nome dell'oggetto brilla del suo colore.
+        var stile = "", badge = "";
+        try {
+          var A = window.UltimateVTTArmeria;
+          var rar = A && A.raritaDi ? A.raritaDi(id) : null;
+          if (rar && rar !== "comune") {
+            var col = A.coloreRarita(rar);
+            stile = ' style="border-color:' + col + ';color:' + col + '"';
+            badge = ' <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.85">[' + (A.RARITA[rar] ? A.RARITA[rar].etichetta : rar) + ']</span>';
+          }
+        } catch(eRar){}
+        return '<div class="lp-item"' + stile + '>⚔️ ' + itemName(id) + badge + '</div>';
+      });
       if (loot.gold) rows.push('<div class="lp-item lp-gold">🪙 ' + loot.gold + ' monete d\'oro</div>');
       if (!rows.length) rows.push('<div class="lp-item">Nessun oggetto.</div>');
       box.innerHTML = rows.join("");
@@ -236,7 +287,13 @@
       seen[c.id] = true;
       var dead = c.defeated || c.hitPoints <= 0;
       if (c.kind === "npc"){
-        if (dead && !deadSet[c.id]){ deadSet[c.id] = true; if (initialized) onEnemyDefeated(c); }
+        if (dead && !deadSet[c.id]){
+          deadSet[c.id] = true;
+          if (initialized){
+            var nomeUccisore = attaccanteDelBersaglio(st.lastRoll, c.name);
+            onEnemyDefeated(c, trovaMembroPerNome(nomeUccisore));
+          }
+        }
         else if (!dead && deadSet[c.id]){ deadSet[c.id] = false; }
       }
     });
@@ -262,7 +319,13 @@
   // API pubblica
   window.VTTProgression = {
     gainXp: gainXp, completeQuest: completeQuest, getProg: getProg,
-    renderXpBar: renderXpBar, _onEnemyDefeated: onEnemyDefeated
+    renderXpBar: renderXpBar, _onEnemyDefeated: onEnemyDefeated,
+    // logica pura (testabile): attribuzione dell'uccisione al vero autore del colpo, non a chi e'
+    // attivo in hotseat quando il polling se ne accorge.
+    attaccanteDelBersaglio: attaccanteDelBersaglio,
+    trovaMembroPerNome: trovaMembroPerNome,
+    // utile ai test: esegue un ciclo di polling reale (lo stesso richiamato da setInterval)
+    _pollCombat: function () { pollCombat(); }
   };
 
   function boot(){

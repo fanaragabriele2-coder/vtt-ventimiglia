@@ -75,10 +75,36 @@
           defaultReply: "Il Master lascia correre la scena per un respiro, poi riporta l'attenzione su di te."
         }
       ];
+      // ARCHITETTURA "SPLIT-RIG": Ollama NON gira piu' sulla stessa macchina del client. Il client
+      // (questo file) resta un laptop leggero che deve tenere 60+ FPS su canvas/nebbia/dadi 3D; il
+      // Master IA gira su un PC separato in rete locale con una GPU molto piu' potente (es. RTX
+      // 5080, 16GB VRAM), che quindi puo' permettersi modelli ben piu' grandi di llama3.1:8b senza
+      // vincoli di VRAM — il default resta conservativo (compatibile anche con chi usa Ollama in
+      // locale su un laptop), ma la scelta del modello si fa lato server: basta un "ollama pull"
+      // di un modello piu' grosso sulla macchina con la 5080, senza toccare questo file.
+      // L'INDIRIZZO del server e' configurabile (readOllamaHost/writeOllamaHost, persistito in
+      // localStorage) proprio per puntare a un IP diverso da quello del client — vedi il pulsante
+      // "Ollama IP" nel menu Master. tagsEndpoint/endpoint erano stringhe fisse: ora sono derivate
+      // a runtime da ollamaBaseUrl(), cosi' cambiare l'IP non richiede un reload del modulo.
+      const ollamaHostStorageKey = "ultimate-vtt-ollama-host";
+      function readOllamaHost() {
+        try { return window.localStorage.getItem(ollamaHostStorageKey) || "127.0.0.1:11434"; }
+        catch (e) { return "127.0.0.1:11434"; }
+      }
+      function writeOllamaHost(host) {
+        try { window.localStorage.setItem(ollamaHostStorageKey, host); } catch (e) { /* ignora */ }
+      }
+      function ollamaBaseUrl() {
+        var host = readOllamaHost().trim();
+        // Se l'utente incolla gia' uno schema (http://...), usalo cosi' com'e'; altrimenti assume
+        // "ip:porta" (il caso comune per un PC sulla stessa rete locale, niente HTTPS necessario).
+        return /^https?:\/\//i.test(host) ? host.replace(/\/+$/, "") : "http://" + host;
+      }
+      function ollamaTagsEndpoint() { return ollamaBaseUrl() + "/api/tags"; }
+      function ollamaChatEndpoint() { return ollamaBaseUrl() + "/api/chat"; }
+
       const ollamaMasterConfig = {
-        tagsEndpoint: "http://127.0.0.1:11434/api/tags",
-        endpoint: "http://127.0.0.1:11434/api/chat",
-        model: "mistral-nemo:12b",
+        model: "llama3.1:8b",
         pingTimeoutMs: 2500,
         timeoutMs: 45000
       };
@@ -95,6 +121,11 @@
       };
 
       const groqMasterStorageKey = "ultimate-vtt-groq-api-key";
+      // Resta VUOTA nel sorgente del repository (nessun segreto in chiaro nel codice condiviso su
+      // GitHub): usata solo come fallback quando localStorage non ha ancora una chiave salvata, cosi'
+      // una copia locale/personale del file (mai committata) puo' avere una chiave pre-impostata
+      // senza dover toccare il meccanismo di attivazione/salvataggio, che resta identico.
+      const DEFAULT_GROQ_API_KEY = "";
       const groqMasterConfig = {
         endpoint: "https://api.groq.com/openai/v1/chat/completions",
         model: "llama-3.3-70b-versatile",
@@ -107,6 +138,37 @@
         lastError: ""
       };
       const groqChatHistory = [];
+      // Riepilogo dell'ultimo combattimento concluso (impostato dal modulo 29, "memoria di
+      // combattimento"): persiste oltre la finestra scorrevole di groqChatHistory (16 messaggi),
+      // cosi' il Master non lo "dimentica" dopo qualche scambio, e viene incluso anche nel prompt
+      // di Ollama, che altrimenti e' del tutto stateless (nessuna cronologia tra una chiamata e l'altra).
+      let ultimoRiepilogoCombattimento = "";
+
+      // Diario di campagna a lungo termine (alimentato dal modulo 32, "memoria di campagna"): a
+      // differenza di ultimoRiepilogoCombattimento (un solo scontro, sovrascritto), qui si accumulano
+      // eventi chiave dell'INTERA sessione (combattimenti, spostamenti tra luoghi di Ventimiglia,
+      // level-up) — cosi' il Master resta coerente anche dopo ore di gioco, quando la cronologia
+      // scorrevole di Groq (16 messaggi) ha gia' fatto uscire scambi di molto tempo prima. Capato a
+      // un numero massimo di voci per non far esplodere il prompt (soprattutto verso Ollama locale,
+      // dove un prompt enorme rallenta molto su una GPU da laptop).
+      let diarioDiCampagna = [];
+      const DIARIO_CAMPAGNA_MAX_VOCI = 50;
+      function pushDiarioCampagna(testo) {
+        if (!testo) { return; }
+        diarioDiCampagna.push(String(testo));
+        if (diarioDiCampagna.length > DIARIO_CAMPAGNA_MAX_VOCI) {
+          diarioDiCampagna = diarioDiCampagna.slice(-DIARIO_CAMPAGNA_MAX_VOCI);
+        }
+      }
+
+      // Inietta un evento nella memoria REALE dell'IA (non solo nella chat visibile): stesso
+      // pattern gia' usato da passTurn() per la notifica di cambio turno, generalizzato per essere
+      // richiamabile da qualunque modulo tramite window.UltimateVTTCoreGameplay.notifyMasterMemory.
+      function pushSystemMemoria(text) {
+        if (groqMasterState.enabled && text) {
+          groqChatHistory.push({ role: "system", content: String(text) });
+        }
+      }
       const GROQ_HISTORY_LIMIT = 16;
 
       function getElement(id) {
@@ -194,7 +256,7 @@
         }
 
         if (announce) {
-          appendMasterChatMessage("system", "Modello locale Master: " + model.status + ".");
+          publicaChatMessage("system", "Modello locale Master: " + model.status + ".");
           appendSystemLog("Modello locale Master cambiato: " + model.status + ".");
         }
       }
@@ -268,7 +330,7 @@
           renderGroqMasterState();
         }
         renderOllamaMasterState();
-        appendMasterChatMessage("system", ollamaMasterState.enabled
+        publicaChatMessage("system", ollamaMasterState.enabled
           ? "Master Ollama attivo: " + ollamaMasterConfig.model + "."
           : "Master Ollama disattivato. Torno al Master offline.");
       }
@@ -295,6 +357,16 @@
         }
       }
 
+      // Separatore tra la NARRAZIONE (da mostrare parola per parola in chat) e i DATI di gioco
+      // strutturati (roll/spawn/moveTo/...). Prima l'intera risposta era un unico blob JSON
+      // ({"reply":"...", "roll":...}): perfetto per leggerlo tutto insieme, impossibile da
+      // mostrare in streaming senza far comparire sintassi JSON grezza a pezzi sullo schermo
+      // ("{"reply": "Il vento sfe" — illeggibile). Col separatore, tutto cio' che arriva PRIMA
+      // e' garantito essere prosa pura: si puo' mostrare in tempo reale, token dopo token, e
+      // congelare la bolla di chat nel momento esatto in cui il separatore compare, mentre i
+      // dati che seguono si accumulano in silenzio e si interpretano solo a risposta conclusa.
+      var SEPARATORE_DATI_MASTER = "<<DATI>>";
+
       function buildOllamaSystemPrompt(localSuggestion) {
         const activeName = getElement("characterIdentityPill") ? getElement("characterIdentityPill").textContent.trim() : "Player";
         const suggestionText = localSuggestion
@@ -305,12 +377,70 @@
           "Sei il Master di un gioco di ruolo fantasy in italiano, stile Baldur's Gate 3.",
           "Rispondi sempre in italiano con 1-3 frasi narrative, in prima persona come Master.",
           "Giocatore attivo: " + activeName + ".",
+          // Contesto nascosto col party REALE (HP/CA/caratteristiche/equipaggiamento correnti):
+          // prima mancava del tutto lato Ollama (Groq ce l'ha da tempo, buildGroqSystemPrompt piu'
+          // sotto) — il Master locale narrava "alla cieca", senza sapere quanti HP avesse davvero
+          // il party. E' testo di SISTEMA, mai mostrato in chat: il giocatore non lo vede mai.
+          "SCHEDE DEI PERSONAGGI DEL PARTY (gia note, tienine conto — HP, CA, caratteristiche ed equipaggiamento REALI: NON chiedere presentazioni):\n" + buildPartySheetContext(),
+          diarioDiCampagna.length
+            ? "DIARIO DI CAMPAGNA (eventi chiave di questa sessione, in ordine cronologico, tienine conto anche se lontani nella conversazione): " + diarioDiCampagna.join(" | ")
+            : "",
+          ultimoRiepilogoCombattimento
+            ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo): " + ultimoRiepilogoCombattimento.replace(/\n/g, " ")
+            : "",
           suggestionText,
-          "Se riesci, rispondi con JSON valido: {\"reply\":\"testo narrativo\",\"roll\":null} oppure {\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}.",
-          "Aggiungi \"teleportCity\":\"nome_luogo\" al JSON se il PG viaggia in citta. Aggiungi \"moveToken\":\"flee\" se fugge in modo tattico.",
-          "Se non riesci col JSON, scrivi solo il testo narrativo della risposta, senza nient'altro.",
+          "FORMATO RISPOSTA — Rispondi SOLO con testo narrativo semplice (1-3 frasi, italiano), SENZA JSON e senza markdown: e' quello che il giocatore legge parola per parola mentre lo scrivi.",
+          "Se e SOLO se serve segnalare un dato di gioco, aggiungi SUBITO DOPO la narrazione, su una riga a parte, ESATTAMENTE questo separatore: " + SEPARATORE_DATI_MASTER,
+          "e poi, sulla riga successiva, un JSON valido con SOLO i campi che ti servono davvero, tra: {\"roll\":{\"die\":20,\"stat\":\"Forza\"},\"teleportCity\":\"nome_luogo\",\"moveToken\":\"flee\",\"spawn\":[{\"name\":\"Goblin\",\"count\":2}]}.",
+          "Se non hai NESSUN dato di gioco da segnalare, NON scrivere affatto il separatore: fermati dopo la narrazione.",
+          "Bestiario disponibile per spawn: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin. NON risolvere tu gli attacchi ne' contare gli HP: il combattimento lo gestisce il gioco.",
           "Usa il campo roll solo quando l'azione del giocatore ha un rischio reale. Stat consentite: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco."
         ].filter(Boolean).join("\n");
+      }
+
+      // Divide la risposta COMPLETA del Master in { narrazione, dati }, usando il separatore
+      // esplicito richiesto nel prompt di sistema. Funzione pura (testabile senza rete). Se il
+      // modello non rispetta il separatore (es. risponde ancora nel vecchio formato a blob JSON
+      // unico, {"reply":"...", "roll":...}), ricade sull'estrazione euristica esistente
+      // (extractJsonObject) per restare compatibile con modelli/prompt piu' vecchi.
+      function separaNarrazioneEDati(testoCompleto) {
+        const testo = String(testoCompleto || "");
+        const idx = testo.indexOf(SEPARATORE_DATI_MASTER);
+        if (idx >= 0) {
+          const narrazione = testo.slice(0, idx).trim();
+          const datiTesto = testo.slice(idx + SEPARATORE_DATI_MASTER.length).trim();
+          return { narrazione: narrazione || stripThinkingBlocks(testo), dati: extractJsonObject(datiTesto) };
+        }
+        const legacy = extractJsonObject(testo);
+        if (legacy && typeof legacy.reply === "string") {
+          return { narrazione: legacy.reply, dati: legacy };
+        }
+        return { narrazione: stripThinkingBlocks(testo), dati: null };
+      }
+
+      // Quanto della risposta accumulata finora e' SICURO mostrare live in chat: tutto cio' che
+      // precede il separatore (o l'intero accumulato, se il separatore non e' ancora comparso —
+      // non sappiamo se comparira' mai, ma finche' non lo vediamo e' prosa valida). Funzione pura.
+      function testoVisibileDuranteStreaming(accumulato) {
+        const idx = String(accumulato || "").indexOf(SEPARATORE_DATI_MASTER);
+        return idx >= 0 ? accumulato.slice(0, idx) : String(accumulato || "");
+      }
+
+      // Estrae il frammento di testo (delta) da UNA riga NDJSON della risposta streaming di
+      // Ollama ({"message":{"content":"tok"},"done":false}). Righe vuote/incomplete (spezzate a
+      // meta' da un TextDecoder che ha ricevuto un chunk di rete a meta' di un carattere UTF-8, o
+      // l'ultima riga del buffer non ancora terminata da \n) ritornano stringa vuota: si
+      // ricompongono da sole al giro successivo, senza mai lanciare un'eccezione che romperebbe
+      // l'intero streaming per un singolo pacchetto di rete arrivato a meta'.
+      function estraiContenutoRigaOllama(riga) {
+        const r = String(riga || "").trim();
+        if (!r) { return ""; }
+        try {
+          const obj = JSON.parse(r);
+          return (obj && obj.message && typeof obj.message.content === "string") ? obj.message.content : "";
+        } catch (e) {
+          return "";
+        }
       }
 
       async function pingOllamaServer() {
@@ -320,7 +450,7 @@
         }, ollamaMasterConfig.pingTimeoutMs);
 
         try {
-          const response = await fetch(ollamaMasterConfig.tagsEndpoint, {
+          const response = await fetch(ollamaTagsEndpoint(), {
             method: "GET",
             signal: controller.signal
           });
@@ -333,7 +463,13 @@
         }
       }
 
-      async function fetchOllamaMasterReply(playerText, localSuggestion) {
+      // Risposta del Master via Ollama, in STREAMING: onProgress(testoParzialeSicuro) viene
+      // richiamato man mano che arrivano token dal server remoto, cosi' il chiamante puo'
+      // aggiornare la bolla di chat in tempo reale (parola per parola) invece di restare fermo
+      // fino alla fine. Sul laptop (client) questo costa pochissimo: solo un textContent
+      // aggiornato a ogni frammento, nessun lavoro pesante — il calcolo vero (i token del
+      // modello) lo fa la GPU 5080 sul PC remoto, non la 4050 del laptop.
+      async function fetchOllamaMasterReplyStreaming(playerText, localSuggestion, onProgress) {
         await pingOllamaServer();
 
         const controller = new AbortController();
@@ -342,7 +478,7 @@
         }, ollamaMasterConfig.timeoutMs);
 
         try {
-          const response = await fetch(ollamaMasterConfig.endpoint, {
+          const response = await fetch(ollamaChatEndpoint(), {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -350,7 +486,7 @@
             signal: controller.signal,
             body: JSON.stringify({
               model: ollamaMasterConfig.model,
-              stream: false,
+              stream: true,
               messages: [
                 {
                   role: "system",
@@ -374,28 +510,49 @@
             throw new Error("Ollama HTTP " + response.status);
           }
 
-          const data = await response.json();
-          const content = data && data.message && data.message.content ? data.message.content : "";
-          const cleaned = stripThinkingBlocks(content);
-          const parsed = extractJsonObject(cleaned);
-          const fallbackReply = cleaned || createGuidedMasterReply(playerText, localSuggestion);
-
-          // Se il modello non ha risposto in JSON, usa il testo grezzo come risposta narrativa
-          if (!parsed || typeof parsed.reply !== "string") {
-            return {
-              reply: fallbackReply,
-              roll: localSuggestion || null
-            };
+          let accumulato = "";
+          // Lettura incrementale del body (ReadableStream): disponibile in ogni browser moderno
+          // (Chrome/Edge sul laptop di gioco compresi). Se manca — ambiente vecchio o response.body
+          // non supportato — si ricade su response.text() in un colpo solo: la STESSA logica di
+          // parsing NDJSON funziona identica, semplicemente senza onProgress intermedi (l'utente
+          // vede comparire la risposta gia' completa, come nel vecchio comportamento non-streaming).
+          if (response.body && typeof response.body.getReader === "function") {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+            for (;;) {
+              const passo = await reader.read();
+              if (passo.done) { break; }
+              buffer += decoder.decode(passo.value, { stream: true });
+              const righe = buffer.split("\n");
+              buffer = righe.pop(); // ultima riga forse incompleta: si riaccoda al prossimo giro
+              for (let i = 0; i < righe.length; i += 1) {
+                accumulato += estraiContenutoRigaOllama(righe[i]);
+              }
+              if (typeof onProgress === "function") {
+                onProgress(testoVisibileDuranteStreaming(accumulato));
+              }
+            }
+            if (buffer.trim()) { accumulato += estraiContenutoRigaOllama(buffer); }
+          } else {
+            const testoGrezzo = await response.text();
+            testoGrezzo.split("\n").forEach(function (riga) { accumulato += estraiContenutoRigaOllama(riga); });
           }
 
+          const pezzi = separaNarrazioneEDati(accumulato);
+          const dati = pezzi.dati || {};
+          const fallbackReply = pezzi.narrazione || createGuidedMasterReply(playerText, localSuggestion);
+
           return {
-            reply: parsed.reply,
-            teleportCity: parsed.teleportCity || null,
-            moveToken: parsed.moveToken || null,
-            roll: parsed.roll && normalizeDie(parsed.roll.die)
+            reply: fallbackReply,
+            teleportCity: dati.teleportCity || null,
+            moveToken: dati.moveToken || null,
+            moveTo: dati.moveTo || dati.location || null,
+            spawn: dati.spawn || dati.enemies || null,
+            roll: dati.roll && normalizeDie(dati.roll.die)
               ? {
-                die: normalizeDie(parsed.roll.die),
-                stat: String(parsed.roll.stat || (localSuggestion && localSuggestion.stat) || "")
+                die: normalizeDie(dati.roll.die),
+                stat: String(dati.roll.stat || (localSuggestion && localSuggestion.stat) || "")
               }
               : (localSuggestion || null)
           };
@@ -425,6 +582,12 @@
       }
 
       function readGroqApiKey() {
+        // Se una build personale ha una chiave incorporata (DEFAULT_GROQ_API_KEY non vuota), quella
+        // ha SEMPRE la precedenza su localStorage: altrimenti una chiave vecchia/revocata salvata in
+        // precedenza dal browser continuerebbe a essere usata anche dopo aver aggiornato il file con
+        // una chiave nuova, e il Master resterebbe rotto (401) senza un motivo apparente. Nel
+        // repository DEFAULT_GROQ_API_KEY e' vuota, quindi vale il comportamento normale (localStorage).
+        if (DEFAULT_GROQ_API_KEY) { return DEFAULT_GROQ_API_KEY; }
         try { return window.localStorage.getItem(groqMasterStorageKey) || ""; } catch (e) { return ""; }
       }
 
@@ -438,14 +601,14 @@
           groqMasterState.lastError = "";
           groqChatHistory.length = 0;
           renderGroqMasterState();
-          appendMasterChatMessage("system", "Groq AI disattivato. Storia resettata.");
+          publicaChatMessage("system", "Groq AI disattivato. Storia resettata.");
           return;
         }
         groqMasterState.apiKey = readGroqApiKey();
         if (!groqMasterState.apiKey) {
           var key = window.prompt("Inserisci la tua Groq API key gratuita (ottienila su console.groq.com):");
           if (!key || !key.trim()) {
-            appendMasterChatMessage("system", "Groq non attivato: API key non inserita.");
+            publicaChatMessage("system", "Groq non attivato: API key non inserita.");
             return;
           }
           groqMasterState.apiKey = key.trim();
@@ -458,7 +621,7 @@
         groqMasterState.enabled = true;
         groqMasterState.lastError = "";
         renderGroqMasterState();
-        appendMasterChatMessage("system", "Groq AI attivo come Master.");
+        publicaChatMessage("system", "Groq AI attivo come Master.");
         appendSystemLog("Groq AI Master attivato.");
         
         // Benvenuto: il Master conosce gia le schede del party, niente presentazioni
@@ -540,6 +703,14 @@
           "SCHEDE DEI PERSONAGGI DEL PARTY (gia note):",
           buildPartySheetContext(),
           "",
+          diarioDiCampagna.length
+            ? "DIARIO DI CAMPAGNA (eventi chiave dell'INTERA sessione, in ordine cronologico — tienine conto per restare coerente anche dopo molti scambi, non solo con gli ultimi messaggi):\n" + diarioDiCampagna.map(function (voce) { return "- " + voce; }).join("\n")
+            : "",
+          "",
+          ultimoRiepilogoCombattimento
+            ? "RIEPILOGO DELL'ULTIMO COMBATTIMENTO (tienine conto, non ignorarlo, non chiedere cosa e' successo):\n" + ultimoRiepilogoCombattimento
+            : "",
+          "",
           diceHint,
           "",
           "FORMATO RISPOSTA - Rispondi SEMPRE e SOLO con JSON valido, senza testo fuori:",
@@ -548,7 +719,8 @@
           "{\"reply\":\"testo narrativo\",\"roll\":{\"die\":20,\"stat\":\"Forza\"}}",
           "SPOSTAMENTO SULLA MAPPA: quando il party si reca o arriva in un luogo preciso di Ventimiglia, aggiungi al JSON \"moveTo\":\"nome esatto del luogo\". Il token del PG si spostera' in QUEL punto della mappa reale. Usa SOLO questi luoghi: " + ((window.VTTCampagna && window.VTTCampagna.places) ? window.VTTCampagna.places().join(", ") : "Stazione FS, Citta Alta, Porto Turistico, Forte dell'Annunziata") + ".",
           "Aggiungi \"moveToken\":\"flee\" se il PG fugge in modo tattico.",
-          "QUANDO COMPAIONO NEMICI: aggiungi al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] elencando i nemici che appaiono nella scena. I nemici compariranno sulla mappa vicino al party e nel tracker di combattimento.",
+          "QUANDO COMPAIONO NEMICI O INIZIA UNO SCONTRO: aggiungi SEMPRE al JSON \"spawn\":[{\"name\":\"Goblin\",\"count\":2}] con i nemici della scena. Il gioco li fara' comparire sulla griglia tattica e avviera' il combattimento a turni (iniziativa, dadi, HUD stile Baldur's Gate 3).",
+          "IN COMBATTIMENTO NON risolvere MAI tu gli attacchi e NON inventare o tenere il conto degli HP: tiri per colpire, danni, iniziativa e turni li gestisce il sistema di combattimento del gioco. Tu descrivi solo la scena e le intenzioni dei nemici, e riprendi la narrazione quando il sistema ti riporta l'esito dello scontro.",
           "Bestiario disponibile per spawn: Goblin, Bandito, Scheletro, Lupo, Orco, Cultista, Zombie, Hobgoblin.",
           "Stat valide: Forza, Destrezza, Costituzione, Intelligenza, Saggezza, Carisma, Attacco"
         ].join("\n");
@@ -616,7 +788,7 @@
         renderGroqMasterState();
         if (groqMasterState.enabled) {
           window.setTimeout(function () {
-            appendMasterChatMessage("system", "🤖 Master IA Groq attivo (" + groqMasterConfig.model + "). Crea il party dal menu per iniziare.");
+            publicaChatMessage("system", "🤖 Master IA Groq attivo (" + groqMasterConfig.model + "). Crea il party dal menu per iniziare.");
             // Il benvenuto vero parte da startAdventure (quando il party e creato),
             // cosi il Master conosce gia le schede e non chiede presentazioni.
           }, 800);
@@ -718,14 +890,31 @@
         return model.defaultReply;
       }
 
-      function appendMasterChatMessage(speaker, text) {
+      // opzioni.nodoEsistente: se presente (il paragrafo <p> di una bolla gia' creata in DOM da
+      // creaBollaStreaming), NON crea un secondo messaggio duplicato — si limita a fissare il
+      // testo finale su quel nodo (gia' visibile e aggiornato in tempo reale durante lo
+      // streaming) e a far partire la sintesi vocale una volta sola, a risposta completa
+      // (leggere ad alta voce frammenti a meta' parola suonerebbe rotto).
+      function appendMasterChatMessage(speaker, text, opzioni) {
+        opzioni = opzioni || {};
+        const normalizedSpeaker = speaker === "player" || speaker === "system" ? speaker : "master";
+
+        if (opzioni.nodoEsistente) {
+          opzioni.nodoEsistente.textContent = String(text);
+          const contenitore = opzioni.nodoEsistente.parentNode;
+          if (contenitore && contenitore.classList) { contenitore.classList.remove("is-streaming"); }
+          if (normalizedSpeaker === "master" && window.UltimateVTTAudioVoice && typeof window.UltimateVTTAudioVoice.speakMaster === "function") {
+            if (window.autoSpeechEnabled !== false) window.UltimateVTTAudioVoice.speakMaster(text);
+          }
+          return;
+        }
+
         const log = getElement("masterChatLog");
 
         if (!log || !text) {
           return;
         }
 
-        const normalizedSpeaker = speaker === "player" || speaker === "system" ? speaker : "master";
         const speakerLabels = {
           master: "Master",
           player: "Tu",
@@ -748,6 +937,62 @@
         if (normalizedSpeaker === "master" && window.UltimateVTTAudioVoice && typeof window.UltimateVTTAudioVoice.speakMaster === "function") {
           if (window.autoSpeechEnabled !== false) window.UltimateVTTAudioVoice.speakMaster(text);
         }
+      }
+
+      // Crea SUBITO una bolla di chat vuota (visibile in DOM) e ritorna un handle per aggiornarne
+      // il testo man mano che arrivano i token dal Master in streaming (fetchOllamaMasterReply
+      // Streaming). Separata da appendMasterChatMessage perche' qui la bolla nasce PRIMA di sapere
+      // il testo finale — l'emissione "ufficiale" (che notifica i ponti 29/32/34/39 via
+      // publicaChatMessage) arriva solo alla fine, passando opzioni.nodoEsistente per riusare
+      // questa stessa bolla invece di crearne una seconda duplicata.
+      function creaBollaStreaming(speaker) {
+        const log = getElement("masterChatLog");
+        if (!log) { return { nodo: null, aggiorna() {}, annulla() {} }; }
+
+        const normalizedSpeaker = speaker === "player" || speaker === "system" ? speaker : "master";
+        const speakerLabels = { master: "Master", player: "Tu", system: "Sistema" };
+        const message = document.createElement("div");
+        const label = document.createElement("span");
+        const body = document.createElement("p");
+
+        message.className = "master-chat-message " + normalizedSpeaker + " is-streaming";
+        label.className = "master-chat-speaker";
+        label.textContent = speakerLabels[normalizedSpeaker];
+        body.textContent = "";
+
+        message.appendChild(label);
+        message.appendChild(body);
+        log.appendChild(message);
+        log.scrollTop = log.scrollHeight;
+
+        return {
+          nodo: body,
+          aggiorna(testoParziale) {
+            body.textContent = testoParziale || "";
+            log.scrollTop = log.scrollHeight;
+          },
+          // Se Ollama fallisce PRIMA che arrivi anche un solo token, non lasciare in chat una
+          // bolla fantasma vuota: la si rimuove e il messaggio di errore/fallback la sostituisce.
+          annulla() {
+            if (message.parentNode) { message.parentNode.removeChild(message); }
+          }
+        };
+      }
+
+      // Punto di emissione UNICO per ogni messaggio di chat generato qui in js/12 (system/player/
+      // master): passa SEMPRE dall'API pubblica (window.UltimateVTTCoreGameplay.appendChatMessage)
+      // invece di chiamare appendMasterChatMessage direttamente. Bug reale: le vere risposte del
+      // Master (Groq/Ollama/locale) chiamavano la funzione privata in modo diretto, scavalcando
+      // completamente i moduli che avvolgono l'API pubblica per osservare "speaker === master"
+      // (34: ponte chat->combattimento; 39: ponte chat->mappa Ventimiglia) — quei ponti non
+      // vedevano MAI la narrazione reale, solo le chiamate esterne di altri moduli. Prima che
+      // qualcuno avvolga l'API (o se nessuno lo fa mai), ricade sulla funzione di rendering diretta.
+      function publicaChatMessage(speaker, text, opzioni) {
+        var api = window.UltimateVTTCoreGameplay;
+        if (api && typeof api.appendChatMessage === "function") {
+          return api.appendChatMessage(speaker, text, opzioni);
+        }
+        return appendMasterChatMessage(speaker, text, opzioni);
       }
 
       function normalizeDie(value) {
@@ -820,7 +1065,7 @@
           diceLockRenderTimer = 0;
         }
         renderDiceLockState();
-        appendMasterChatMessage("system", "Prova richiesta: tira D" + die + (stat ? " su " + stat : "") + ".");
+        publicaChatMessage("system", "Prova richiesta: tira D" + die + (stat ? " su " + stat : "") + ".");
         appendSystemLog("Master IA ha sbloccato D" + die + ".");
         highlightRequestedDie(die);
       }
@@ -847,7 +1092,7 @@
       function unlockDiceFromMaster(text) {
         const command = parseMasterDiceCommand(text);
 
-        appendMasterChatMessage("master", text);
+        publicaChatMessage("master", text);
 
         if (!command) {
           return false;
@@ -858,7 +1103,7 @@
       }
 
       function lockDiceAfterRoll(sides, result) {
-        appendMasterChatMessage("system", "Risultato D" + sides + ": " + result + ".");
+        publicaChatMessage("system", "Risultato D" + sides + ": " + result + ".");
         diceLockState.locked = true;
         diceLockState.requestedDie = null;
         diceLockState.stat = "";
@@ -1016,17 +1261,30 @@
       }
 
       async function handlePlayerPrompt(text, isAutoRoll) {
+        // ⚔️ Durante un combattimento la chat del Master e' IN PAUSA: lo scontro si gioca solo
+        // nell'interfaccia di combattimento (HUD BG3: bersaglio, Attacca, Termina turno), i turni
+        // dei nemici li gioca l'IA (modulo 33) e a scontro finito il Master riceve il riepilogo
+        // (modulo 29) e riprende la narrazione da li'. Senza questa pausa il Master risolveva gli
+        // attacchi in prosa in parallelo al motore (HP inventati, dadi chiesti in chat) e ogni sua
+        // risposta rischiava di rievocare nemici, mandando in conflitto chat e combat system.
+        try {
+          var statoCombattimento = window.UltimateVTTCombat && window.UltimateVTTCombat.getState && window.UltimateVTTCombat.getState();
+          if (statoCombattimento && statoCombattimento.active) {
+            publicaChatMessage("system", "⚔️ Combattimento in corso: la chat del Master è in pausa. Gestisci lo scontro dall'interfaccia di combattimento (clicca un nemico per bersagliarlo, poi Attacca / Spingi / Termina turno). Il Master riprenderà la narrazione a scontro finito.");
+            return;
+          }
+        } catch (errorePausaCombattimento) { /* in dubbio, non bloccare la chat */ }
         const request = isAutoRoll ? null : inferMasterRollRequest(text);
 
         if (!isAutoRoll) {
-          appendMasterChatMessage("player", text);
+          publicaChatMessage("player", text);
           var movePlace = inferMoveFromText(text);
           if (movePlace && window.VTTCampagna && window.VTTCampagna.goToPlace) {
             try {
               window.VTTCampagna.goToPlace(movePlace);
               // Feedback leggero in chat solo se siamo in modalità campagna attiva
               if (window.VTTCampagna.isActive && window.VTTCampagna.isActive()) {
-                appendMasterChatMessage("system", "📍 Token spostato → " + movePlace);
+                publicaChatMessage("system", "📍 Token spostato → " + movePlace);
               }
             } catch (e) {}
           }
@@ -1038,7 +1296,7 @@
           renderGroqMasterState();
           try {
             const groqReply = await fetchGroqMasterReply(text, request);
-            appendMasterChatMessage("master", groqReply.reply);
+            publicaChatMessage("master", groqReply.reply);
             appendSystemLog("🤖 Groq ha risposto.");
             if (groqReply.roll) { requestDiceRoll(groqReply.roll.die, groqReply.roll.stat); }
             handleAIMovement(groqReply);
@@ -1048,9 +1306,9 @@
               : (error.message || "Groq non raggiungibile. Controlla la connessione internet.");
             groqMasterState.lastError = message;
             renderGroqMasterState();
-            appendMasterChatMessage("system", "⚠️ " + message + " — rispondo offline.");
+            publicaChatMessage("system", "⚠️ " + message + " — rispondo offline.");
             appendSystemLog("⚠️ Groq ERRORE: " + message);
-            appendMasterChatMessage("master", createGuidedMasterReply(text, request));
+            publicaChatMessage("master", createGuidedMasterReply(text, request));
             if (request) { requestDiceRoll(request.die, request.stat); }
           } finally {
             groqMasterState.busy = false;
@@ -1064,21 +1322,26 @@
           ollamaMasterState.lastError = "";
           renderOllamaMasterState();
 
+          // Bolla vuota creata SUBITO: il testo compare parola per parola man mano che arriva
+          // dal server remoto (GPU 5080), invece di restare fermi su "..." fino alla fine.
+          const bolla = creaBollaStreaming("master");
+
           try {
-            const ollamaReply = await fetchOllamaMasterReply(text, request);
-            appendMasterChatMessage("master", ollamaReply.reply);
+            const ollamaReply = await fetchOllamaMasterReplyStreaming(text, request, bolla.aggiorna);
+            publicaChatMessage("master", ollamaReply.reply, { nodoEsistente: bolla.nodo });
 
             if (ollamaReply.roll) {
               requestDiceRoll(ollamaReply.roll.die, ollamaReply.roll.stat);
             }
             handleAIMovement(ollamaReply);
           } catch (error) {
+            bolla.annulla(); // niente token arrivato: via la bolla fantasma, non lasciarla vuota in chat
             const message = error && error.name === "AbortError"
               ? "Ollama non ha risposto in tempo. Avvia Ollama o usa un modello piu piccolo."
-              : "Ollama non raggiungibile. Avvia Ollama e scarica: ollama pull " + ollamaMasterConfig.model;
+              : "Ollama non raggiungibile su " + readOllamaHost() + ". Verifica IP/porta (menu Master → Ollama IP) e che il server sia acceso.";
             setOllamaMasterError(message);
-            appendMasterChatMessage("system", message + " Uso il Master offline per questa risposta.");
-            appendMasterChatMessage("master", createGuidedMasterReply(text, request));
+            publicaChatMessage("system", message + " Uso il Master offline per questa risposta.");
+            publicaChatMessage("master", createGuidedMasterReply(text, request));
 
             if (request) {
               requestDiceRoll(request.die, request.stat);
@@ -1091,7 +1354,7 @@
           return;
         }
 
-        appendMasterChatMessage("master", createGuidedMasterReply(text, request));
+        publicaChatMessage("master", createGuidedMasterReply(text, request));
 
         if (request) {
           requestDiceRoll(request.die, request.stat);
@@ -1262,7 +1525,7 @@
         switchPartyMember(nextIndex);
         
         const activeName = partyData[nextIndex].identity.name;
-        appendMasterChatMessage("system", "⏳ È il turno di " + activeName + ".");
+        publicaChatMessage("system", "⏳ È il turno di " + activeName + ".");
         appendSystemLog("Turno passato a " + activeName + ".");
         
         if (groqMasterState.enabled) {
@@ -1371,12 +1634,38 @@
         renderLocalMasterModel(false);
       }
 
+      // Chiede (window.prompt, stesso schema gia' usato per la API key di Groq) l'indirizzo del
+      // server Ollama remoto e lo persiste. Le richieste successive lo leggono a runtime
+      // (ollamaBaseUrl/ollamaChatEndpoint/ollamaTagsEndpoint): non serve alcun riavvio o
+      // riconnessione esplicita, il prossimo messaggio del giocatore usa gia' il nuovo indirizzo.
+      function renderOllamaHostButton() {
+        const b = getElement("ollamaHostButton");
+        if (!b) { return; }
+        const host = readOllamaHost();
+        b.textContent = "🖧 " + host;
+        b.title = "Server Ollama in rete locale: " + host + ". Clicca per cambiarlo (IP:porta del PC con la GPU).";
+      }
+      function configuraOllamaHost() {
+        const attuale = readOllamaHost();
+        const host = window.prompt("Indirizzo del server Ollama in rete locale (IP:porta, es. 192.168.1.50:11434):", attuale);
+        if (!host || !host.trim()) { return; }
+        writeOllamaHost(host.trim());
+        renderOllamaHostButton();
+        publicaChatMessage("system", "🖧 Server Ollama impostato su " + host.trim() + ".");
+      }
+
       function initializeOllamaMaster() {
         const button = getElement("ollamaMasterButton");
 
         if (button) {
           button.addEventListener("click", toggleOllamaMaster);
         }
+
+        const hostButton = getElement("ollamaHostButton");
+        if (hostButton) {
+          hostButton.addEventListener("click", configuraOllamaHost);
+        }
+        renderOllamaHostButton();
 
         renderOllamaMasterState();
       }
@@ -1407,11 +1696,25 @@
           return cloneData(getActiveLocalMasterModel());
         },
         getOllamaMasterConfig: function getOllamaMasterConfig() {
-          return cloneData(ollamaMasterConfig);
+          var cfg = cloneData(ollamaMasterConfig);
+          cfg.host = readOllamaHost();
+          cfg.tagsEndpoint = ollamaTagsEndpoint();
+          cfg.endpoint = ollamaChatEndpoint();
+          return cfg;
         },
         getOllamaMasterState: function getOllamaMasterState() {
           return cloneData(ollamaMasterState);
         },
+        // Host Ollama remoto (architettura Split-Rig: PC separato con GPU sulla stessa LAN).
+        getOllamaHost: readOllamaHost,
+        setOllamaHost: function setOllamaHost(host) {
+          writeOllamaHost(String(host || ""));
+          renderOllamaHostButton();
+        },
+        // Funzioni pure di streaming/parsing (testabili senza rete: vedi tools/test).
+        separaNarrazioneEDati: separaNarrazioneEDati,
+        testoVisibileDuranteStreaming: testoVisibileDuranteStreaming,
+        estraiContenutoRigaOllama: estraiContenutoRigaOllama,
         switchPartyMember: switchPartyMember,
         addPartyMember: addPartyMember,
         getPartyData: function getPartyData() {
@@ -1419,6 +1722,56 @@
         },
         getDiceLockState: function getDiceLockState() {
           return cloneData(diceLockState);
+        },
+        // Iniettano un evento nella memoria REALE dell'IA (groqChatHistory), non solo nella chat
+        // visibile: usati dal modulo 29 (memoria di combattimento) per notificare al Master IA
+        // cosa e' successo in battaglia, cosi' puo' riprendere la narrazione in modo coerente.
+        notifyMasterMemory: pushSystemMemoria,
+        setUltimoRiepilogoCombattimento: function setUltimoRiepilogoCombattimento(testo) {
+          ultimoRiepilogoCombattimento = String(testo || "");
+        },
+        getUltimoRiepilogoCombattimento: function getUltimoRiepilogoCombattimentoSnapshot() {
+          return ultimoRiepilogoCombattimento;
+        },
+        // Diario di campagna a lungo termine (usato dal modulo 32, "memoria di campagna"): eventi
+        // chiave dell'intera sessione (combattimenti, spostamenti, level-up), cosi' il Master resta
+        // coerente anche dopo ore di gioco e molti scambi, oltre la finestra scorrevole di Groq.
+        appendDiarioCampagna: pushDiarioCampagna,
+        getDiarioCampagna: function getDiarioCampagnaSnapshot() {
+          return diarioDiCampagna.slice();
+        },
+        // Permettono al modulo di backup (js/11) di salvare/ripristinare la memoria del Master IA
+        // (cronologia Groq, riepilogo dell'ultimo combattimento, diario di campagna) insieme al
+        // resto della partita: senza questo, ricaricare la pagina o importare un backup
+        // azzererebbe la memoria costruita dai moduli 29/32, vanificando la "ripartenza coerente".
+        getState: function getState() {
+          return {
+            groqChatHistory: cloneData(groqChatHistory),
+            ultimoRiepilogoCombattimento: ultimoRiepilogoCombattimento,
+            diarioDiCampagna: diarioDiCampagna.slice()
+          };
+        },
+        hydrate: function hydrate(snapshot) {
+          if (!snapshot) {
+            return false;
+          }
+          if (Array.isArray(snapshot.groqChatHistory)) {
+            groqChatHistory.length = 0;
+            snapshot.groqChatHistory.forEach(function pushEntry(entry) {
+              if (entry && typeof entry.role === "string" && typeof entry.content === "string") {
+                groqChatHistory.push({ role: entry.role, content: entry.content });
+              }
+            });
+          }
+          if (typeof snapshot.ultimoRiepilogoCombattimento === "string") {
+            ultimoRiepilogoCombattimento = snapshot.ultimoRiepilogoCombattimento;
+          }
+          if (Array.isArray(snapshot.diarioDiCampagna)) {
+            diarioDiCampagna = snapshot.diarioDiCampagna
+              .filter(function (voce) { return typeof voce === "string"; })
+              .slice(-DIARIO_CAMPAGNA_MAX_VOCI);
+          }
+          return true;
         }
       };
 
@@ -1426,315 +1779,15 @@
     })();
     // --- FINE CORE GAMEPLAY LOOP: CHAT MASTER, DICE LOCK, PARTY HOTSEAT ---
 
-    // --- INIZIO MODULO 6 & 7: CANVAS MAPPA E FOG OF WAR HOTSEAT ---
-    (function initCanvasModule() {
-      const canvas = document.getElementById("vttCanvas");
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      
-      let gridSize = 48;
-      let cameraX = 0;
-      let cameraY = 0;
-      let isDragging = false;
-      let draggedTokenIndex = -1;
-      let dragOffsetX = 0;
-      let dragOffsetY = 0;
-
-      // PATCH 3: Muri e collisioni
-      let walls = [
-        // Muri esterni stanza principale
-        { x1: 400, y1: 200, x2: 800, y2: 200 },
-        { x1: 800, y1: 200, x2: 800, y2: 300 }, // porta nord corridoio
-        { x1: 800, y1: 400, x2: 800, y2: 500 }, // porta sud corridoio
-        { x1: 800, y1: 500, x2: 400, y2: 500 },
-        { x1: 400, y1: 500, x2: 400, y2: 200 },
-        // Colonna interna
-        { x1: 550, y1: 300, x2: 650, y2: 300 },
-        { x1: 650, y1: 300, x2: 650, y2: 350 },
-        // Corridoio
-        { x1: 800, y1: 300, x2: 1100, y2: 300 },
-        { x1: 800, y1: 400, x2: 1100, y2: 400 },
-        // Bordo canvas per bloccare raggi infiniti
-        { x1: 0, y1: 0, x2: 1280, y2: 0 },
-        { x1: 1280, y1: 0, x2: 1280, y2: 720 },
-        { x1: 1280, y1: 720, x2: 0, y2: 720 },
-        { x1: 0, y1: 720, x2: 0, y2: 0 }
-      ];
-
-      function segmentsIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
-        let det = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-        if (det === 0) return false;
-        let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / det;
-        let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / det;
-        return (t > 0 && t < 1 && u > 0 && u < 1);
-      }
-
-      function checkWallCollision(oldX, oldY, newX, newY) {
-        for (let i = 0; i < walls.length; i++) {
-          let w = walls[i];
-          // Evitiamo le collisioni con i bordi del canvas
-          if (w.x1 === 0 && w.y1 === 0 && w.x2 === 1280) continue; 
-          if (segmentsIntersect(oldX, oldY, newX, newY, w.x1, w.y1, w.x2, w.y2)) {
-            return true;
-          }
-        }
-        return false;
-      }
-
-      function getRayIntersection(ray, segment) {
-        const r_px = ray.a.x; const r_py = ray.a.y;
-        const r_dx = ray.b.x - ray.a.x; const r_dy = ray.b.y - ray.a.y;
-        const s_px = segment.x1; const s_py = segment.y1;
-        const s_dx = segment.x2 - segment.x1; const s_dy = segment.y2 - segment.y1;
-        
-        const T2 = r_dx * s_dy - r_dy * s_dx;
-        if (T2 === 0) return null;
-        
-        const T1 = (s_px - r_px) * s_dy - (s_py - r_py) * s_dx;
-        const u = (s_px - r_px) * r_dy - (s_py - r_py) * r_dx;
-        const t1 = T1 / T2;
-        const t2 = u / T2;
-        
-        if (t1 > 0 && t2 >= 0 && t2 <= 1) {
-          return { x: r_px + r_dx * t1, y: r_py + r_dy * t1, param: t1 };
-        }
-        return null;
-      }
-
-      function getSightPolygon(ox, oy) {
-        let points = [];
-        walls.forEach(w => { points.push({x: w.x1, y: w.y1}); points.push({x: w.x2, y: w.y2}); });
-        
-        let uniqueAngles = [];
-        points.forEach(p => {
-          let angle = Math.atan2(p.y - oy, p.x - ox);
-          uniqueAngles.push(angle - 0.0001);
-          uniqueAngles.push(angle);
-          uniqueAngles.push(angle + 0.0001);
-        });
-        
-        let intersects = [];
-        uniqueAngles.forEach(angle => {
-          let ray = { a: {x: ox, y: oy}, b: {x: ox + Math.cos(angle), y: oy + Math.sin(angle)} };
-          let closest = null;
-          walls.forEach(w => {
-            let int = getRayIntersection(ray, w);
-            if (!int) return;
-            if (!closest || int.param < closest.param) closest = int;
-          });
-          if (closest) {
-            closest.angle = angle;
-            intersects.push(closest);
-          }
-        });
-        
-        intersects.sort((a, b) => a.angle - b.angle);
-        return intersects;
-      }
-
-      function initTokenPositions() {
-        if (!window.partyData) return;
-        window.partyData.forEach(function (p, i) {
-          if (p.x === undefined) p.x = 600 + (i * 48);
-          if (p.y === undefined) p.y = 350;
-        });
-      }
-
-      function drawGrid() {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let x = cameraX % gridSize; x < canvas.width; x += gridSize) {
-          ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
-        }
-        for (let y = cameraY % gridSize; y < canvas.height; y += gridSize) {
-          ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
-        }
-        ctx.stroke();
-      }
-
-      function drawWalls() {
-        ctx.strokeStyle = "#4aa1b3";
-        ctx.lineWidth = 4;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        walls.forEach(w => {
-          if (w.x1 === 0 || w.y1 === 0 || w.x2 === 1280 || w.y2 === 720) return;
-          ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2);
-        });
-        ctx.stroke();
-      }
-
-      function drawTokens() {
-        if (!window.partyData) return;
-        window.partyData.forEach(function (p, i) {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, gridSize / 2.2, 0, Math.PI * 2);
-          ctx.fillStyle = i === window.activePartyIndex ? "#5bb7c8" : "#333";
-          ctx.fill();
-          
-          ctx.strokeStyle = i === window.activePartyIndex ? "#fff" : "#666";
-          ctx.lineWidth = i === window.activePartyIndex ? 3 : 2;
-          ctx.stroke();
-          
-          ctx.fillStyle = "#fff";
-          ctx.font = "14px Arial";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          const shortName = p.identity && p.identity.name ? p.identity.name.substring(0, 3).toUpperCase() : "PG";
-          ctx.fillText(shortName, p.x, p.y);
-        });
-      }
-
-      function drawFogOfWar() {
-        if (!window.partyData || window.activePartyIndex === undefined) return;
-        const activeToken = window.partyData[window.activePartyIndex];
-        if (!activeToken) return;
-        
-        ctx.save();
-        ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.globalCompositeOperation = "destination-out";
-        
-        const poly = getSightPolygon(activeToken.x, activeToken.y);
-        if (poly.length > 0) {
-          ctx.beginPath();
-          ctx.moveTo(poly[0].x, poly[0].y);
-          for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
-          ctx.closePath();
-          
-          const visionRadius = gridSize * 8;
-          const gradient = ctx.createRadialGradient(activeToken.x, activeToken.y, 0, activeToken.x, activeToken.y, visionRadius);
-          gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
-          gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.9)");
-          gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-          
-          ctx.fillStyle = gradient;
-          ctx.fill();
-        }
-        
-        ctx.restore();
-      }
-
-      function renderCanvas() {
-        ctx.fillStyle = "#111";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        drawGrid();
-        drawWalls();
-        drawTokens();
-        drawFogOfWar();
-        
-        requestAnimationFrame(renderCanvas);
-      }
-
-      // Interazioni Mouse
-      canvas.addEventListener("mousedown", function(e) {
-        if (!window.partyData) return;
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX;
-        const my = (e.clientY - rect.top) * scaleY;
-        
-        draggedTokenIndex = window.partyData.findIndex(function(p) {
-          const dx = mx - p.x; const dy = my - p.y;
-          return Math.sqrt(dx*dx + dy*dy) < gridSize / 2;
-        });
-
-        if (draggedTokenIndex !== -1) {
-          isDragging = true;
-          dragOffsetX = mx - window.partyData[draggedTokenIndex].x;
-          dragOffsetY = my - window.partyData[draggedTokenIndex].y;
-          
-          if (draggedTokenIndex !== window.activePartyIndex && window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.switchPartyMember) {
-             window.UltimateVTTCoreGameplay.switchPartyMember(draggedTokenIndex);
-          }
-        }
-      });
-
-      canvas.addEventListener("mousemove", function(e) {
-        if (!isDragging || draggedTokenIndex === -1 || !window.partyData) return;
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX;
-        const my = (e.clientY - rect.top) * scaleY;
-        
-        let newX = mx - dragOffsetX;
-        let newY = my - dragOffsetY;
-        let p = window.partyData[draggedTokenIndex];
-        
-        // Verifica collisioni prima di muovere
-        if (!checkWallCollision(p.x, p.y, newX, newY)) {
-          p.x = newX;
-          p.y = newY;
-        }
-      });
-
-      canvas.addEventListener("mouseup", function() {
-        if (!isDragging || !window.partyData) return;
-        isDragging = false;
-        
-        if (draggedTokenIndex !== -1) {
-          const p = window.partyData[draggedTokenIndex];
-          // Prova a snappare, ma solo se non ci porta oltre un muro
-          let snapX = Math.round(p.x / gridSize) * gridSize;
-          let snapY = Math.round(p.y / gridSize) * gridSize;
-          if (!checkWallCollision(p.x, p.y, snapX, snapY)) {
-            p.x = snapX; p.y = snapY;
-          }
-        }
-        draggedTokenIndex = -1;
-      });
-      
-      canvas.addEventListener("mouseleave", function() {
-        isDragging = false;
-        draggedTokenIndex = -1;
-      });
-
-      /* ---- PATCH: TOUCH EVENTS per mobile (drag token su touchscreen) ---- */
-      function getTouchPos(e) {
-        var rect = canvas.getBoundingClientRect();
-        var t = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0] : null);
-        if (!t) return { clientX: 0, clientY: 0 };
-        return { clientX: t.clientX, clientY: t.clientY };
-      }
-      canvas.addEventListener("touchstart", function(e) {
-        e.preventDefault();
-        var pos = getTouchPos(e);
-        canvas.dispatchEvent(new MouseEvent("mousedown", { clientX: pos.clientX, clientY: pos.clientY, bubbles: true }));
-      }, { passive: false });
-      canvas.addEventListener("touchmove", function(e) {
-        e.preventDefault();
-        var pos = getTouchPos(e);
-        canvas.dispatchEvent(new MouseEvent("mousemove", { clientX: pos.clientX, clientY: pos.clientY, bubbles: true }));
-      }, { passive: false });
-      canvas.addEventListener("touchend", function(e) {
-        e.preventDefault();
-        var pos = getTouchPos(e);
-        canvas.dispatchEvent(new MouseEvent("mouseup", { clientX: pos.clientX, clientY: pos.clientY, bubbles: true }));
-      }, { passive: false });
-      /* ---- FINE PATCH TOUCH EVENTS ---- */
-
-      const centerBtn = document.getElementById("tokenCenterButton");
-      if (centerBtn) {
-        centerBtn.addEventListener("click", function() {
-          if (window.partyData && window.partyData[window.activePartyIndex]) {
-             window.partyData[window.activePartyIndex].x = 600;
-             window.partyData[window.activePartyIndex].y = 350;
-          }
-        });
-      }
-
-      window.setTimeout(initTokenPositions, 1000);
-      const statusLabel = document.getElementById("stageStatusLabel");
-      if (statusLabel) statusLabel.textContent = "Canvas e Nebbia di Guerra interattivi (Raycasting)";
-      
-      renderCanvas();
-    })();
-    // --- FINE MODULO 6 & 7: CANVAS MAPPA E FOG OF WAR HOTSEAT ---
+    // --- MODULO 6 & 7 (CANVAS MAPPA E FOG OF WAR HOTSEAT): RIMOSSO ---
+    // Qui viveva un SECONDO renderer di mappa che disegnava sullo stesso canvas del modulo 07
+    // (#vttCanvas) in un loop requestAnimationFrame: stanza con muri fissi, token del party a
+    // coordinate pixel proprie e una nebbia line-of-sight quasi nera (95%). Sovrascriveva ogni
+    // frame il renderer ufficiale (modulo 07: terreno, griglia, nebbia del Master; modulo 08:
+    // token fisici con drag), percio' in gioco la mappa appariva nera, senza terreno e SENZA i
+    // nemici (questo renderer disegnava solo il party). Due sistemi sullo stesso canvas = quello
+    // visibile era sempre il piu' povero. Rimosso per intero: il rendering della scena e' SOLO
+    // del modulo 07 + 08 (che gestisce anche il touch via pointer events e il tasto "Centra").
 
     // --- INIZIO MODULO 9: WEB AUDIO API PROCEDURALE E FILTRI VISIVI (PATCH 4) ---
     (function initAudioModule() {
@@ -1940,6 +1993,37 @@
           document.body.classList.add("ally-mode");
         }
       });
+
+      /* --- Tastiera virtuale (Task 5): quando si apre, il layout flexbox deve adattarsi
+         all'area VISIBILE, non restare alto 100vh con l'input nascosto sotto la tastiera.
+         Il segnale affidabile e' visualViewport: la sua height si riduce quando la tastiera
+         occupa lo schermo (window.innerHeight spesso NON cambia — e' proprio questo che
+         "rompe" i layout basati su 100vh). Qui si scrive l'altezza visibile in una variabile
+         CSS (--vvh) e si accende una classe sul body: il resto lo fanno le regole CSS
+         (height: var(--vvh) su #app e sugli overlay a schermo intero), cosi' la flexbox si
+         ricalcola da sola e l'input col focus resta in vista. */
+      var SOGLIA_TASTIERA_PX = 140; // sotto questa soglia e' solo la barra URL che si ritrae, non la tastiera
+      function tastieraAperta(altezzaFinestra, altezzaVisibile) {
+        return (Number(altezzaFinestra) - Number(altezzaVisibile)) > SOGLIA_TASTIERA_PX;
+      }
+      function applicaViewportVisibile(altezzaFinestra, altezzaVisibile) {
+        var aperta = tastieraAperta(altezzaFinestra, altezzaVisibile);
+        document.documentElement.style.setProperty("--vvh", Math.round(altezzaVisibile) + "px");
+        document.body.classList.toggle("keyboard-aperta", aperta);
+        // Con la tastiera appena aperta, il campo col focus puo' essere finito fuori
+        // dall'area visibile ridotta: lo si riporta in vista.
+        if (aperta && document.activeElement && document.activeElement.scrollIntoView) {
+          try { document.activeElement.scrollIntoView({ block: "nearest" }); } catch (e) { /* vecchi browser */ }
+        }
+        return aperta;
+      }
+      // Esposto per test e diagnostica: la logica e' pura (dipende solo dalle due altezze).
+      window.UltimateVTTViewport = { tastieraAperta: tastieraAperta, applica: applicaViewportVisibile };
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", function () {
+          applicaViewportVisibile(window.innerHeight, window.visualViewport.height);
+        });
+      }
 
       /* Bottone "Passa Turno" nella barra in-page (scheda sinistra) */
       var passTurnBtn = document.getElementById("passTurnButton");
@@ -2334,18 +2418,32 @@
       }
 
       /* -------- Toggle -------- */
+      // Transizione canvas tattico <-> mappa reale (Task 3b): la commutazione passa da una CLASSE
+      // sul contenitore (.stage.ventimiglia-attiva, regole in css/07) invece che da stili inline
+      // sparsi. Motivi concreti:
+      //  - prima overlay.style.pointerEvents="none" spegneva TUTTA la stage-overlay, compreso il
+      //    cassetto 🛠 Strumenti: aperto sopra la mappa reale era visibile ma NON cliccabile — il
+      //    conflitto classico di pointer-events. Con la classe, il CSS rimette pointer-events:auto
+      //    sul solo cassetto, che resta usabile anche durante l'esplorazione urbana;
+      //  - la vignetta cinematografica (.stage::after, z-index 3) scuriva anche Leaflet: la classe
+      //    la spegne quando la mappa reale e' attiva;
+      //  - il fade-in di #ventimigliaMapDiv e' via opacity (compositor GPU, nessun reflow).
       function activate() {
         var mapDiv = document.getElementById("ventimigliaMapDiv");
         var vttC = document.getElementById("vttCanvas");
         var diceC = document.getElementById("diceCanvas");
-        var overlay = document.querySelector(".stage-overlay");
+        var stage = document.querySelector(".stage");
         var btn = document.getElementById("ventimigliaToggleBtn");
 
         if (!mapDiv) return;
         mapDiv.style.display = "block";
         if (vttC) vttC.style.display = "none";
         if (diceC) diceC.style.display = "none";
-        if (overlay) overlay.style.pointerEvents = "none";
+        if (stage) {
+          // display:block e' appena stato applicato: la classe (che porta opacity 1) va aggiunta
+          // al frame DOPO, altrimenti il browser fonde i due cambi e il fade non parte mai.
+          window.requestAnimationFrame(function () { stage.classList.add("ventimiglia-attiva"); });
+        }
         if (btn) { btn.textContent = "🗺 DUNGEON"; btn.style.borderColor = "rgba(200,155,60,.72)"; }
 
         vtActive = true;
@@ -2365,17 +2463,20 @@
         var mapDiv = document.getElementById("ventimigliaMapDiv");
         var vttC = document.getElementById("vttCanvas");
         var diceC = document.getElementById("diceCanvas");
-        var overlay = document.querySelector(".stage-overlay");
+        var stage = document.querySelector(".stage");
         var btn = document.getElementById("ventimigliaToggleBtn");
         var info = document.getElementById("vtTokenInfo");
 
         if (mapDiv) mapDiv.style.display = "none";
         if (vttC) vttC.style.display = "";
         if (diceC) diceC.style.display = "";
-        if (overlay) overlay.style.pointerEvents = "";
+        if (stage) stage.classList.remove("ventimiglia-attiva");
         if (btn) { btn.textContent = "🏔 VENTIMIGLIA"; btn.style.borderColor = "rgba(93,159,69,.72)"; }
         if (info) info.style.display = "none";
         vtActive = false;
+        // Tornando alla griglia tattica, un repaint esplicito rimette subito in scena terreno e
+        // token (le cache offscreen del modulo 07 rendono l'operazione un semplice blit).
+        try { if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.requestRender) window.UltimateVTTCanvas.requestRender(); } catch (e) {}
       }
 
       function toggle() {
@@ -2487,7 +2588,9 @@
 
         if (el("hubPgColor")) { el("hubPgColor").textContent=name[0]||"E"; el("hubPgColor").style.background=color; }
         if (el("hubPgNameTxt")) el("hubPgNameTxt").textContent=name;
-        if (el("hubPgHpFill")) { el("hubPgHpFill").style.width=hpPct+"%"; el("hubPgHpFill").style.background=hpColor; }
+        /* scaleX invece di width (Task 5): la barra HP anima in compositing (GPU), senza
+           far ricalcolare il layout della barra superiore a ogni variazione di HP. */
+        if (el("hubPgHpFill")) { el("hubPgHpFill").style.transform="scaleX("+(hpPct/100)+")"; el("hubPgHpFill").style.background=hpColor; }
         if (el("hubPgHpNum")) el("hubPgHpNum").textContent=hp+"/"+maxHp;
 
         /* round combat */
@@ -2694,7 +2797,7 @@
           '<div class="hub-hp-block">'+
             '<div class="hub-hp-top"><span class="hub-hp-name">'+V.name+'</span>'+
             '<span class="hub-hp-vals">❤️ '+hp+'/'+maxHp+' &nbsp;🛡 '+(V.ac!=null?V.ac:'—')+'</span></div>'+
-            '<div class="hub-hp-bar-full"><div class="hub-hp-bar-fill" style="width:'+hpPct+'%;background:'+hpC+'"></div></div>'+
+            '<div class="hub-hp-bar-full"><div class="hub-hp-bar-fill" style="transform:scaleX('+(hpPct/100)+');background:'+hpC+'"></div></div>'+
           '</div>'+
           '<div class="hub-section-title">Caratteristiche</div>'+
           '<div class="hub-stats-grid">'+statsHtml+'</div>'+
@@ -3006,7 +3109,7 @@
         if (el("campPgDot"))    el("campPgDot").style.background = state.pgColor;
         if (el("campPgHpTxt")) el("campPgHpTxt").textContent   = state.pgHp + "/" + state.pgMaxHp;
         var pct = state.pgMaxHp > 0 ? Math.max(0, Math.min(100, (state.pgHp/state.pgMaxHp)*100)) : 0;
-        if (el("campPgHpFill")) el("campPgHpFill").style.width = pct + "%";
+        if (el("campPgHpFill")) el("campPgHpFill").style.transform = "scaleX(" + (pct/100) + ")";
         /* colore barra HP */
         if (el("campPgHpFill")) el("campPgHpFill").style.background = pct>50?"#5d9f45":pct>25?"#c89b3c":"#c9362b";
       }
@@ -3364,6 +3467,18 @@
         var sprintBtn = el("campSprintBtn");
         var examBtn   = el("campExamBtn");
         var fightBtn  = el("campFightBtn");
+        var sendBtnCheck = el("campDmSend"), inpCheck = el("campDmInput");
+        var backBtnCheck = el("campBackBtn");
+        // #campOverlay (con TUTTI questi pulsanti) e' definito nell'HTML DOPO questo script: alla
+        // primissima chiamata (sincrona, subito dopo aver trovato campLaunchBtn in wireLaunchBtn)
+        // questi elementi non esistono ancora nel DOM. A differenza di campLaunchBtn (che ha gia' un
+        // suo retry in wireLaunchBtn), qui non c'era alcun retry: gli "if (bottone) ..." sottostanti
+        // fallivano silenziosamente UNA SOLA VOLTA e per sempre, lasciando "← VTT", Sprint, Esamina,
+        // Combatti e l'invio del messaggio completamente senza alcuna azione collegata, ogni volta.
+        if (!sprintBtn || !examBtn || !fightBtn || !sendBtnCheck || !inpCheck || !backBtnCheck) {
+          setTimeout(wireActionButtons, 200);
+          return;
+        }
         if (sprintBtn) sprintBtn.addEventListener("click", function() {
           state.sprint = !state.sprint;
           sprintBtn.classList.toggle("on", state.sprint);

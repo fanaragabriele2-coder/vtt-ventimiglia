@@ -26,18 +26,20 @@
         round: 0,
         currentTurnIndex: -1,
         rollMode: "normal",
-        selectedTargetId: "npc-1",
+        selectedTargetId: null,
         lastEvent: "Combattimento non iniziato.",
         lastRoll: {
           title: "In attesa",
           detail: "Nessun tiro eseguito."
         },
-        nextNpcNumber: 4,
+        nextNpcNumber: 1,
+        // Il tracker parte SOLO con il PG: i nemici NON devono esistere finche' il Master non li fa
+        // comparire (VTTSpawn.spawn -> addNpc). Prima qui c'erano 3 PNG fissi (Goblin/Bandito/
+        // Scheletro) sempre presenti: comparivano nell'iniziativa e nella HUD anche quando il Master,
+        // nella chat, stava facendo tutt'altro (andare al municipio, aprire una porta) e non aveva
+        // affatto evocato nemici — dando l'impressione di un combattimento partito dal nulla.
         combatants: [
-          { id: "pc-local", kind: "pc", name: "Eroe Locale", armorClass: 10, hitPoints: 10, maxHitPoints: 10, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 0, attackBonus: 4, damageFormula: "1d8+2", defeated: false },
-          { id: "npc-1", kind: "npc", name: "Goblin", armorClass: 15, hitPoints: 7, maxHitPoints: 7, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 2, attackBonus: 4, damageFormula: "1d6+2", defeated: false },
-          { id: "npc-2", kind: "npc", name: "Bandito", armorClass: 12, hitPoints: 11, maxHitPoints: 11, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 1, attackBonus: 3, damageFormula: "1d6+1", defeated: false },
-          { id: "npc-3", kind: "npc", name: "Scheletro", armorClass: 13, hitPoints: 13, maxHitPoints: 13, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 2, attackBonus: 4, damageFormula: "1d6+2", defeated: false }
+          { id: "pc-local", kind: "pc", name: "Eroe Locale", armorClass: 10, hitPoints: 10, maxHitPoints: 10, temporaryHitPoints: 0, initiative: 0, initiativeBonus: 0, attackBonus: 4, damageFormula: "1d8+2", defeated: false }
         ]
       };
 
@@ -130,10 +132,12 @@
         player.maxHitPoints = character.resources && character.resources.hp ? character.resources.hp.max : player.maxHitPoints;
         player.temporaryHitPoints = character.resources && character.resources.hp ? character.resources.hp.temporary : 0;
         player.initiativeBonus = dexModifier;
-        player.attackBonus = proficiencyBonus + Math.max(strengthModifier, dexModifier);
-        // formula danni: dado dell'arma equipaggiata + modificatore (Forza/Destrezza piu alto)
+        // formula danni: dado dell'arma equipaggiata + modificatore (Forza/Destrezza piu alto).
+        // Le armi dell'Armeria (modulo 41) portano un bonus di rarita' cotto nella formula
+        // ("1d8+2"): quel +N si somma al modificatore nei DANNI e si aggiunge anche al TIRO PER
+        // COLPIRE (arma magica: +N a colpire e ai danni).
         var atkMod = Math.max(strengthModifier, dexModifier);
-        var weaponDie = "1d8";
+        var weaponDie = "1d8", weaponBonus = 0;
         try {
           var inv = window.UltimateVTTInventory;
           if (inv && inv.getState) {
@@ -141,11 +145,268 @@
             var mainId = invState.equipmentSlots && invState.equipmentSlots.mainHand;
             var entry = mainId ? (invState.inventory || []).filter(function (e) { return e.inventoryId === mainId; })[0] : null;
             var cat = entry ? (inv.itemCatalog || []).filter(function (c) { return c.id === entry.catalogId; })[0] : null;
-            if (cat && cat.damage) { var dm = String(cat.damage).match(/\d+d\d+/); if (dm) weaponDie = dm[0]; }
+            if (cat && cat.damage) {
+              var dm = String(cat.damage).match(/(\d+d\d+)\s*([+-]\d+)?/);
+              if (dm) { weaponDie = dm[1]; weaponBonus = dm[2] ? parseInt(dm[2], 10) : 0; }
+            }
           }
         } catch (e) {}
-        player.damageFormula = atkMod > 0 ? (weaponDie + "+" + atkMod) : (atkMod < 0 ? (weaponDie + atkMod) : weaponDie);
+        player.attackBonus = proficiencyBonus + atkMod + weaponBonus;
+        var flatDanno = atkMod + weaponBonus;
+        player.damageFormula = flatDanno > 0 ? (weaponDie + "+" + flatDanno) : (flatDanno < 0 ? (weaponDie + flatDanno) : weaponDie);
         player.defeated = player.hitPoints <= 0;
+      }
+
+      // Regola 2 (multi-party): TUTTI i membri vivi del roster hotseat (window.partyData) entrano
+      // in combattimento come combattenti distinti, non solo la scheda attiva. Il membro ATTIVO
+      // resta rappresentato da "pc-local" (sincronizzato dallo state manager, come sempre); gli
+      // ALTRI diventano "pc-party-<id>", con statistiche derivate dalla loro scheda nel roster e
+      // HP persistiti nel roster stesso (cosi' i danni restano sul personaggio giusto).
+      function syncPartyCombatantsFromRoster() {
+        const roster = window.partyData;
+        if (!Array.isArray(roster) || roster.length < 2) {
+          return; // party di 1 (o assente): basta pc-local
+        }
+        let activeId = null;
+        try { activeId = window.UltimateVTTState.getState().identity.id; } catch (e) { activeId = null; }
+
+        // Dopo un cambio di scheda attiva (hotseat switch), il PG ORA attivo e' rappresentato da
+        // "pc-local": il suo vecchio combattente "pc-party-<id>" (creato quando era un membro non
+        // attivo) resterebbe nel tracker come DOPPIONE dello stesso personaggio — due card in
+        // iniziativa, due bersagli, due token. Va rimosso.
+        if (activeId) {
+          const doppioneId = "pc-party-" + activeId;
+          const indiceDoppione = combatState.combatants.findIndex(function trovaDoppione(c) { return c.id === doppioneId; });
+          if (indiceDoppione >= 0) {
+            combatState.combatants.splice(indiceDoppione, 1);
+          }
+        }
+
+        roster.forEach(function syncMember(member) {
+          if (!member || !member.identity || !member.identity.id) {
+            return;
+          }
+          if (member.identity.id === activeId) {
+            return; // gia' rappresentato da pc-local
+          }
+          const combatantId = "pc-party-" + member.identity.id;
+          const dexScore = member.abilities && member.abilities.dex ? member.abilities.dex.score : 10;
+          const strScore = member.abilities && member.abilities.str ? member.abilities.str.score : 10;
+          const dexMod = Math.floor((dexScore - 10) / 2);
+          const strMod = Math.floor((strScore - 10) / 2);
+          const attackMod = Math.max(strMod, dexMod);
+          const existing = getCombatant(combatantId);
+          const combatant = existing || {
+            id: combatantId, kind: "pc", temporaryHitPoints: 0, initiative: 0, defeated: false
+          };
+          combatant.name = member.identity.name || combatantId;
+          combatant.armorClass = (member.resources && member.resources.armorClass) || 10;
+          combatant.maxHitPoints = (member.resources && member.resources.hp && member.resources.hp.max) || 10;
+          combatant.hitPoints = (member.resources && member.resources.hp && member.resources.hp.current != null)
+            ? member.resources.hp.current : combatant.maxHitPoints;
+          combatant.initiativeBonus = dexMod;
+          combatant.attackBonus = (member.proficiencyBonus || 2) + attackMod;
+          combatant.damageFormula = attackMod > 0 ? ("1d8+" + attackMod) : (attackMod < 0 ? ("1d8" + attackMod) : "1d8");
+          combatant.defeated = combatant.hitPoints <= 0;
+          if (!existing) {
+            combatState.combatants.push(combatant);
+          }
+        });
+      }
+
+      // OGNI membro del party ha il SUO token sulla griglia (fix: "nel party siamo in 2 ma nella
+      // mappa vedo solo un player"). Il PG ATTIVO resta "token-pc" (che qui prende anche il nome
+      // reale del personaggio, non piu' "Eroe Locale"); per ogni combattente "pc-party-<id>" senza
+      // token se ne crea uno alleato accanto al PG e lo si collega alla FSM (impostaMappaToken),
+      // cosi' HUD, Spingi, distanze e IA nemica lo trovano sulla griglia come qualunque altro.
+      function assicuraTokenDelParty() {
+        const tp = window.UltimateVTTTokenPhysics;
+        const fsm = window.UltimateVTTCombatFSM;
+        if (!tp || !tp.getState || !tp.addToken) {
+          return;
+        }
+        let tokens;
+        try { tokens = tp.getState().tokens || []; } catch (e) { return; }
+
+        // 1) Il token principale mostra il NOME del PG attivo.
+        let nomeAttivo = "";
+        try { nomeAttivo = String(window.UltimateVTTState.getState().identity.name || ""); } catch (e) { nomeAttivo = ""; }
+        if (nomeAttivo && tp.setTokenName) {
+          tp.setTokenName("token-pc", nomeAttivo);
+        }
+
+        // 2) Dopo un cambio di scheda attiva, il PG ora attivo e' rappresentato da token-pc: il suo
+        //    VECCHIO token da membro (stesso nome, alleato) resterebbe orfano come doppione.
+        if (nomeAttivo) {
+          tokens.filter(function (t) { return t && t.kind === "pc" && t.id !== "token-pc" && t.name === nomeAttivo; })
+            .forEach(function (t) {
+              try { tp.removeToken(t.id); } catch (e) { /* best-effort */ }
+              try { if (fsm && fsm.impostaMappaToken) { fsm.impostaMappaToken(t.id, null); } } catch (e) {}
+            });
+          tokens = tokens.filter(function (t) { return !(t && t.kind === "pc" && t.id !== "token-pc" && t.name === nomeAttivo); });
+        }
+
+        // 3) Ogni "pc-party-<id>" ha un token: se gia' mappato lo si rinomina e basta; se esiste un
+        //    token alleato omonimo non mappato (es. ripristino da backup) lo si adotta; altrimenti
+        //    se ne crea uno su una cella libera accanto al PG.
+        const pcTok = tokens.find(function (t) { return t.id === "token-pc"; });
+        const base = pcTok ? { x: pcTok.cellX, y: pcTok.cellY } : { x: 16, y: 12 };
+        const offsets = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [0, 2]];
+        let prossimoOffset = 0;
+        combatState.combatants.forEach(function (c) {
+          if (c.kind !== "pc" || c.id === "pc-local") {
+            return;
+          }
+          let tokId = null;
+          try { tokId = fsm && fsm.combattenteAToken ? fsm.combattenteAToken(c.id) : null; } catch (e) { tokId = null; }
+          const attuale = tokId ? tokens.find(function (t) { return t.id === tokId; }) : null;
+          if (attuale) {
+            if (tp.setTokenName) { tp.setTokenName(attuale.id, c.name); }
+            return;
+          }
+          const omonimo = tokens.find(function (t) { return t.kind === "pc" && t.id !== "token-pc" && t.name === c.name; });
+          if (omonimo) {
+            try { if (fsm && fsm.impostaMappaToken) { fsm.impostaMappaToken(omonimo.id, c.id); } } catch (e) {}
+            return;
+          }
+          let cella = null;
+          for (; prossimoOffset < offsets.length; prossimoOffset += 1) {
+            const cx = base.x + offsets[prossimoOffset][0];
+            const cy = base.y + offsets[prossimoOffset][1];
+            const occupata = tokens.some(function (t) { return t && t.cellX === cx && t.cellY === cy; });
+            let bloccata = false;
+            try { bloccata = window.UltimateVTTCanvas.isTerrainBlocking(cx, cy); } catch (e) { bloccata = false; }
+            if (!occupata && !bloccata) {
+              cella = { x: cx, y: cy };
+              prossimoOffset += 1;
+              break;
+            }
+          }
+          if (!cella) { cella = { x: base.x + 1, y: base.y + 1 }; }
+          let creato = null;
+          try { creato = tp.addToken(c.name, cella.x, cella.y, "#2e7d9f", "pc"); } catch (e) { creato = null; }
+          if (creato) {
+            try { if (fsm && fsm.impostaMappaToken) { fsm.impostaMappaToken(creato.id, c.id); } } catch (e) {}
+            tokens.push(creato); // cosi' il controllo "cella occupata" vede anche i token appena creati
+          }
+        });
+      }
+
+      // Un PNG sconfitto SPARISCE dalla griglia (fix: "i nemici quando vengono uccisi devono
+      // sparire dalla mappa"): il suo token viene rimosso e la mappatura FSM ripulita. Chiamata
+      // dall'UNICO punto in cui un PNG muore (applyDamageToCombatant): tutti i percorsi di danno
+      // — attacchi, reazioni, superfici, comandi IA e persino gli eventi HP di rete in ingresso —
+      // passano da li', quindi la rimozione vale per ogni tipo di uccisione, anche lato Giocatore.
+      function rimuoviTokenDelCaduto(combatantId) {
+        try {
+          const tp = window.UltimateVTTTokenPhysics;
+          if (!tp || !tp.removeToken || !tp.getState) {
+            return;
+          }
+          const fsm = window.UltimateVTTCombatFSM;
+          const tokenId = fsm && fsm.combattenteAToken ? fsm.combattenteAToken(combatantId) : null;
+          if (!tokenId || tokenId === "token-pc") {
+            return;
+          }
+          const esiste = (tp.getState().tokens || []).some(function (t) { return t.id === tokenId; });
+          if (esiste) {
+            tp.removeToken(tokenId);
+          }
+          // La mappatura FSM NON si tocca qui, DI PROPOSITO. Sul Master, impostaMappaToken emette
+          // subito la mappa autorevole via rete, MENTRE l'evento HP dell'uccisione parte solo DOPO
+          // (il wrapper di rete emette al ritorno di questa funzione): il Giocatore riceverebbe
+          // prima la mappa SENZA la voce del caduto e poi il danno — e non saprebbe piu' quale
+          // token rimuovere. Le voci orfane si ripuliscono in blocco a fine combattimento.
+        } catch (e) { /* best-effort: la rimozione visiva non deve mai bloccare il danno */ }
+      }
+
+      // A fine combattimento, ripulisce le mappature token<->combattente rimaste orfane (token
+      // rimossi alla morte del PNG): igiene dello stato, senza le corse di eventi descritte sopra.
+      function pulisciMappaturaTokenOrfani() {
+        try {
+          const fsm = window.UltimateVTTCombatFSM;
+          const tp = window.UltimateVTTTokenPhysics;
+          if (!fsm || !fsm.getMappa || !fsm.impostaMappaToken || !tp || !tp.getState) {
+            return;
+          }
+          const mappa = fsm.getMappa();
+          const idEsistenti = {};
+          (tp.getState().tokens || []).forEach(function (t) { idEsistenti[t.id] = true; });
+          Object.keys(mappa).forEach(function (tokenId) {
+            if (!idEsistenti[tokenId]) {
+              fsm.impostaMappaToken(tokenId, null);
+            }
+          });
+        } catch (e) { /* best-effort */ }
+      }
+
+      // Regola 4 (distanze): celle fra due combattenti sulla griglia (Chebyshev, come si muovono i
+      // token), risolte via mappatura FSM + posizioni dei token. null se una posizione non e' nota
+      // (es. teatro della mente / membro senza token): in quel caso l'attacco non viene bloccato.
+      function combatantCell(combatantId) {
+        let tokenId = null;
+        try {
+          if (window.UltimateVTTCombatFSM && window.UltimateVTTCombatFSM.combattenteAToken) {
+            tokenId = window.UltimateVTTCombatFSM.combattenteAToken(combatantId);
+          }
+        } catch (e) { tokenId = null; }
+        if (!tokenId && combatantId === "pc-local") { tokenId = "token-pc"; }
+        if (!tokenId) {
+          const m = /^npc-(\w+)$/.exec(String(combatantId)); if (m) { tokenId = "token-npc-" + m[1]; }
+        }
+        if (!tokenId || !window.UltimateVTTTokenPhysics || !window.UltimateVTTTokenPhysics.getState) {
+          return null;
+        }
+        let tokens; try { tokens = window.UltimateVTTTokenPhysics.getState().tokens || []; } catch (e) { return null; }
+        const token = tokens.find(function findToken(t) { return t.id === tokenId; });
+        return token ? { cellX: token.cellX, cellY: token.cellY } : null;
+      }
+
+      function distanzaCelle(aId, bId) {
+        const a = combatantCell(aId), b = combatantCell(bId);
+        if (!a || !b) { return null; }
+        return Math.max(Math.abs(a.cellX - b.cellX), Math.abs(a.cellY - b.cellY));
+      }
+
+      // Portata dell'arma in celle: mischia = 1 (adiacente); a distanza (arco/balestra equipaggiata
+      // in mano principale) = 12 celle (~18 m). I PNG del bestiario attaccano in mischia.
+      function portataArma(attacker) {
+        if (!attacker || attacker.kind !== "pc") { return 1; }
+        try {
+          const inv = window.UltimateVTTInventory;
+          if (inv && inv.getState) {
+            const st = inv.getState();
+            const mainId = st.equipmentSlots && st.equipmentSlots.mainHand;
+            const entry = mainId ? (st.inventory || []).find(function (e) { return e.inventoryId === mainId; }) : null;
+            const cat = entry ? (inv.itemCatalog || []).find(function (c) { return c.id === entry.catalogId; }) : null;
+            if (cat && (/bow|crossbow/i.test(cat.id || "") || /arco|balestra/i.test(cat.name || ""))) { return 12; }
+          }
+        } catch (e) { /* fallback mischia */ }
+        return 1;
+      }
+
+      // Regola 1 (action economy): l'attacco di un PG spende la sua Azione. Il pool e' quello del
+      // modulo 05 (azione/bonus/reazione del tavolo hotseat, resettato a ogni cambio turno). Se il
+      // modulo non e' caricato (ambienti di test ridotti) non si blocca nulla.
+      function spendiAzioneDelPg() {
+        const inv = window.UltimateVTTInventory;
+        if (!inv || !inv.spendActionResource) { return true; }
+        try { return inv.spendActionResource("action") === true; } catch (e) { return true; }
+      }
+
+      // Guardie comuni pre-attacco per un attaccante PG: portata dell'arma, poi spesa dell'Azione.
+      // Ritorna null se l'attacco puo' procedere, altrimenti il messaggio di blocco.
+      function bloccoAttaccoPg(attacker, target) {
+        if (!attacker || attacker.kind !== "pc") { return null; } // i PNC (IA) gestiscono da soli il loro turno
+        const dist = distanzaCelle(attacker.id, target.id);
+        const portata = portataArma(attacker);
+        if (dist != null && dist > portata) {
+          return "Fuori portata: " + target.name + " è a " + dist + " celle, l'arma arriva a " + portata + ".";
+        }
+        if (!spendiAzioneDelPg()) {
+          return "Azione già spesa in questo turno: usa Termina turno.";
+        }
+        return null;
       }
 
       function rollDie(sides) {
@@ -326,6 +587,21 @@
 
       function startCombat() {
         syncPlayerCombatantFromState();
+        syncPartyCombatantsFromRoster();
+        assicuraTokenDelParty();
+        // Non si combatte con tutto il party a terra: dopo una sconfitta lo scontro puo' ripartire
+        // solo quando almeno un PG e' di nuovo cosciente (rianimato/curato DAVVERO), altrimenti si
+        // riaprirebbe un combattimento gia' perso in uno stato rotto (turni che girano a vuoto,
+        // nemici senza bersagli validi).
+        var pgCoscienti = combatState.combatants.some(function (c) {
+          return c.kind === "pc" && !c.defeated && c.hitPoints > 0;
+        });
+        if (!pgCoscienti) {
+          combatState.lastEvent = "Impossibile iniziare il combattimento: tutti i PG sono incoscienti. Rianimali prima.";
+          renderCombat();
+          appendLog(combatState.lastEvent);
+          return;
+        }
         combatState.active = true;
         combatState.round = 1;
         rollAllInitiative();
@@ -343,6 +619,15 @@
         combatState.round = 0;
         combatState.currentTurnIndex = -1;
         combatState.lastEvent = "Combattimento terminato.";
+        // La pulizia e' RIMANDATA (non sincrona): quando l'ULTIMO nemico muore, endCombat() scatta
+        // DENTRO la stessa applyDamageToCombatant() che lo ha appena ucciso — PRIMA che il wrapper
+        // di rete (modulo 22) emetta l'evento HP di quella morte. Se impostaMappaToken pulisse la
+        // mappa qui, sincrona, la sua TokenMappingEvent (autorevole, sostituisce l'intera mappa)
+        // arriverebbe al Giocatore PRIMA dell'evento HP della morte stessa: il Giocatore perderebbe
+        // proprio la voce che gli serve per capire QUALE suo token rimuovere, e quel token
+        // resterebbe orfano sulla sua griglia per sempre (bug osservato in test multiplayer reali).
+        // Rimandarla al tick successivo garantisce che l'evento HP sia gia' partito per primo.
+        window.setTimeout(pulisciMappaturaTokenOrfani, 0);
         renderCombat();
         appendLog("Combattimento terminato.");
       }
@@ -364,8 +649,14 @@
       }
 
       function nextTurn() {
+        // A combattimento spento avanzare il turno NON deve (ri)avviare lo scontro: dopo un TPK o
+        // una fine combattimento, un "Turno Succ." (o un nextTurn programmatico rimasto in coda)
+        // riavviava il combattimento in uno stato incoerente. Lo scontro parte SOLO da startCombat
+        // (pulsante Start, spawn dei nemici, ponte chat).
         if (!combatState.active) {
-          startCombat();
+          combatState.lastEvent = "Il combattimento non e' attivo: nessun turno da avanzare.";
+          renderCombat();
+          appendLog(combatState.lastEvent);
           return;
         }
 
@@ -395,7 +686,24 @@
         appendLog(combatState.lastEvent);
       }
 
-      function addNpc(catalogId) {
+      // Applica una variazione al modificatore fisso di una formula danni ("1d6+2" con delta -1 ->
+      // "1d6+1"; "2d4" con delta +1 -> "2d4+1"). Non tocca i dadi: scala solo il bonus costante.
+      function applicaDeltaDanno(formula, delta) {
+        const norm = String(formula || "1d4").trim();
+        const m = norm.match(/^(.*?d\d+)\s*([+-]\s*\d+)?$/i);
+        if (!m) { return norm; }
+        const dado = m[1].replace(/\s+/g, "");
+        const bonusAttuale = m[2] ? parseInt(m[2].replace(/\s+/g, ""), 10) : 0;
+        const nuovo = bonusAttuale + delta;
+        if (nuovo === 0) { return dado; }
+        return dado + (nuovo > 0 ? "+" + nuovo : String(nuovo));
+      }
+
+      // addNpc(catalogId[, overrides]): overrides opzionale usato dall'Encounter Balancer (modulo
+      // 37) per SCALARE le statistiche del nemico appena creato senza toccare il catalogo — es.
+      // { hitPoints, maxHitPoints, attackBonus, armorClass, damageBonusDelta }. Retrocompatibile:
+      // senza overrides il PNG esce identico al template, come prima.
+      function addNpc(catalogId, overrides) {
         const npcTemplate = npcCatalog.find(function findNpc(template) {
           return template.id === catalogId;
         });
@@ -408,18 +716,24 @@
           return combatant.kind === "npc" && combatant.name.indexOf(npcTemplate.name) === 0;
         }).length + 1;
 
+        const ov = overrides || {};
+        const hp = clampNumber(ov.hitPoints != null ? ov.hitPoints : npcTemplate.hitPoints, 1, 9999, npcTemplate.hitPoints);
+        // damageBonusDelta: variazione del modificatore FISSO della formula danni (es. "1d6+2" con
+        // delta -1 -> "1d6+1"). Scala l'offesa senza cambiare il dado, mantenendo la formula leggibile.
+        const dmgFormula = ov.damageBonusDelta ? applicaDeltaDanno(npcTemplate.damageFormula, ov.damageBonusDelta) : npcTemplate.damageFormula;
+
         const combatant = {
           id: "npc-" + combatState.nextNpcNumber,
           kind: "npc",
           name: npcTemplate.name + " " + sameTypeCount,
-          armorClass: npcTemplate.armorClass,
-          hitPoints: npcTemplate.hitPoints,
-          maxHitPoints: npcTemplate.hitPoints,
+          armorClass: clampNumber(ov.armorClass != null ? ov.armorClass : npcTemplate.armorClass, 1, 40, npcTemplate.armorClass),
+          hitPoints: hp,
+          maxHitPoints: clampNumber(ov.maxHitPoints != null ? ov.maxHitPoints : hp, 1, 9999, hp),
           temporaryHitPoints: 0,
           initiative: 0,
           initiativeBonus: npcTemplate.initiativeBonus,
-          attackBonus: npcTemplate.attackBonus,
-          damageFormula: npcTemplate.damageFormula,
+          attackBonus: clampNumber(ov.attackBonus != null ? ov.attackBonus : npcTemplate.attackBonus, -5, 30, npcTemplate.attackBonus),
+          damageFormula: dmgFormula,
           defeated: false
         };
 
@@ -457,6 +771,17 @@
         return true;
       }
 
+      // Membro del roster hotseat (window.partyData) rappresentato da un combattente "pc-party-<id>".
+      function partyMemberByCombatantId(combatantId) {
+        const m = /^pc-party-(.+)$/.exec(String(combatantId || ""));
+        if (!m || !Array.isArray(window.partyData)) {
+          return null;
+        }
+        return window.partyData.find(function findMember(member) {
+          return member && member.identity && member.identity.id === m[1];
+        }) || null;
+      }
+
       function applyDamageToCombatant(combatantId, amount) {
         const combatant = getCombatant(combatantId);
         const damageAmount = clampNumber(amount, 0, 9999, 0);
@@ -465,17 +790,73 @@
           return false;
         }
 
-        if (combatant.kind === "pc") {
+        // Per rilevare la TRANSIZIONE a sconfitto (solo il colpo che uccide rimuove il token,
+        // non ogni danno successivo su un PNG gia' caduto).
+        const eraGiaSconfitto = Boolean(combatant.defeated);
+
+        // Routing per ID, non per kind: "pc-local" e' il PG della scheda ATTIVA (state manager);
+        // "pc-party-<id>" sono gli ALTRI membri del party in hotseat (HP persistiti nel roster
+        // window.partyData, cosi' il danno resta sul personaggio giusto anche cambiando scheda).
+        if (combatantId === "pc-local") {
           window.UltimateVTTState.applyDamage(damageAmount);
           syncPlayerCombatantFromState();
+        } else if (combatant.kind === "pc") {
+          combatant.hitPoints = Math.max(0, combatant.hitPoints - damageAmount);
+          combatant.defeated = combatant.hitPoints <= 0;
+          const member = partyMemberByCombatantId(combatantId);
+          if (member && member.resources && member.resources.hp) {
+            member.resources.hp.current = combatant.hitPoints;
+          }
         } else {
           combatant.hitPoints = Math.max(0, combatant.hitPoints - damageAmount);
           combatant.defeated = combatant.hitPoints <= 0;
         }
 
-        combatState.lastEvent = combatant.name + " subisce " + damageAmount + " danni.";
+        // Un PG a 0 HP e' INCOSCIENTE (puo' essere rialzato da un alleato), non "sconfitto" come un PNG.
+        if (combatant.kind === "pc" && getCombatant(combatantId).defeated) {
+          combatState.lastEvent = combatant.name + " subisce " + damageAmount + " danni e cade INCOSCIENTE!";
+        } else {
+          combatState.lastEvent = combatant.name + " subisce " + damageAmount + " danni.";
+        }
+
+        // Il colpo che UCCIDE un PNG ne rimuove il token dalla griglia (il caduto sparisce dal
+        // campo; resta nel tracker come "defeated" per XP/loot/riepilogo del Master).
+        if (combatant.kind === "npc" && combatant.defeated && !eraGiaSconfitto) {
+          rimuoviTokenDelCaduto(combatantId);
+        }
         renderCombat();
         appendLog(combatState.lastEvent);
+
+        // TPK: se TUTTI i PG del party sono a terra contemporaneamente, il combattimento si chiude
+        // subito (resetCombat) invece di lasciare i turni dei nemici a girare su un party incosciente.
+        if (combatState.active) {
+          const pgVivi = combatState.combatants.filter(function contaPgVivi(c) {
+            return c.kind === "pc" && !c.defeated && c.hitPoints > 0;
+          });
+          const pgTotali = combatState.combatants.filter(function contaPg(c) { return c.kind === "pc"; });
+          if (pgTotali.length > 0 && pgVivi.length === 0) {
+            resetCombat();
+          }
+        }
+
+        // VITTORIA: quando l'ULTIMO nemico cade, lo scontro finisce DA SOLO (prima restava attivo
+        // e la chat del Master — in pausa durante il combattimento — non ripartiva mai finché non
+        // si premeva "End" a mano). All'annuncio segue endCombat: la chat si riattiva da sola,
+        // perché il suo blocco controlla lo stato active. Il controllo scatta SOLO sul danno a un
+        // PNG (l'evento dell'uccisione), non su un danno qualsiasi a un PG.
+        if (combatState.active && combatant.kind === "npc") {
+          const pncTotali = combatState.combatants.filter(function contaPnc(c) { return c.kind === "npc"; });
+          const pncVivi = pncTotali.filter(function contaPncVivi(c) { return !c.defeated && c.hitPoints > 0; });
+          if (pncTotali.length > 0 && pncVivi.length === 0) {
+            try {
+              if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) {
+                window.UltimateVTTCoreGameplay.appendChatMessage("system", "🏆 VITTORIA! Tutti i nemici sono stati sconfitti. La chat del Master è di nuovo attiva.");
+              }
+            } catch (eVitt) { /* ignora */ }
+            appendLog("🏆 Vittoria: tutti i nemici sconfitti. Combattimento concluso.");
+            endCombat();
+          }
+        }
         return true;
       }
 
@@ -487,9 +868,16 @@
           return false;
         }
 
-        if (combatant.kind === "pc") {
+        if (combatantId === "pc-local") {
           window.UltimateVTTState.heal(healAmount);
           syncPlayerCombatantFromState();
+        } else if (combatant.kind === "pc") {
+          combatant.hitPoints = Math.min(combatant.maxHitPoints, combatant.hitPoints + healAmount);
+          combatant.defeated = combatant.hitPoints <= 0;
+          const member = partyMemberByCombatantId(combatantId);
+          if (member && member.resources && member.resources.hp) {
+            member.resources.hp.current = combatant.hitPoints;
+          }
         } else {
           combatant.hitPoints = Math.min(combatant.maxHitPoints, combatant.hitPoints + healAmount);
           combatant.defeated = combatant.hitPoints <= 0;
@@ -499,6 +887,69 @@
         renderCombat();
         appendLog(combatState.lastEvent);
         return true;
+      }
+
+      // Rialza un PG incosciente (Regola 5): un alleato spende la sua Azione Bonus (o l'Azione, se
+      // la bonus e' gia' stata usata — la spesa la gestisce chi chiama, es. la HUD) per rimetterlo
+      // in piedi con pochi HP. Solo per PG: i PNG sconfitti restano sconfitti.
+      function reviveCombatant(combatantId, hp) {
+        const combatant = getCombatant(combatantId);
+        if (!combatant || combatant.kind !== "pc") {
+          return false;
+        }
+        const amount = clampNumber(hp, 1, 9999, 1);
+        if (combatantId === "pc-local") {
+          try { window.UltimateVTTState.setCurrentHp(amount); } catch (e) { return false; }
+          syncPlayerCombatantFromState();
+        } else {
+          combatant.hitPoints = Math.min(amount, combatant.maxHitPoints || amount);
+          combatant.defeated = false;
+          const member = partyMemberByCombatantId(combatantId);
+          if (member && member.resources && member.resources.hp) {
+            member.resources.hp.current = combatant.hitPoints;
+          }
+        }
+        combatState.lastEvent = combatant.name + " riprende conoscenza (" + getCombatant(combatantId).hitPoints + " HP).";
+        renderCombat();
+        appendLog(combatState.lastEvent);
+        return true;
+      }
+
+      // TPK / interruzione forzata: chiude lo scontro (il modulo 29 ne fara' il riepilogo per il
+      // Master, con esito "sconfitta del party" se tutti i PG sono a terra).
+      function resetCombat() {
+        try {
+          if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) {
+            window.UltimateVTTCoreGameplay.appendChatMessage("system", "💀 Tutto il party è incosciente: il combattimento si interrompe.");
+          }
+        } catch (e) { /* ignora */ }
+        appendLog("💀 TPK: tutti i PG sono a terra. Combattimento interrotto.");
+        endCombat();
+        risveglioDopoLaSconfitta();
+      }
+
+      // Dopo il TPK il party NON resta in uno stato "zombie" a 0 HP: prima il Master narrava la
+      // rianimazione ma meccanicamente i PG restavano incoscienti, quindi il combattimento non
+      // poteva ripartire in modo valido (o ripartiva rotto). A scontro ormai chiuso — il riepilogo
+      // del modulo 29 fotografa l'ultimo stato ATTIVO, quindi l'esito "sconfitta del party" resta
+      // corretto — il party si risveglia con gli HP pieni, pronto a riprendere la storia. Applica
+      // il risveglio solo il Master (o il gioco in solitaria/hotseat): in multiplayer decide un
+      // client solo, come per tutte le azioni GM-autorevoli.
+      function risveglioDopoLaSconfitta() {
+        if (window.UltimateVTTSync && !window.UltimateVTTSync.isMaster()) {
+          return;
+        }
+        combatState.combatants.forEach(function risvegliaPg(c) {
+          if (c.kind !== "pc") {
+            return;
+          }
+          reviveCombatant(c.id, c.maxHitPoints || 1);
+        });
+        try {
+          if (window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.appendChatMessage) {
+            window.UltimateVTTCoreGameplay.appendChatMessage("system", "🌅 Il party si risveglia malconcio ma vivo: HP ripristinati. La storia continua.");
+          }
+        } catch (e) { /* ignora */ }
       }
 
       function setRollMode(mode) {
@@ -552,6 +1003,16 @@
           return null;
         }
 
+        const blocco = bloccoAttaccoPg(attacker, target);
+        if (blocco) {
+          combatState.lastRoll.title = "Attacco non eseguito";
+          combatState.lastRoll.detail = blocco;
+          combatState.lastEvent = blocco;
+          renderCombat();
+          appendLog(blocco);
+          return null;
+        }
+
         const attackRoll = rollD20WithMode(combatState.rollMode);
         const attackTotal = attackRoll.chosen + inputs.attackBonus;
         const critical = Boolean(forceCritical || attackRoll.naturalTwenty);
@@ -584,6 +1045,40 @@
           hit: hit,
           critical: critical,
           damageRoll: damageRoll
+        };
+      }
+
+      // Attacco diretto tra due combattenti SPECIFICI (non dipende dal turno corrente ne' dai campi
+      // del DOM): usato dall'IA dei nemici (modulo 33) per far attaccare un PNG contro un bersaglio
+      // preciso. Tira per colpire e, se colpisce, tira i danni e li applica; imposta lastRoll/
+      // lastEvent nel formato "Attaccante vs Bersaglio ..." (cosi' la memoria di combattimento del
+      // modulo 29 e l'attribuzione XP del modulo 15 lo riconoscono come qualunque altro attacco).
+      function resolveAttackBetween(attackerId, targetId, mode) {
+        const attacker = getCombatant(attackerId);
+        const target = getCombatant(targetId);
+        if (!attacker || !target) { return null; }
+        const rollMode = (mode === "advantage" || mode === "disadvantage") ? mode : "normal";
+        const attackRoll = rollD20WithMode(rollMode);
+        const attackTotal = attackRoll.chosen + (attacker.attackBonus || 0);
+        const critical = Boolean(attackRoll.naturalTwenty);
+        const automaticMiss = attackRoll.naturalOne;
+        const targetAc = typeof target.armorClass === "number" ? target.armorClass : 10;
+        const hit = !automaticMiss && (critical || attackTotal >= targetAc);
+        let damageRoll = null;
+        if (hit) {
+          damageRoll = rollDamageFormula(attacker.damageFormula || "1d4", critical);
+          applyDamageToCombatant(target.id, damageRoll.total);
+        }
+        const hitText = hit ? (critical ? "CRITICO" : "colpito") : "mancato";
+        const damageText = damageRoll ? " Danni: " + damageRoll.total + " (" + describeDamageRoll(damageRoll) + ")." : "";
+        combatState.lastRoll.title = attacker.name + " vs " + target.name;
+        combatState.lastRoll.detail = "d20 " + attackRoll.chosen + "+" + (attacker.attackBonus || 0) + "=" + attackTotal + " vs CA " + targetAc + ": " + hitText + "." + damageText;
+        combatState.lastEvent = combatState.lastRoll.detail;
+        renderCombat();
+        appendLog(combatState.lastRoll.detail);
+        return {
+          attacker: cloneData(attacker), target: cloneData(target),
+          attackRoll: attackRoll, attackTotal: attackTotal, hit: hit, critical: critical, damageRoll: damageRoll
         };
       }
 
@@ -637,12 +1132,116 @@
         }, 42);
       }
 
+      /* ---- Attacco animato tra due combattenti SPECIFICI (usato dall'IA nemici, modulo 33): stessa
+         HUD dei dadi del giocatore (tiro per colpire -> tiro per i danni), ma pilotata per id invece
+         che dal turno corrente/dai campi del form, e senza bisogno di click per proseguire tra le
+         fasi — al termine (colpito o mancato) chiama onComplete(), cosi' chi la invoca (l'IA) sa
+         quando puo' passare al turno successivo invece di indovinare un ritardo fisso scollegato
+         dall'animazione vera. Un pulsante "Chiudi" resta disponibile per chi vuole saltare l'attesa. ---- */
+      var PAUSA_TRA_FASI_MS = 650;
+      var PAUSA_RISULTATO_MS = 1100;
+
+      function resolveAttackAnimatoTra(attackerId, targetId, mode, onComplete) {
+        var attacker = getCombatant(attackerId);
+        var target = getCombatant(targetId);
+        var chiuso = false;
+        function fine() {
+          if (chiuso) { return; }
+          chiuso = true;
+          closeAttackHud();
+          if (typeof onComplete === "function") { onComplete(); }
+        }
+        if (!attacker || !target) { fine(); return; }
+
+        var rollMode = (mode === "advantage" || mode === "disadvantage") ? mode : "normal";
+        openAttackHud(attacker.name + " attacca " + target.name + "!");
+        var attackRoll = rollD20WithMode(rollMode);
+        var attackBonus = attacker.attackBonus || 0;
+        var attackTotal = attackRoll.chosen + attackBonus;
+        var critical = Boolean(attackRoll.naturalTwenty);
+        var automaticMiss = attackRoll.naturalOne;
+        var targetAc = typeof target.armorClass === "number" ? target.armorClass : 10;
+        var hit = !automaticMiss && (critical || attackTotal >= targetAc);
+        var modeText = rollMode === "normal" ? "" :
+                       rollMode === "advantage" ? " [Vant. " + attackRoll.rolls.join("/") + "]" :
+                       " [Svant. " + attackRoll.rolls.join("/") + "]";
+
+        spinAphudDie(20, attackRoll.chosen, function () {
+          var rollLine = "d20 " + attackRoll.chosen + modeText + " + " + attackBonus +
+                         " = <span class='big'>" + attackTotal + "</span> vs CA " + targetAc;
+          var resultLine = critical
+            ? "<span class='crit'>✦ COLPO CRITICO!</span>"
+            : automaticMiss
+              ? "<span class='miss'>✕ Fallimento critico</span>"
+              : hit
+                ? "<span class='hit'>✔ Colpito!</span>"
+                : "<span class='miss'>✗ Mancato (CA " + targetAc + ")</span>";
+          aphudLines("<b>" + attacker.name + "</b> → <b>" + target.name + "</b><br>" + rollLine + "<br>" + resultLine);
+          aphudBtn("Chiudi", "style='opacity:.6'", fine);
+
+          if (!hit) {
+            combatState.lastRoll.title = attacker.name + " vs " + target.name;
+            combatState.lastRoll.detail = "d20 " + attackRoll.chosen + "+" + attackBonus + "=" + attackTotal + " vs CA " + targetAc + ": mancato.";
+            combatState.lastEvent = combatState.lastRoll.detail;
+            appendLog(combatState.lastRoll.detail);
+            renderCombat();
+            window.setTimeout(fine, PAUSA_RISULTATO_MS);
+            return;
+          }
+
+          window.setTimeout(function () {
+            if (chiuso) { return; } // gia' chiuso (es. click su "Chiudi" durante la pausa)
+            openAttackHud("Tiro per i danni" + (critical ? " — CRITICO" : ""));
+            var damageRoll = rollDamageFormula(attacker.damageFormula || "1d4", critical);
+            var firstDie = (String(attacker.damageFormula || "1d4").match(/d(\d+)/) || [null, "6"])[1];
+            var firstRoll = damageRoll.details[0] && damageRoll.details[0].rolls
+                            ? damageRoll.details[0].rolls[0] : damageRoll.total;
+
+            spinAphudDie(parseInt(firstDie, 10) || 6, firstRoll, function () {
+              applyDamageToCombatant(target.id, damageRoll.total);
+
+              var dmgDesc = describeDamageRoll(damageRoll);
+              var targetNow = getCombatant(target.id);
+              var hpText = targetNow ? targetNow.hitPoints + " / " + targetNow.maxHitPoints + " HP" : "";
+              var defeatedText = targetNow && targetNow.defeated ? " — <span class='crit'>SCONFITTO</span>" : "";
+
+              aphudLines(
+                (critical ? "<span class='crit'>✦ Dadi raddoppiati!</span><br>" : "") +
+                "Danni: <span class='big dmg'>" + damageRoll.total + "</span><br>" +
+                "<span style='font-size:11px;opacity:.75'>" + dmgDesc + "</span><br>" +
+                "<b>" + target.name + "</b>: " + hpText + defeatedText
+              );
+              aphudBtn("Chiudi", "", fine);
+
+              combatState.lastRoll.title = attacker.name + " vs " + target.name;
+              combatState.lastRoll.detail = "COLPITO! Danni: " + damageRoll.total + " (" + dmgDesc + ")." + (critical ? " CRITICO!" : "");
+              combatState.lastEvent = combatState.lastRoll.detail;
+              appendLog(combatState.lastRoll.detail);
+              setTargetFromCombatant(target.id);
+              renderCombat();
+              window.setTimeout(fine, PAUSA_RISULTATO_MS);
+            });
+          }, PAUSA_TRA_FASI_MS);
+        });
+      }
+
       /* FASE 1: tiro per colpire */
       function resolveAttackStep1(forceCritical) {
         syncPlayerCombatantFromState();
         var inputs = getAttackInputs();
         if (!inputs.attacker) { appendLog("Errore: nessun attaccante."); return; }
         if (!inputs.target)   { appendLog("Errore: nessun target."); return; }
+
+        // Stesse guardie della risoluzione immediata: portata dell'arma e Azione del turno.
+        var bloccoDueFasi = bloccoAttaccoPg(inputs.attacker, inputs.target);
+        if (bloccoDueFasi) {
+          combatState.lastRoll.title = "Attacco non eseguito";
+          combatState.lastRoll.detail = bloccoDueFasi;
+          combatState.lastEvent = bloccoDueFasi;
+          renderCombat();
+          appendLog(bloccoDueFasi);
+          return;
+        }
 
         openAttackHud("Tiro per colpire");
         var attackRoll = rollD20WithMode(combatState.rollMode);
@@ -739,6 +1338,14 @@
       function renderInitiativeStrip() {
         var strip = document.getElementById("initiativeStrip");
         if (!strip) return;
+        // La barra iniziativa in stile BG3 (modulo 23) e' l'UNICA striscia d'iniziativa del gioco:
+        // quando e' presente, questa versione precedente resta spenta, altrimenti in combattimento
+        // comparivano DUE barre sovrapposte che dicevano la stessa cosa una sopra l'altra.
+        if (window.UltimateVTTBG3HUD) {
+          strip.classList.remove("is-visible");
+          strip.innerHTML = "";
+          return;
+        }
         if (!combatState.active || combatState.combatants.length === 0) {
           strip.classList.remove("is-visible");
           strip.innerHTML = "";
@@ -1111,6 +1718,22 @@
         healCombatant: healCombatant,
         setRollMode: setRollMode,
         resolveAttack: resolveAttack,
+        // Attacco a DUE FASI con animazione dei dadi (tiro per colpire -> tiro per i danni): e' il
+        // flusso che mostra davvero i dadi al giocatore. La HUD BG3 (modulo 23) lo usa se presente,
+        // cosi' cliccare "Attacca" fa vedere il tiro invece di risolvere tutto in silenzio.
+        resolveAttackAnimato: resolveAttackStep1,
+        // Attacco diretto tra due combattenti (usato dall'IA nemici, modulo 33): risoluzione
+        // immediata (senza HUD, per test/automazioni) e versione animata con la stessa HUD dei
+        // dadi del giocatore, che avvisa onComplete() quando l'animazione e' davvero finita.
+        resolveAttackBetween: resolveAttackBetween,
+        resolveAttackAnimatoTra: resolveAttackAnimatoTra,
+        // Incoscienza/rialzo dei PG e chiusura forzata (TPK) — Regola 5.
+        reviveCombatant: reviveCombatant,
+        resetCombat: resetCombat,
+        // Distanze e portata (Regola 4) e sync del party (Regola 2), esposte anche per i test.
+        distanzaCelle: distanzaCelle,
+        portataArma: portataArma,
+        syncPartyCombatants: syncPartyCombatantsFromRoster,
         renderCombat: renderCombat
       };
 

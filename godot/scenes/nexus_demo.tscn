@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+; Scena standalone del Nexus Map Engine: apri e premi Play per vedere SOLO il motore dungeon
+; (senza le 3 colonne di gioco). Utile per provare temi/illuminazione in isolamento.
+; Il nodo radice ha lo script NexusView, che costruisce da solo SubViewport + mappa + toolbar.
+
+[ext_resource type="Script" path="res://scripts/ui/nexus_view.gd" id="1_nexus"]
+
+[node name="NexusDemo" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_nexus")

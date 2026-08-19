@@ -1,0 +1,79 @@
+; Ultimate VTT — progetto Godot 4 (porting del monolite Vanilla JS/HTML).
+; Generato dalla migrazione automatica. Apri questa cartella con Godot 4.3+.
+;
+; Gli autoload sono elencati NELL'ORDINE DI DIPENDENZA: Godot li inizializza dall'alto verso il
+; basso, e i manager piu' in basso usano quelli sopra (CombatManager legge CharacterManager al
+; _ready; AIBridge usa tutti gli altri). Non riordinarli a caso.
+
+config_version=5
+
+[application]
+
+config/name="Ultimate VTT — Tavolo Oscuro di Ventimiglia"
+config/description="Porting Godot 4 del VTT D&D 5e. Client leggero (Split-Rig); il Master IA gira su un PC remoto via Ollama."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+
+EventBus="*res://scripts/autoload/event_bus.gd"
+GameState="*res://scripts/autoload/game_state.gd"
+CharacterManager="*res://scripts/autoload/character_manager.gd"
+InventoryManager="*res://scripts/autoload/inventory_manager.gd"
+ArmeriaManager="*res://scripts/autoload/armeria_manager.gd"
+CharacterCreation="*res://scripts/autoload/character_creation.gd"
+CombatManager="*res://scripts/combat/combat_manager.gd"
+ProgressionManager="*res://scripts/autoload/progression_manager.gd"
+ConditionsManager="*res://scripts/combat/conditions_manager.gd"
+FlankingSystem="*res://scripts/combat/flanking_system.gd"
+ElevationManager="*res://scripts/combat/elevation_manager.gd"
+SurfacesManager="*res://scripts/combat/surfaces_manager.gd"
+CoverManager="*res://scripts/combat/cover_manager.gd"
+ConcentrationManager="*res://scripts/combat/concentration_manager.gd"
+TacticalRules="*res://scripts/combat/tactical_rules.gd"
+EnemyAI="*res://scripts/combat/enemy_ai.gd"
+DeathSaves="*res://scripts/combat/death_saves.gd"
+EncounterBalancer="*res://scripts/combat/encounter_balancer.gd"
+ActionMenuManager="*res://scripts/combat/action_menu_manager.gd"
+CampaignMemory="*res://scripts/autoload/campaign_memory.gd"
+VttCoreManager="*res://scripts/autoload/vtt_core_manager.gd"
+LocalGameManager="*res://scripts/autoload/local_game_manager.gd"
+LocalInputManager="*res://scripts/autoload/local_input_manager.gd"
+AIBridge="*res://scripts/network/ai_bridge.gd"
+ChatCombatBridge="*res://scripts/combat/chat_combat_bridge.gd"
+ChatTravelBridge="*res://scripts/network/chat_travel_bridge.gd"
+MasterVoice="*res://scripts/network/master_voice.gd"
+AmbienceManager="*res://scripts/autoload/ambience_manager.gd"
+DiceServer="*res://scripts/network/dice_server.gd"
+SaveManager="*res://scripts/autoload/save_manager.gd"
+CampaignDirector="*res://scripts/autoload/campaign_director.gd"
+StoryDirector="*res://scripts/autoload/story_director.gd"
+TravelDirector="*res://scripts/autoload/travel_director.gd"
+CompanySpirit="*res://scripts/autoload/company_spirit.gd"
+RelicsManager="*res://scripts/autoload/relics_manager.gd"
+TravelJournal="*res://scripts/autoload/travel_journal.gd"
+JourneyEvents="*res://scripts/autoload/journey_events.gd"
+CompanionManager="*res://scripts/autoload/companion_manager.gd"
+MerchantManager="*res://scripts/autoload/merchant_manager.gd"
+QuestManager="*res://scripts/autoload/quest_manager.gd"
+TokenDirector="*res://scripts/network/token_director.gd"
+CombatSfx="*res://scripts/autoload/combat_sfx.gd"
+ToastUi="*res://scripts/ui/toast_ui.gd"
+UiSfx="*res://scripts/autoload/ui_sfx.gd"
+TravelSfx="*res://scripts/autoload/travel_sfx.gd"
+MusicDirector="*res://scripts/autoload/music_director.gd"
+ReactionPrompt="*res://scripts/combat/reaction_prompt.gd"
+SpellBook="*res://scripts/combat/spell_book.gd"
+ClassFeats="*res://scripts/combat/class_feats.gd"
+EpilogueScreen="*res://scripts/ui/epilogue_screen.gd"
+TutorialDirector="*res://scripts/autoload/tutorial_director.gd"
+TavoloTheme="*res://scripts/autoload/tavolo_theme.gd"
+TavoloFrame="*res://scripts/ui/tavolo_frame.gd"
+
+[audio]
+
+general/text_to_speech=true
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

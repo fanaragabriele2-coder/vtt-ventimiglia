@@ -28,9 +28,12 @@
         lastFrameTime: performance.now(),
         tokens: [
           { id: "token-pc", name: "Eroe Locale", kind: "pc", color: "#c89b3c", ringColor: "#f0ddb3", cellX: 16, cellY: 12, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.38, dragging: false, hidden: false },
-          { id: "token-npc-1", name: "Goblin", kind: "npc", color: "#5d9f45", ringColor: "#9fe087", cellX: 20, cellY: 12, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: false },
-          { id: "token-npc-2", name: "Bandito", kind: "npc", color: "#8f1d18", ringColor: "#ff8b83", cellX: 22, cellY: 14, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: false },
-          { id: "token-npc-3", name: "Scheletro", kind: "npc", color: "#707070", ringColor: "#d8c7a3", cellX: 20, cellY: 16, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: false }
+          // I tre PNG di esempio partono NASCOSTI: sulla scena iniziale c'e' solo l'eroe.
+          // I nemici veri compaiono quando il Master li evoca (spawn -> token-extra-N mappati
+          // esplicitamente). Questi restano disponibili alle liste tecniche (mappatura, select).
+          { id: "token-npc-1", name: "Goblin", kind: "npc", color: "#5d9f45", ringColor: "#9fe087", cellX: 20, cellY: 12, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: true },
+          { id: "token-npc-2", name: "Bandito", kind: "npc", color: "#8f1d18", ringColor: "#ff8b83", cellX: 22, cellY: 14, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: true },
+          { id: "token-npc-3", name: "Scheletro", kind: "npc", color: "#707070", ringColor: "#d8c7a3", cellX: 20, cellY: 16, x: 0, y: 0, targetX: 0, targetY: 0, radiusScale: 0.36, dragging: false, hidden: true }
         ]
       };
 
@@ -215,15 +218,18 @@
         return true;
       }
 
-      function addToken(name, cellX, cellY, color) {
+      // kind opzionale ("pc" per i membri del party in hotseat, default "npc"): serve al
+      // combattimento multi-party — ogni membro del roster ha il SUO token sulla griglia,
+      // riconoscibile come alleato (anello chiaro) e non come nemico.
+      function addToken(name, cellX, cellY, color, kind) {
         const clamped = clampCell(cellX, cellY);
         const center = getCellCenter(clamped.cellX, clamped.cellY);
         const token = {
           id: "token-extra-" + tokenState.nextTokenNumber,
           name: name || "PNG " + tokenState.nextTokenNumber,
-          kind: "npc",
+          kind: kind === "pc" ? "pc" : "npc",
           color: color || "#8f1d18",
-          ringColor: "#f0ddb3",
+          ringColor: kind === "pc" ? "#bfe3f0" : "#f0ddb3",
           cellX: clamped.cellX,
           cellY: clamped.cellY,
           x: center.x,
@@ -240,6 +246,19 @@
         setSelectedToken(token.id);
         appendLog("Token aggiunto: " + token.name + ".");
         return token;
+      }
+
+      // Rinomina un token esistente (es. "Eroe Locale" -> nome reale del PG attivo, o il nome
+      // del membro del party sul suo token alleato): il nome e' quello disegnato sulla griglia.
+      function setTokenName(tokenId, name) {
+        const token = getToken(tokenId);
+        if (!token || !name) {
+          return false;
+        }
+        token.name = String(name);
+        renderTokenUi();
+        window.UltimateVTTCanvas.requestRender();
+        return true;
       }
 
       function removeToken(tokenId) {
@@ -671,6 +690,7 @@
         setSelectedToken: setSelectedToken,
         addToken: addToken,
         removeToken: removeToken,
+        setTokenName: setTokenName,
         resetTokens: resetTokens,
         centerSelectedToken: centerSelectedToken,
         moveTokenToCell: moveTokenToCell,

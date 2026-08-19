@@ -13,6 +13,10 @@
         { command: "audioCue", cue: "spell" },
         { command: "moveToken", tokenId: "token-pc", cellX: 18, cellY: 12 },
         { command: "revealFog", cellX: 18, cellY: 12, radius: 4 },
+        { command: "createSurface", type: "fuoco", cellX: 20, cellY: 12, radius: 1, rounds: 3 },
+        { command: "setElevation", cellX: 22, cellY: 10, radius: 2, level: 1 },
+        { command: "applyCondition", targetId: "npc-1", condition: "prono", rounds: 1 },
+        { command: "clearCondition", targetId: "npc-1", condition: "prono" },
         { command: "damage", targetId: "npc-1", amount: 5 },
         { command: "save", slot: "slot1" }
       ];
@@ -168,6 +172,7 @@
           tokenState: getModuleState("UltimateVTTTokenPhysics"),
           diceState: getModuleState("UltimateVTTDice3D"),
           audioVoiceState: getModuleState("UltimateVTTAudioVoice"),
+          coreGameplayState: getModuleState("UltimateVTTCoreGameplay"),
           ui: {
             notes: notesInput ? notesInput.value : "",
             aiCommandText: aiInput ? aiInput.value : ""
@@ -252,6 +257,13 @@
         return true;
       }
 
+      function applyCoreGameplaySnapshot(snapshot) {
+        if (snapshot.coreGameplayState && window.UltimateVTTCoreGameplay && window.UltimateVTTCoreGameplay.hydrate) {
+          return window.UltimateVTTCoreGameplay.hydrate(snapshot.coreGameplayState);
+        }
+        return false;
+      }
+
       function applyUiSnapshot(snapshot) {
         if (!snapshot.ui) {
           return false;
@@ -283,7 +295,8 @@
           character: applyCharacterSnapshot(snapshot),
           canvas: applyCanvasSnapshot(snapshot),
           tokens: applyTokenSnapshot(snapshot),
-          ui: applyUiSnapshot(snapshot)
+          ui: applyUiSnapshot(snapshot),
+          coreGameplay: applyCoreGameplaySnapshot(snapshot)
         };
 
         if (window.UltimateVTTDice3D && window.UltimateVTTDice3D.clearDice) {
@@ -414,6 +427,94 @@
         return applySnapshot(parsed.value);
       }
 
+      // Backup scaricabile: a differenza di saveTable() (solo localStorage del browner corrente),
+      // produce un file .json che l'utente puo' conservare altrove e ripristinare anche su un
+      // altro dispositivo/browser. Riusa lo stesso createSnapshot() del salvataggio in slot.
+      function exportSnapshotToFile() {
+        const snapshot = createSnapshot();
+        const serialized = JSON.stringify(snapshot, null, 2);
+        const slot = bridgeState.lastSaveSlot || "slot1";
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const filename = "vtt-ventimiglia-" + slot + "-" + timestamp + ".json";
+
+        try {
+          const blob = new Blob([serialized], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          bridgeState.lastStatus = "exported file";
+          bridgeState.lastResult = "Backup scaricato: " + filename + " (" + serialized.length + " bytes).";
+          pushHistory("export-file", bridgeState.lastResult, true);
+          renderBridgeUi();
+          return {
+            ok: true,
+            filename: filename,
+            bytes: serialized.length,
+            snapshot: snapshot
+          };
+        } catch (error) {
+          bridgeState.lastStatus = "export error";
+          bridgeState.lastResult = "Download backup fallito: " + error.message;
+          pushHistory("export-file", bridgeState.lastResult, false);
+          renderBridgeUi();
+          return {
+            ok: false,
+            message: bridgeState.lastResult
+          };
+        }
+      }
+
+      // Ripristina da un file scelto dall'utente (es. <input type="file"> .files[0]). Asincrono
+      // (FileReader): ritorna una Promise che risolve sempre con { ok, message, ... }, mai con un
+      // throw, cosi' chi chiama puo' trattarla allo stesso modo di un esito non riuscito.
+      function importSnapshotFromFile(file) {
+        return new Promise(function resolveImport(resolve) {
+          if (!file) {
+            const message = "Nessun file selezionato.";
+            bridgeState.lastStatus = "import error";
+            bridgeState.lastResult = message;
+            pushHistory("import-file", message, false);
+            renderBridgeUi();
+            resolve({ ok: false, message: message });
+            return;
+          }
+
+          const reader = new FileReader();
+
+          reader.onerror = function handleReadError() {
+            const message = "Lettura del file di backup fallita.";
+            bridgeState.lastStatus = "import error";
+            bridgeState.lastResult = message;
+            pushHistory("import-file", message, false);
+            renderBridgeUi();
+            resolve({ ok: false, message: message });
+          };
+
+          reader.onload = function handleReadDone() {
+            let result;
+            try {
+              const parsed = JSON.parse(String(reader.result || ""));
+              result = applySnapshot(parsed);
+            } catch (error) {
+              result = { ok: false, message: "File di backup non valido: " + error.message };
+            }
+            bridgeState.lastStatus = result.ok ? "imported file" : "import error";
+            bridgeState.lastResult = result.ok ? (result.message + " (da file).") : result.message;
+            pushHistory("import-file", bridgeState.lastResult, result.ok);
+            renderBridgeUi();
+            resolve(result);
+          };
+
+          reader.readAsText(file);
+        });
+      }
+
       function executeCommand(commandPayload) {
         const command = normalizeCommand(cloneData(commandPayload));
         const name = String(command.command || "noop");
@@ -492,6 +593,57 @@
             window.UltimateVTTCanvas.revealCircle(clampNumber(command.cellX, 0, 999, 16), clampNumber(command.cellY, 0, 999, 12), clampNumber(command.radius, 0, 16, 3));
           }
           result.message = "Nebbia rivelata.";
+        } else if (name === "createSurface") {
+          if (window.UltimateVTTSurfaces && typeof window.UltimateVTTSurfaces.creaSuperficie === "function") {
+            var esitoSuperficie = window.UltimateVTTSurfaces.creaSuperficie(
+              command.type || "fuoco",
+              clampNumber(command.cellX, 0, 999, 16),
+              clampNumber(command.cellY, 0, 999, 12),
+              clampNumber(command.radius, 0, 16, 1),
+              clampNumber(command.rounds, 1, 20, 3)
+            );
+            result.ok = Boolean(esitoSuperficie && esitoSuperficie.ok);
+            result.message = (esitoSuperficie && esitoSuperficie.message) || (result.ok ? "Superficie creata." : "Superficie non creata.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo superfici non disponibile.";
+          }
+        } else if (name === "setElevation") {
+          if (window.UltimateVTTElevation && typeof window.UltimateVTTElevation.impostaElevazioneArea === "function") {
+            var esitoElevazione = window.UltimateVTTElevation.impostaElevazioneArea(
+              clampNumber(command.cellX, 0, 999, 16),
+              clampNumber(command.cellY, 0, 999, 12),
+              clampNumber(command.radius, 0, 16, 1),
+              clampNumber(command.level, -5, 5, 1)
+            );
+            result.ok = Boolean(esitoElevazione && esitoElevazione.ok);
+            result.message = (esitoElevazione && esitoElevazione.message) || (result.ok ? "Quota impostata." : "Quota non impostata.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo elevazione non disponibile.";
+          }
+        } else if (name === "applyCondition") {
+          if (window.UltimateVTTConditions && typeof window.UltimateVTTConditions.applicaCondizione === "function") {
+            var esitoCondizione = window.UltimateVTTConditions.applicaCondizione(
+              command.targetId || "pc-local",
+              command.condition || "",
+              clampNumber(command.rounds, 1, 20, 1)
+            );
+            result.ok = Boolean(esitoCondizione && esitoCondizione.ok);
+            result.message = (esitoCondizione && esitoCondizione.message) || (result.ok ? "Condizione applicata." : "Condizione non applicata.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo condizioni non disponibile.";
+          }
+        } else if (name === "clearCondition") {
+          if (window.UltimateVTTConditions && typeof window.UltimateVTTConditions.rimuoviCondizione === "function") {
+            var esitoRimozione = window.UltimateVTTConditions.rimuoviCondizione(command.targetId || "pc-local", command.condition || "");
+            result.ok = Boolean(esitoRimozione && esitoRimozione.ok);
+            result.message = (esitoRimozione && esitoRimozione.message) || (result.ok ? "Condizione rimossa." : "Condizione non rimossa.");
+          } else {
+            result.ok = false;
+            result.message = "Modulo condizioni non disponibile.";
+          }
         } else if (name === "hideFog") {
           if (window.UltimateVTTCanvas && window.UltimateVTTCanvas.hideCircle) {
             window.UltimateVTTCanvas.hideCircle(clampNumber(command.cellX, 0, 999, 16), clampNumber(command.cellY, 0, 999, 12), clampNumber(command.radius, 0, 16, 3));
@@ -637,6 +789,9 @@
         const saveButton = getElement("saveTableButton");
         const loadButton = getElement("loadTableButton");
         const slotSelect = getElement("saveSlotSelect");
+        const downloadBackupButton = getElement("downloadBackupButton");
+        const restoreBackupButton = getElement("restoreBackupButton");
+        const restoreBackupInput = getElement("restoreBackupInput");
 
         if (exampleButton) {
           exampleButton.addEventListener("click", cycleExample);
@@ -668,6 +823,25 @@
             renderBridgeUi();
           });
         }
+
+        if (downloadBackupButton) {
+          downloadBackupButton.addEventListener("click", exportSnapshotToFile);
+        }
+
+        if (restoreBackupButton && restoreBackupInput) {
+          restoreBackupButton.addEventListener("click", function handleRestoreClick() {
+            restoreBackupInput.click();
+          });
+        }
+
+        if (restoreBackupInput) {
+          restoreBackupInput.addEventListener("change", function handleRestoreFileChosen() {
+            const file = restoreBackupInput.files && restoreBackupInput.files[0];
+            importSnapshotFromFile(file).then(function resetInput() {
+              restoreBackupInput.value = ""; // permette di ricaricare lo stesso file una seconda volta
+            });
+          });
+        }
       }
 
       function initializeBridge() {
@@ -686,6 +860,8 @@
         loadTable: loadTable,
         exportSnapshotToInput: exportSnapshotToInput,
         importSnapshotFromInput: importSnapshotFromInput,
+        exportSnapshotToFile: exportSnapshotToFile,
+        importSnapshotFromFile: importSnapshotFromFile,
         executeCommand: executeCommand,
         executePayload: executePayload,
         executeInput: executeInput,

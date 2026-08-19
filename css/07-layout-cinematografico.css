@@ -1,0 +1,192 @@
+/* --- INIZIO MODULO 35 CSS: LAYOUT CINEMATOGRAFICO A TRE COLONNE --- */
+/* Rifinitura strutturale dell'interfaccia: mappa protagonista al centro (niente pannelli
+   tecnici fissi sopra la scena), chat del Master padrona della colonna destra, diagnostica
+   in un cassetto richiudibile. Caricato per ULTIMO: vince sulle regole precedenti. */
+
+/* 0) La griglia dell'app non deve MAI superare la finestra. Prima la topbar (flex nowrap,
+      piena di pulsanti) imponeva la sua larghezza minima all'INTERA griglia #app: su schermi
+      normali la colonna destra con la chat del Master finiva letteralmente FUORI dallo
+      schermo (era questo il "layout rotto / chat che non si apre"). La colonna unica di #app
+      viene bloccata alla larghezza della finestra e la topbar va a capo se non ci sta. */
+#app {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.topbar {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: var(--layout-topbar-height);
+  padding: 6px 14px;
+  row-gap: 4px;
+}
+
+.topbar-center {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topbar-right {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Le etichette informative ("Modalita: Tavolo Locale", "Regole: D&D 5e") spariscono quando
+   lo spazio scarseggia: sono testo di stato, non comandi. */
+@media (max-width: 1760px) {
+  #sessionModePill,
+  #rulesetPill {
+    display: none;
+  }
+}
+
+/* 1) Centro pulito: l'etichetta diagnostica sopra la mappa ("Canvas: griglia e nebbia...")
+      sparisce dalla scena. L'elemento resta nel DOM (i moduli la aggiornano), ma non copre
+      piu' la visuale. */
+.stage-label {
+  display: none;
+}
+
+/* 2) Strumenti del Master: da pannellone fisso sovrapposto alla mappa a CASSETTO laterale,
+      chiuso di default. Si apre con 🛠 STRUMENTI in topbar o si chiude con la ✕ interna.
+      Nessun controllo rimosso: stessi id, stessa logica, solo fuori dalla visuale. */
+.map-toolbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 92vw);
+  display: none;
+  align-content: start;
+  overflow: auto;
+  border-radius: var(--radius-panel);
+  background: linear-gradient(180deg, rgba(13, 11, 9, 0.97), rgba(9, 7, 6, 0.95));
+  box-shadow: -14px 0 40px rgba(0, 0, 0, 0.55);
+}
+
+.map-toolbar.is-open {
+  display: grid;
+}
+
+.map-tools-head {
+  padding-bottom: 6px;
+  border-bottom: var(--border-iron);
+}
+
+.map-tools-close {
+  min-width: 44px;  /* hit-box touch minima (Task 5) */
+  min-height: 44px;
+  padding: 2px 9px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 3) Colonna destra = Chat Master: la chat riempie la colonna (log che scorre, input sempre
+      in basso); la diagnostica e i riepiloghi tecnici stanno in un cassetto in fondo. */
+.side-panel.right .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.side-panel.right .master-chat-panel {
+  flex: 1 1 auto;
+  min-height: 260px;
+  margin-bottom: 0;
+}
+
+.diag-drawer {
+  flex: 0 0 auto;
+  border: var(--border-iron);
+  border-radius: var(--radius-panel);
+  background: rgba(12, 10, 8, 0.6);
+}
+
+.diag-drawer > summary {
+  padding: 9px 12px;
+  color: rgba(216, 199, 163, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.diag-drawer > summary:hover {
+  color: var(--color-gold);
+}
+
+.diag-drawer[open] > summary {
+  border-bottom: var(--border-iron);
+  color: var(--color-gold);
+}
+
+.diag-drawer-body {
+  display: grid;
+  gap: 10px;
+  max-height: 46vh;
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+/* 3b) Elementi di combattimento che non si pestano i piedi: la barra iniziativa BG3 si
+       aggancia all'altezza REALE della topbar (che puo' andare a capo su schermi stretti:
+       la variabile --topbar-real-height la misura il modulo 35), e l'HUD dei dadi sta sopra
+       il tray delle azioni BG3 invece di finirci sotto. */
+.bg3-initiative {
+  top: calc(var(--topbar-real-height, var(--layout-topbar-height)) + 6px);
+}
+
+#attackPhaseHud {
+  bottom: calc(var(--layout-bottombar-height) + 118px);
+}
+
+/* 4) Scena centrale piu' cinematografica: vignettatura leggera ai bordi, fondale meno cupo
+      (la luminosita' della mappa arriva dal fog ammorbidito nel modulo 07). */
+.stage {
+  background:
+    radial-gradient(circle at center, rgba(200, 155, 60, 0.1), transparent 56%),
+    linear-gradient(135deg, rgba(9, 7, 6, 0.35), rgba(18, 16, 14, 0.85));
+}
+
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 110px rgba(0, 0, 0, 0.5);
+}
+
+#vttCanvas {
+  background: rgba(11, 10, 9, 0.55);
+}
+
+/* 5) Transizione canvas tattico <-> mappa reale di Ventimiglia (Task 3b). Quando la mappa
+      Leaflet e' attiva (classe messa da VentimigliaMap.activate in js/12):
+      - la vignetta cinematografica si spegne (scuriva anche la mappa reale);
+      - la stage-overlay lascia passare i click a Leaflet (pan/zoom), MA il cassetto
+        🛠 Strumenti resta cliccabile — prima veniva spento in blocco con lo stile inline e il
+        cassetto aperto sopra la mappa reale era visibile ma morto al click;
+      - la mappa entra con un fade su opacity: proprieta' composita sulla GPU, nessun reflow. */
+.stage.ventimiglia-attiva::after {
+  display: none;
+}
+
+.stage.ventimiglia-attiva .stage-overlay {
+  pointer-events: none;
+}
+
+.stage.ventimiglia-attiva .stage-overlay .map-toolbar {
+  pointer-events: auto;
+}
+
+#ventimigliaMapDiv {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.stage.ventimiglia-attiva #ventimigliaMapDiv {
+  opacity: 1;
+}
+/* --- FINE MODULO 35 CSS: LAYOUT CINEMATOGRAFICO A TRE COLONNE --- */

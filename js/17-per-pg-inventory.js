@@ -6,6 +6,14 @@
   "use strict";
 
   var lastOwner = null;
+  // Kit di partenza di riferimento, catturato una sola volta all'avvio (prima di qualunque hydrate):
+  // usato come fallback per un PG senza inventario salvato NE' build (es. aggiunto in hotseat con
+  // "+ Aggiungi giocatore", js/12, che non passa dalla creazione personaggio e quindi non ha un
+  // record "build" in VTTCharacters.byId). Prima di questo fallback, restoreFor() non faceva NULLA
+  // in quel caso ("mantieni l'inventario corrente") — lo zaino del PG USCENTE restava visibile e
+  // modificabile sotto l'identita' del PG entrante, un bug silenzioso in ogni sessione hotseat con
+  // membri aggiunti al volo.
+  var inventarioIniziale = null;
 
   function inv(){ return window.UltimateVTTInventory; }
   function regById(){ window.VTTCharacters = window.VTTCharacters || { byId:{} }; return window.VTTCharacters.byId; }
@@ -26,7 +34,8 @@
       window.VTTStartMenu.applyKitFor(rec.build);
       if (I.getState) rec.inventory = I.getState();
     }
-    // altrimenti: nessun dato noto, mantieni l'inventario corrente
+    else if (inventarioIniziale && I.hydrate){ I.hydrate(inventarioIniziale); }
+    // altrimenti (nessun kit di riferimento nemmeno catturato): mantieni l'inventario corrente.
   }
   function onActiveChange(newId){
     if (!newId || newId === lastOwner) return;
@@ -37,6 +46,7 @@
 
   function boot(){
     lastOwner = activeId();
+    try { if (inv() && inv().getState) { inventarioIniziale = inv().getState(); } } catch (e) {}
     try { window.UltimateVTTState && window.UltimateVTTState.subscribe && window.UltimateVTTState.subscribe(function(){ onActiveChange(activeId()); }); } catch (e) {}
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

@@ -35,6 +35,7 @@
         <span class="pill" id="activeTurnPill" style="background: linear-gradient(180deg, #5bb7c8, #187789); border: 1px solid #73d1e2; color: #fff; font-size: 12px; font-weight: bold; padding: 5px 11px; box-shadow: 0 0 10px rgba(91,183,200,0.4);">TURNO: ...</span>
         <select class="header-party-select" id="headerPartySelect" aria-label="Cambia giocatore attivo"></select>
         <button class="hud-button scroll-shortcut-button" type="button" id="scrollMapButton" title="Vai alla mappa">MAPPA</button>
+        <button class="hud-button" type="button" id="mapToolsToggleBtn" aria-expanded="false" title="Apri/chiudi gli strumenti del Master (mappa, nebbia, token, audio, salvataggi)">🛠 STRUMENTI</button>
         <button class="hud-button" type="button" id="ventimigliaToggleBtn" title="Apri mappa reale di Ventimiglia" style="min-width:128px;border-color:rgba(93,159,69,.72);background:linear-gradient(180deg,rgba(93,159,69,.18),rgba(25,55,21,.88));color:#e2ffd9;font-weight:700;">🏔 VENTIMIGLIA</button>
         <button class="hud-button" type="button" id="campLaunchBtn" title="Entra in modalità campagna — esplora Ventimiglia con il tuo PG" style="min-width:110px;border-color:rgba(200,155,60,.8);background:linear-gradient(180deg,rgba(80,50,5,.7),rgba(30,18,2,.9));color:#f0d472;font-weight:700;">⚔️ CAMPAGNA</button>
         <button class="hud-button scroll-shortcut-button" type="button" id="scrollChatButton" title="Vai alla chat del Master">CHAT</button>
@@ -45,6 +46,7 @@
           <div class="topbar-dropdown-menu" id="masterDropdownMenu" role="menu">
             <button class="hud-button local-model-button topbar-dropdown-item" type="button" id="localMasterModelButton" title="Cambia modello locale del Master" role="menuitem">MODELLO: CLASSICO</button>
             <button class="hud-button ollama-master-button topbar-dropdown-item" type="button" id="ollamaMasterButton" title="Usa Ollama locale come Master" role="menuitem">OLLAMA: OFF</button>
+            <button class="hud-button topbar-dropdown-item" type="button" id="ollamaHostButton" title="Indirizzo del server Ollama in rete locale (IP:porta del PC con la GPU)" role="menuitem">🖧 127.0.0.1:11434</button>
             <button class="hud-button groq-master-button topbar-dropdown-item" type="button" id="groqMasterButton" title="Usa Groq AI come Master (API key gratuita su console.groq.com)" role="menuitem">GROQ: OFF</button>
           </div>
         </div>
@@ -59,9 +61,17 @@
             <button class="hud-button topbar-dropdown-item" type="button" id="openCombatModalButton" title="Apri tracker combattimento" role="menuitem">⚔️ FIGHT</button>
           </div>
         </div>
-        <button class="hud-button" type="button" id="diagnosticRefreshButton" title="Esegui autodiagnosi">CHECK</button>
-        <button class="hud-button ally-toggle-button" type="button" id="rogAllyModeButton" aria-pressed="false" title="Attiva Modalita Console">MODALITA CONSOLE</button>
-        <button class="hud-button" type="button" id="fullscreenButton" title="Schermo intero">FULL</button>
+        <!-- 🖥 Sistema dropdown: raccoglie i comandi di servizio (autodiagnosi, modalita' console,
+             schermo intero) che prima erano tre pulsanti separati e allargavano la topbar oltre lo
+             schermo, spingendo la colonna della chat fuori dalla finestra. -->
+        <div class="topbar-dropdown" id="systemDropdownWrapper">
+          <button class="hud-button topbar-dropdown-trigger" type="button" id="systemDropdownTrigger" aria-haspopup="true" aria-expanded="false" title="Comandi di sistema">🖥 Sistema</button>
+          <div class="topbar-dropdown-menu" id="systemDropdownMenu" role="menu">
+            <button class="hud-button topbar-dropdown-item" type="button" id="diagnosticRefreshButton" title="Esegui autodiagnosi" role="menuitem">✓ CHECK</button>
+            <button class="hud-button ally-toggle-button topbar-dropdown-item" type="button" id="rogAllyModeButton" aria-pressed="false" title="Attiva Modalita Console" role="menuitem">MODALITA CONSOLE</button>
+            <button class="hud-button topbar-dropdown-item" type="button" id="fullscreenButton" title="Schermo intero" role="menuitem">⛶ FULL</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -335,8 +345,15 @@
         <!-- --- FINE MODULO 8 HTML: CANVAS DADI 3D --- -->
         <div class="stage-overlay">
           <div class="stage-label" id="stageStatusLabel">Canvas: griglia e nebbia in caricamento</div>
-          <!-- --- INIZIO MODULO 6 HTML: TOOLBAR CANVAS MAPPA --- -->
-          <div class="map-toolbar" aria-label="Controlli mappa">
+          <!-- --- INIZIO MODULO 6 HTML: TOOLBAR CANVAS MAPPA ---
+               Cassetto "Strumenti del Master": CHIUSO di default, si apre dal pulsante 🛠 STRUMENTI
+               in topbar. Contiene tutti i controlli tecnici (mappa/nebbia, token, dadi fisici,
+               audio, AI bridge e salvataggi) che prima erano un pannello fisso sopra la mappa. -->
+          <div class="map-toolbar" id="mapToolsDrawer" aria-label="Strumenti del Master">
+            <div class="map-toolbar-title map-tools-head">
+              <span>🛠 Strumenti del Master</span>
+              <button class="map-tools-close" type="button" id="mapToolsCloseBtn" aria-label="Chiudi strumenti">✕</button>
+            </div>
             <div class="map-toolbar-title">
               <span>Mappa tattica</span>
               <span id="mapRenderStatus">Init</span>
@@ -467,6 +484,9 @@
                 </div>
                 <button class="ai-control-button" type="button" id="saveTableButton">Save</button>
                 <button class="ai-control-button" type="button" id="loadTableButton">Load</button>
+                <button class="ai-control-button" type="button" id="downloadBackupButton" title="Scarica un backup .json (oltre al salvataggio nel browser)">⬇ Backup</button>
+                <button class="ai-control-button" type="button" id="restoreBackupButton" title="Ripristina da un file di backup .json">⬆ Ripristina</button>
+                <input type="file" id="restoreBackupInput" accept="application/json,.json" style="display:none">
               </div>
               <div class="ai-result-box" id="aiBridgeResult">Nessun comando eseguito.</div>
             </div>
@@ -477,12 +497,43 @@
         </div>
       </section>
 
-      <aside class="side-panel right" aria-label="Sistema e diagnostica">
+      <aside class="side-panel right" aria-label="Chat del Master">
         <div class="panel-header">
-          <h2 class="panel-title">Autodiagnosi</h2>
+          <h2 class="panel-title">Chat Master</h2>
           <span class="pill" id="moduleCountPill">0 / 10</span>
         </div>
         <div class="panel-body">
+          <!-- --- CORE LOOP HTML: CHAT DEL MASTER (protagonista della colonna destra) --- -->
+          <section class="master-chat-panel" aria-label="Chat del Master">
+            <header class="master-chat-header">
+              <div>
+                <h2 class="master-chat-title">Master IA</h2>
+                <p class="master-chat-subtitle">Canale narrativo</p>
+              </div>
+              <span class="master-chat-status" id="masterChatStatus">Online</span>
+            </header>
+
+            <div class="master-chat-log" id="masterChatLog" aria-live="polite">
+              <div class="master-chat-message master">
+                <span class="master-chat-speaker">Master</span>
+                <p>Le ombre si muovono oltre la soglia. Cosa fai?</p>
+              </div>
+            </div>
+
+            <form class="master-chat-form" id="masterChatForm">
+              <button class="master-chat-tts" type="button" id="masterChatTtsBtn" title="Auto Lettura (On/Off)">🔊</button>
+              <input class="master-chat-input" id="masterChatInput" type="text" autocomplete="off" placeholder="Scrivi al Master o chiedi una prova...">
+              <button class="master-chat-mic" type="button" id="masterChatMicBtn" title="Parla (Speech-to-Text)">🎤</button>
+              <button class="master-chat-send" type="submit">Invia</button>
+            </form>
+          </section>
+          <!-- --- FINE CORE LOOP HTML: CHAT DEL MASTER --- -->
+
+          <!-- Diagnostica e riepiloghi tecnici dei moduli: cassetto richiudibile, CHIUSO di
+               default. Stessi id e stesse funzioni di prima, solo fuori dalla visuale. -->
+          <details class="diag-drawer" id="diagnosticsDrawer">
+            <summary>🔧 Diagnostica e stato moduli</summary>
+            <div class="diag-drawer-body">
           <!-- --- INIZIO MODULO 2 HTML: FILTRI STATUS --- -->
           <div class="status-filter-bar" id="statusFilterBar" aria-label="Filtri status">
             <button class="status-filter-button" type="button" data-status="blinded" aria-pressed="false">Accecato</button>
@@ -692,32 +743,9 @@
             </div>
           </section>
           <!-- --- FINE MODULO 10 HTML: RIEPILOGO AI BRIDGE E SAVE SYSTEM --- -->
-          <!-- --- INIZIO CORE LOOP HTML: CHAT DEL MASTER --- -->
-          <section class="master-chat-panel" aria-label="Chat del Master">
-            <header class="master-chat-header">
-              <div>
-                <h2 class="master-chat-title">Master IA</h2>
-                <p class="master-chat-subtitle">Canale narrativo</p>
-              </div>
-              <span class="master-chat-status" id="masterChatStatus">Online</span>
-            </header>
-
-            <div class="master-chat-log" id="masterChatLog" aria-live="polite">
-              <div class="master-chat-message master">
-                <span class="master-chat-speaker">Master</span>
-                <p>Le ombre si muovono oltre la soglia. Cosa fai?</p>
-              </div>
-            </div>
-
-            <form class="master-chat-form" id="masterChatForm">
-              <button class="master-chat-tts" type="button" id="masterChatTtsBtn" title="Auto Lettura (On/Off)">🔊</button>
-              <input class="master-chat-input" id="masterChatInput" type="text" autocomplete="off" placeholder="Scrivi al Master o chiedi una prova...">
-              <button class="master-chat-mic" type="button" id="masterChatMicBtn" title="Parla (Speech-to-Text)">🎤</button>
-              <button class="master-chat-send" type="submit">Invia</button>
-            </form>
-          </section>
-          <!-- --- FINE CORE LOOP HTML: CHAT DEL MASTER --- -->
           <div class="diagnostic-panel" id="diagnosticPanel" aria-live="polite"></div>
+            </div>
+          </details>
         </div>
       </aside>
     </main>
@@ -932,6 +960,46 @@
   <script src="js/15-xp-loot-system.js"></script>
   <script src="js/16-enemy-spawn.js"></script>
   <script src="js/17-per-pg-inventory.js"></script>
+
+  <!-- Architettura real-time multiplayer (Fasi 1-3) -->
+  <link rel="stylesheet" href="css/05-session-panel.css">
+  <link rel="stylesheet" href="css/06-bg3-combat-hud.css">
+  <script src="js/18-sync-manager.js"></script>
+  <script src="js/19-combat-state-machine.js"></script>
+  <script src="js/20-token-kinematics-network.js"></script>
+  <script src="js/21-session-panel.js"></script>
+  <script src="js/22-network-game-events.js"></script>
+  <script src="js/23-bg3-combat-hud.js"></script>
+  <script src="js/24-bg3-reactions.js"></script>
+  <script src="js/25-bg3-flanking.js"></script>
+  <script src="js/26-bg3-shove.js"></script>
+  <script src="js/27-bg3-surfaces.js"></script>
+  <script src="js/28-bg3-elevation.js"></script>
+  <script src="js/29-combat-memory.js"></script>
+  <script src="js/30-bg3-conditions.js"></script>
+  <script src="js/31-combat-view-autoswitch.js"></script>
+  <script src="js/32-campaign-memory.js"></script>
+  <script src="js/33-enemy-ai.js"></script>
+  <script src="js/34-chat-combat-bridge.js"></script>
+
+  <!-- Rifinitura layout: caricato per ULTIMO (CSS vince sulle regole precedenti, JS trova tutto il DOM) -->
+  <link rel="stylesheet" href="css/07-layout-cinematografico.css">
+  <script src="js/35-layout-cinematografico.js"></script>
+
+  <!-- Sistemi RPG avanzati: stato unico condiviso, bilanciamento scontri, menu azioni, chat->mappa -->
+  <link rel="stylesheet" href="css/08-action-menu.css">
+  <script src="js/36-global-game-state.js"></script>
+  <script src="js/37-encounter-balancer.js"></script>
+  <script src="js/38-action-menu.js"></script>
+  <script src="js/39-chat-map-sync.js"></script>
+
+  <!-- Arena tattica (ostacoli/altura/luogo + movimento col click) e Armeria (rarita', loot) -->
+  <link rel="stylesheet" href="css/09-arena-tattica.css">
+  <script src="js/40-arena-tattica.js"></script>
+  <script src="js/41-armeria-rarita.js"></script>
+
+  <!-- Net outbox "Supabase-ready": delta di stato coalizzati (debounce+throttle), payload puliti -->
+  <script src="js/42-net-outbox.js"></script>
 
 </body>
 </html>

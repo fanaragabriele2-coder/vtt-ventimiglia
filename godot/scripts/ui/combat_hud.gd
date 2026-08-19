@@ -1,0 +1,607 @@
+class_name CombatHUD
+extends PanelContainer
+## HUD di combattimento (in basso al centro, stile BG3) — porting della tray azioni del Modulo 05.
+##
+## Si connette a CombatManager: la barra dell'iniziativa si ricostruisce quando l'iniziativa viene
+## tirata, la card di turno si evidenzia a ogni turn_changed, gli HP calano in tempo reale, e i
+## pulsanti (Attacca / Spingi / Termina turno) invocano il manager. Vittoria/TPK spengono l'HUD.
+
+var _initiative_strip: HFlowContainer
+var _target_option: OptionButton
+var _round_label: Label
+var _last_event: Label
+var _attack_button: Button
+var _shove_button: Button
+var _bonus_button: Button
+var _disengage_button: Button
+var _dash_button: Button
+var _dodge_button: Button
+var _fireball_button: Button
+var _bless_button: Button
+var _spells_button: Button
+var _items_button: Button
+var _bonus_popup: PopupPanel
+var _spell_popup: PopupPanel
+var _items_popup: PopupPanel
+var _cards: Dictionary = {}   # combatant_id -> PanelContainer (per l'evidenziazione di turno)
+var _current_id: String = ""
+
+
+func _ready() -> void:
+	_apply_dark_style()
+	_build_ui()
+	CombatManager.combat_started.connect(_on_combat_started)
+	CombatManager.combat_ended.connect(_on_combat_ended)
+	CombatManager.initiative_rolled.connect(_on_initiative_rolled)
+	CombatManager.turn_changed.connect(_on_turn_changed)
+	CombatManager.combatant_damaged.connect(_on_combatant_damaged)
+	CombatManager.combatant_defeated.connect(_on_combatant_defeated)
+	CombatManager.combatant_added.connect(_on_combatant_added)
+	CombatManager.attack_resolved.connect(_on_attack_resolved)
+	CombatManager.shove_resolved.connect(_on_shove_resolved)
+	# Economia delle azioni: i pulsanti si accendono/spengono in base a cio' che resta nel turno
+	# (una azione base, una bonus, poi Termina turno) — niente piu' attacchi all'infinito.
+	InventoryManager.action_economy_changed.connect(_on_action_economy_changed)
+	CombatManager.victory.connect(func() -> void: _announce("🏆 VITTORIA! Tutti i nemici sconfitti."))
+	CombatManager.party_wiped.connect(func() -> void: _announce("💀 Il party e' caduto."))
+	visible = false  # nascosto finche' non inizia un combattimento
+
+
+func _apply_dark_style() -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.09, 0.078, 0.063, 0.96)
+	sb.border_color = Color(0.78, 0.61, 0.24, 0.5)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(12)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	add_theme_stylebox_override("panel", sb)
+
+
+func _build_ui() -> void:
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 8)
+	add_child(root)
+
+	# --- Barra dell'iniziativa (una card per combattente) ---
+	# HFlowContainer: con molti combattenti le card vanno a capo invece di allargare la colonna
+	# centrale (che spingerebbe la chat a destra fuori schermo).
+	_initiative_strip = HFlowContainer.new()
+	_initiative_strip.add_theme_constant_override("h_separation", 6)
+	_initiative_strip.add_theme_constant_override("v_separation", 6)
+	root.add_child(_initiative_strip)
+
+	# --- Riga info: round + ultimo evento ---
+	var info := HBoxContainer.new()
+	info.add_theme_constant_override("separation", 12)
+	root.add_child(info)
+	_round_label = Label.new()
+	_round_label.add_theme_color_override("font_color", Color(0.78, 0.61, 0.24))
+	info.add_child(_round_label)
+	_last_event = Label.new()
+	_last_event.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_child(_last_event)
+
+	# --- Riga azioni: bersaglio + pulsanti ---
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	root.add_child(actions)
+
+	var target_lbl := Label.new()
+	target_lbl.text = "Bersaglio:"
+	actions.add_child(target_lbl)
+	_target_option = OptionButton.new()
+	_target_option.custom_minimum_size = Vector2(160, 44)
+	actions.add_child(_target_option)
+
+	_attack_button = _make_action("⚔ Attacca", Color(0.47, 0.16, 0.11), _on_attack_pressed)
+	actions.add_child(_attack_button)
+	# SPINTA alla BG3: e' un'azione BONUS (non piena) — sposta il bersaglio di 1 cella e, se
+	# cade da un'altura, si somma il danno da caduta (TacticalRules).
+	_shove_button = _make_action("👐 Spingi", Color(0.11, 0.24, 0.31), _on_shove_pressed)
+	_shove_button.tooltip_text = "Azione BONUS (stile BG3): prova di Atletica contrapposta; se " \
+		+ "riesce il bersaglio arretra di 1 cella (giu' da un'altura = danno da caduta)."
+	actions.add_child(_shove_button)
+	_bonus_button = _make_action("⚡ Bonus", Color(0.42, 0.32, 0.08), _on_bonus_pressed)
+	actions.add_child(_bonus_button)
+	# Le tre azioni tattiche BG3 (azione piena): Disimpegno, Scatto, Schivata.
+	_disengage_button = _make_action("🌀 Disimpegno", Color(0.18, 0.22, 0.38), _on_disengage_pressed)
+	_disengage_button.tooltip_text = "Azione: ti sganci dalla mischia SENZA provocare attacchi " \
+		+ "di opportunita' fino al tuo prossimo turno."
+	actions.add_child(_disengage_button)
+	_dash_button = _make_action("💨 Scatto", Color(0.16, 0.34, 0.3), _on_dash_pressed)
+	_dash_button.tooltip_text = "Azione: passo raddoppiato in questo turno (9 -> 18 m)."
+	actions.add_child(_dash_button)
+	_dodge_button = _make_action("🛡 Schivata", Color(0.3, 0.3, 0.16), _on_dodge_pressed)
+	_dodge_button.tooltip_text = "Azione: chi ti attacca ha SVANTAGGIO fino al tuo prossimo turno."
+	actions.add_child(_dodge_button)
+	# Palla di Fuoco: SOLO per il Mago (il pulsante compare al suo turno). Esplosione ad area
+	# centrata sul bersaglio selezionato, tiro DES per tutti nel raggio — alleati compresi.
+	_fireball_button = _make_action("🔥 Palla di Fuoco", Color(0.55, 0.28, 0.05), _on_fireball_pressed)
+	_fireball_button.visible = false
+	_fireball_button.tooltip_text = "Esplosione ad AREA (raggio 2 celle) centrata sul bersaglio: " \
+		+ "tiro salvezza DES per TUTTI nel raggio, alleati compresi. Meta' danno a chi salva. " \
+		+ "L'area resta in fiamme."
+	actions.add_child(_fireball_button)
+	# Benedizione: SOLO per il Chierico. Concentrazione: fino a 3 alleati colpiscono con +1d4
+	# finche' il chierico regge la concentrazione (un colpo puo' spezzarla con un TS Cost).
+	_bless_button = _make_action("✨ Benedizione", Color(0.5, 0.42, 0.14), _on_bless_pressed)
+	_bless_button.visible = false
+	_bless_button.tooltip_text = "Concentrazione: fino a 3 alleati (te compreso) tirano +1d4 " \
+		+ "per colpire finche' reggi la concentrazione (subire danno puo' spezzarla)."
+	actions.add_child(_bless_button)
+	# GRIMORIO (H3): il popup degli incantesimi con gli SLOT veri, per mago e chierico.
+	_spells_button = _make_action("📖 Magie", Color(0.28, 0.2, 0.45), _on_spells_pressed)
+	_spells_button.visible = false
+	_spells_button.tooltip_text = "Il grimorio giocabile: incantesimi preparati e slot residui. " \
+		+ "Bersaglio dal selettore; le cure vanno da sole al PG piu' ferito."
+	actions.add_child(_spells_button)
+	# OGGETTI da battaglia (H3): lancia olio/acido, leggi pergamene (azione piena).
+	_items_button = _make_action("🧪 Oggetti", Color(0.3, 0.26, 0.12), _on_items_pressed)
+	_items_button.tooltip_text = "Usa un oggetto in battaglia: lancia una fiasca (olio, acido) " \
+		+ "o leggi una pergamena. Bere pozioni resta nel menu ⚡ Bonus."
+	actions.add_child(_items_button)
+	actions.add_child(_make_action("⏭ Termina turno", Color(0.16, 0.31, 0.16), _on_end_turn_pressed))
+
+	_build_bonus_popup()
+	_spell_popup = _crea_popup_scuro()
+	_items_popup = _crea_popup_scuro()
+
+
+func _make_action(text: String, tint: Color, handler: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	# Hit-box touch minima 44x44 (coerente col Task 5 anti-clutter del monolite).
+	b.custom_minimum_size = Vector2(44, 44)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = tint
+	sb.set_corner_radius_all(9)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	b.add_theme_stylebox_override("normal", sb)
+	b.pressed.connect(handler)
+	return b
+
+
+# --- Ricostruzione della barra iniziativa ---
+
+func _rebuild_strip() -> void:
+	for child in _initiative_strip.get_children():
+		child.queue_free()
+	_cards.clear()
+	var state: Dictionary = CombatManager.get_state()
+	for c: Dictionary in state["combatants"]:
+		var card := _make_init_card(c)
+		_initiative_strip.add_child(card)
+		_cards[String(c["id"])] = card
+	_rebuild_targets()
+
+
+func _make_init_card(c: Dictionary) -> PanelContainer:
+	var card := PanelContainer.new()
+	var is_pc: bool = c["kind"] == "pc"
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.13, 0.16, 0.2) if is_pc else Color(0.2, 0.11, 0.1)
+	sb.set_corner_radius_all(8)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0, 0, 0, 0)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 5
+	sb.content_margin_bottom = 5
+	card.add_theme_stylebox_override("panel", sb)
+	card.custom_minimum_size = Vector2(96, 0)
+
+	var vb := VBoxContainer.new()
+	card.add_child(vb)
+	var name_lbl := Label.new()
+	name_lbl.text = String(c["name"])
+	name_lbl.add_theme_font_size_override("font_size", 12)
+	name_lbl.add_theme_color_override("font_color", Color(0.62, 0.82, 1) if is_pc else Color(1, 0.72, 0.66))
+	vb.add_child(name_lbl)
+	var hp_lbl := Label.new()
+	hp_lbl.name = "HP"
+	hp_lbl.text = "%d / %d" % [int(c["hitPoints"]), int(c["maxHitPoints"])]
+	hp_lbl.add_theme_font_size_override("font_size", 11)
+	vb.add_child(hp_lbl)
+	return card
+
+
+func _rebuild_targets() -> void:
+	_target_option.clear()
+	var state: Dictionary = CombatManager.get_state()
+	for c: Dictionary in state["combatants"]:
+		if c["kind"] == "npc" and not c["defeated"]:
+			_target_option.add_item(String(c["name"]))
+			_target_option.set_item_metadata(_target_option.item_count - 1, String(c["id"]))
+
+
+func _selected_target_id() -> String:
+	if _target_option.item_count == 0 or _target_option.selected < 0:
+		return ""
+	return String(_target_option.get_item_metadata(_target_option.selected))
+
+
+# --- Reazioni ai signal ---
+
+func _on_combat_started() -> void:
+	visible = true
+	_rebuild_strip()
+	_round_label.text = "Round 1"
+	_refresh_action_buttons()
+
+
+func _on_combat_ended() -> void:
+	visible = false
+
+
+func _on_initiative_rolled(_order: Array) -> void:
+	_rebuild_strip()
+
+
+func _on_turn_changed(combatant_id: String, round_number: int) -> void:
+	_current_id = combatant_id
+	_round_label.text = "Round %d" % round_number
+	# Evidenzia la card di turno (bordo dorato) e spegne le altre.
+	for id: String in _cards.keys():
+		var card: PanelContainer = _cards[id]
+		var sb: StyleBoxFlat = card.get_theme_stylebox("panel")
+		sb.border_color = Color(0.94, 0.83, 0.53) if id == combatant_id else Color(0, 0, 0, 0)
+	var c: Dictionary = CombatManager.get_combatant(combatant_id)
+	if not c.is_empty():
+		_last_event.text = "Turno di %s" % c["name"]
+	_refresh_action_buttons()
+
+
+func _on_combatant_damaged(combatant_id: String, amount: int, current_hp: int) -> void:
+	_update_card_hp(combatant_id, current_hp)
+	var c: Dictionary = CombatManager.get_combatant(combatant_id)
+	if not c.is_empty():
+		_last_event.text = "%s subisce %d danni" % [c["name"], amount]
+
+
+# Il segnale porta DUE argomenti (id + chi lo ha abbattuto): l'handler deve accettarli
+# entrambi, o la connessione fallisce a runtime e la card del caduto non si spegne mai.
+func _on_combatant_defeated(combatant_id: String, _source_id: String = "") -> void:
+	if _cards.has(combatant_id):
+		var card: PanelContainer = _cards[combatant_id]
+		card.modulate = Color(0.5, 0.5, 0.5, 0.6)
+	_rebuild_targets()
+
+
+func _on_combatant_added(_combatant: Dictionary) -> void:
+	if visible:
+		_rebuild_strip()
+
+
+func _update_card_hp(combatant_id: String, current_hp: int) -> void:
+	if not _cards.has(combatant_id):
+		return
+	var card: PanelContainer = _cards[combatant_id]
+	var hp_lbl: Label = card.find_child("HP", true, false)
+	var c: Dictionary = CombatManager.get_combatant(combatant_id)
+	if hp_lbl and not c.is_empty():
+		hp_lbl.text = "%d / %d" % [current_hp, int(c["maxHitPoints"])]
+
+
+func _on_attack_resolved(result: Dictionary) -> void:
+	if bool(result.get("outOfRange", false)):
+		_last_event.text = "Fuori gittata: il colpo non parte."
+	elif not bool(result.get("hit", false)):
+		_last_event.text = "Attacco mancato (%d vs CA %d)" % [int(result.get("attackTotal", 0)), int(result.get("targetAc", 0))]
+	else:
+		var crit: String = " CRITICO!" if bool(result.get("critical", false)) else ""
+		_last_event.text = "Colpito per %d danni%s" % [int(result.get("damage", 0)), crit]
+
+
+func _on_shove_resolved(result: Dictionary) -> void:
+	_last_event.text = "Spinta %s" % ("riuscita" if bool(result.get("success", false)) else "fallita")
+
+
+func _announce(text: String) -> void:
+	_last_event.text = text
+
+
+# --- Handler dei pulsanti azione ---
+
+func _on_attack_pressed() -> void:
+	if not _puo_agire():
+		return
+	var target: String = _selected_target_id()
+	if target.is_empty():
+		_last_event.text = "Nessun bersaglio selezionato."
+		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: fai un'azione bonus o termina il turno."
+		return
+	# Fuori gittata: non si spreca l'azione. Mischia = adiacente; ranger/mago colpiscono lontano.
+	if not CombatManager.in_attack_range(_actor_id(), target):
+		var g: int = CombatManager.attack_range_of(_actor_id())
+		_last_event.text = ("Bersaglio troppo lontano (gittata %d cell%s): avvicinati o "
+			+ "scegli un nemico piu' vicino.") % [g, "a" if g == 1 else "e"]
+		return
+	CombatManager.resolve_attack(_actor_id(), target, "normal")
+	InventoryManager.spend_action_resource("action")  # una sola azione base per turno
+
+
+func _on_shove_pressed() -> void:
+	if not _puo_agire():
+		return
+	var target: String = _selected_target_id()
+	if target.is_empty():
+		return
+	if not InventoryManager.can_afford("bonusAction"):
+		_last_event.text = "Azione bonus gia' usata: la spinta (stile BG3) e' un'azione bonus."
+		return
+	if not CombatManager.in_attack_range(_actor_id(), target):
+		_last_event.text = "Per spingere devi essere ADIACENTE al bersaglio."
+		return
+	CombatManager.shove(_actor_id(), target)
+	InventoryManager.spend_action_resource("bonusAction")
+
+
+func _on_disengage_pressed() -> void:
+	if not _puo_agire() or not _spendi_azione("il Disimpegno"):
+		return
+	TacticalRules.disimpegna(_actor_id())
+
+
+func _on_dash_pressed() -> void:
+	if not _puo_agire() or not _spendi_azione("lo Scatto"):
+		return
+	TacticalRules.scatta(_actor_id())
+
+
+func _on_dodge_pressed() -> void:
+	if not _puo_agire() or not _spendi_azione("la Schivata"):
+		return
+	TacticalRules.schiva(_actor_id())
+
+
+## Spende l'azione piena per un'azione tattica, con messaggio se e' gia' stata usata.
+func _spendi_azione(nome: String) -> bool:
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: %s e' l'azione del turno." % nome
+		return false
+	InventoryManager.spend_action_resource("action")
+	return true
+
+
+## Palla di Fuoco del Mago: CD e danno derivati dalla SUA scheda (CD = 8 + competenza + mod
+## INT; 5d6 di fuoco), centrata sulla cella del bersaglio selezionato, raggio 2 celle.
+func _on_fireball_pressed() -> void:
+	if not _puo_agire():
+		return
+	var target: String = _selected_target_id()
+	if target.is_empty():
+		_last_event.text = "Scegli il bersaglio al centro dell'esplosione."
+		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: la Palla di Fuoco e' l'azione del turno."
+		return
+	if not CombatManager.in_attack_range(_actor_id(), target):
+		_last_event.text = "Troppo lontano per la Palla di Fuoco (gittata %d celle)." \
+			% CombatManager.attack_range_of(_actor_id())
+		return
+	var centro: Variant = CombatManager.get_combatant_cell(target)
+	if centro == null:
+		_last_event.text = "Il bersaglio non ha una posizione sulla griglia."
+		return
+	var mago: CharacterData = CharacterManager.get_character_by_id(
+		CombatManager.character_id_di(_actor_id()))
+	var dc: int = 13
+	if mago != null:
+		dc = 8 + mago.proficiency_bonus + mago.modifier_of("int")
+	CombatSfx.suona("magia")
+	CombatManager.palla_di_fuoco(_actor_id(), centro, 2, "5d6", dc)
+	InventoryManager.spend_action_resource("action")
+
+
+func _on_bless_pressed() -> void:
+	if not _puo_agire():
+		return
+	if not InventoryManager.can_afford("action"):
+		_last_event.text = "Azione gia' usata: la Benedizione e' l'azione del turno."
+		return
+	if CombatManager.benedici(_actor_id()):
+		CombatSfx.suona("magia")
+		InventoryManager.spend_action_resource("action")
+
+
+func _on_action_economy_changed(_economy: Dictionary) -> void:
+	_refresh_action_buttons()
+
+
+## Solo nel turno di un PG si puo' agire dai pulsanti (nei turni dei PNG comanda l'IA nemica).
+## Un PG STORDITO non agisce affatto (condizione 5e): gli resta solo Termina turno.
+func _puo_agire() -> bool:
+	var c: Dictionary = CombatManager.get_combatant(_current_id)
+	if CombatManager.is_active() and not c.is_empty() and c["kind"] == "pc":
+		if ConditionsManager.ha_condizione(_current_id, "stordito"):
+			_last_event.text = "💫 Sei STORDITO: puoi solo terminare il turno."
+			return false
+		return true
+	_last_event.text = "Non e' il tuo turno."
+	return false
+
+
+## Accende/spegne i pulsanti azione in base a cosa resta nel turno del PG corrente: una azione
+## base (Attacca/Spingi), una bonus, poi solo Termina turno. Nei turni dei PNG restano tutti spenti.
+func _refresh_action_buttons() -> void:
+	var c: Dictionary = CombatManager.get_combatant(_current_id)
+	var turno_pc: bool = CombatManager.is_active() and not c.is_empty() and c["kind"] == "pc"
+	var eco: Dictionary = InventoryManager.get_action_economy()
+	var ha_azione: bool = turno_pc and bool(eco.get("action", false))
+	var ha_bonus: bool = turno_pc and bool(eco.get("bonusAction", false))
+	_attack_button.disabled = not ha_azione
+	_shove_button.disabled = not ha_bonus  # la spinta e' un'azione BONUS (stile BG3)
+	_disengage_button.disabled = not ha_azione
+	_dash_button.disabled = not ha_azione
+	_dodge_button.disabled = not ha_azione
+	_bonus_button.disabled = not ha_bonus
+	# Palla di Fuoco (Mago) e Benedizione (Chierico) compaiono SOLO al turno della classe giusta.
+	var classe: String = ""
+	if turno_pc:
+		var pg: CharacterData = CharacterManager.get_character_by_id(
+			CombatManager.character_id_di(_current_id))
+		classe = pg.class_name_label.to_lower() if pg != null else ""
+	_fireball_button.visible = classe == "mago"
+	_fireball_button.disabled = not ha_azione
+	_bless_button.visible = classe == "chierico"
+	_bless_button.disabled = not ha_azione
+	# Il GRIMORIO compare per le classi incantatrici; gli OGGETTI per tutti (serve l'azione).
+	_spells_button.visible = classe == "mago" or classe == "chierico"
+	_spells_button.disabled = not (ha_azione or ha_bonus)
+	_items_button.disabled = not ha_azione
+
+
+func _on_end_turn_pressed() -> void:
+	CombatManager.next_turn()
+
+
+# L'attore corrente se e' un PG, altrimenti il PG locale (i pulsanti sono per il giocatore).
+func _actor_id() -> String:
+	var c: Dictionary = CombatManager.get_combatant(_current_id)
+	if not c.is_empty() and c["kind"] == "pc":
+		return _current_id
+	return CombatManager.pc_attivo_id()
+
+
+# --- Menu Azione Bonus dinamico (porting del Modulo 38): opzioni generate da classe/razza/
+# inventario del PG attivo, in una griglia a comparsa sopra il pulsante "⚡ Bonus". ---
+
+func _build_bonus_popup() -> void:
+	_bonus_popup = PopupPanel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.06)
+	sb.border_color = Color(0.78, 0.61, 0.24, 0.6)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	_bonus_popup.add_theme_stylebox_override("panel", sb)
+	add_child(_bonus_popup)
+
+
+func _on_bonus_pressed() -> void:
+	for child: Node in _bonus_popup.get_children():
+		child.queue_free()
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	_bonus_popup.add_child(col)
+
+	var opzioni: Array[Dictionary] = ActionMenuManager.get_current_options()
+	if opzioni.is_empty():
+		var lbl := Label.new()
+		lbl.text = "Nessuna azione bonus disponibile."
+		col.add_child(lbl)
+	else:
+		for o: Dictionary in opzioni:
+			var btn := Button.new()
+			var fonte: String = "Classe" if o["fonte"] == "classe" else ("Razza" if o["fonte"] == "razza" else "Zaino")
+			btn.text = "%s  [%s]" % [String(o["etichetta"]), fonte]
+			btn.custom_minimum_size = Vector2(220, 40)
+			btn.tooltip_text = String(o.get("descrizione", ""))
+			btn.pressed.connect(_on_bonus_option_chosen.bind(o))
+			col.add_child(btn)
+
+	_bonus_popup.position = Vector2i(_bonus_button.get_screen_position()) + Vector2i(0, -220)
+	_bonus_popup.popup()
+
+
+func _on_bonus_option_chosen(opzione: Dictionary) -> void:
+	ActionMenuManager.esegui(opzione, _selected_target_id())
+	_bonus_popup.hide()
+
+
+# --- Grimorio e oggetti da battaglia (H3) ---
+
+func _crea_popup_scuro() -> PopupPanel:
+	var popup := PopupPanel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.06)
+	sb.border_color = Color(0.78, 0.61, 0.24, 0.6)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	popup.add_theme_stylebox_override("panel", sb)
+	add_child(popup)
+	return popup
+
+
+## Riempie un popup con una colonna di pulsanti-voce; `vuoto` e' il messaggio senza opzioni.
+func _apri_popup_voci(popup: PopupPanel, voci: Array[Dictionary], vuoto: String,
+		sotto: Button, scelto: Callable) -> void:
+	for child: Node in popup.get_children():
+		child.queue_free()
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	popup.add_child(col)
+	if voci.is_empty():
+		var lbl := Label.new()
+		lbl.text = vuoto
+		col.add_child(lbl)
+	for v: Dictionary in voci:
+		var btn := Button.new()
+		btn.text = String(v["testo"])
+		btn.custom_minimum_size = Vector2(300, 40)
+		btn.tooltip_text = String(v.get("tooltip", ""))
+		btn.disabled = bool(v.get("spento", false))
+		btn.pressed.connect(scelto.bind(v))
+		col.add_child(btn)
+	popup.position = Vector2i(sotto.get_screen_position()) + Vector2i(0, -260)
+	popup.popup()
+
+
+func _on_spells_pressed() -> void:
+	if not _puo_agire():
+		return
+	var eco: Dictionary = InventoryManager.get_action_economy()
+	var voci: Array[Dictionary] = []
+	for s: Dictionary in SpellBook.lanciabili():
+		var bonus: bool = String(s["costo"]) == "bonusAction"
+		var risorsa_ok: bool = bool(eco.get("bonusAction" if bonus else "action", false))
+		var slot: String = "∞" if int(s["livello"]) == 0 else str(int(s["slotResidui"]))
+		voci.append({
+			"testo": "%s  [L%d · slot %s · %s]" % [String(s["nome"]), int(s["livello"]),
+				slot, "bonus" if bonus else "azione"],
+			"tooltip": String(s["descrizione"]),
+			"spento": not risorsa_ok or int(s["slotResidui"]) <= 0,
+			"id": String(s["id"]), "bonus": bonus,
+		})
+	_apri_popup_voci(_spell_popup, voci, "Nessun incantesimo pronto nel grimorio.",
+		_spells_button, _on_spell_chosen)
+
+
+func _on_spell_chosen(voce: Dictionary) -> void:
+	_spell_popup.hide()
+	var esito: Dictionary = SpellBook.lancia(_actor_id(), String(voce["id"]), _selected_target_id())
+	if not bool(esito.get("ok", false)):
+		_last_event.text = String(esito.get("motivo", "L'incantesimo non parte."))
+		return
+	InventoryManager.spend_action_resource("bonusAction" if bool(voce["bonus"]) else "action")
+
+
+func _on_items_pressed() -> void:
+	if not _puo_agire():
+		return
+	var voci: Array[Dictionary] = []
+	for o: Dictionary in ActionMenuManager.opzioni_oggetti_combattimento():
+		voci.append({
+			"testo": String(o["etichetta"]), "tooltip": String(o.get("descrizione", "")),
+			"opzione": o,
+		})
+	_apri_popup_voci(_items_popup, voci, "Nessun oggetto da battaglia nello zaino "
+		+ "(olio, acido, pergamene…).", _items_button, _on_item_chosen)
+
+
+func _on_item_chosen(voce: Dictionary) -> void:
+	_items_popup.hide()
+	ActionMenuManager.esegui(voce["opzione"], _selected_target_id())
