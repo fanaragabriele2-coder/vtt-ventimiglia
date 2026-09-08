@@ -133,11 +133,30 @@ lettura risultato, errori, timeout, pulizia dei temporanei) con un finto
 eseguibile che rispetta lo stesso contratto CLI; **il codice `bpy` interno
 gira solo dentro Blender, quindi il primo collaudo vero è sul tuo PC.**
 
+### Fatto: il gioco è protetto anche nelle regole
+
+I test del VTT non si fermano più a "si carica": ora verificano che **funzioni
+ancora**. 37 test guidano il gioco in un browser vero — nuova partita, tiri di
+dado, inventario, salvataggio — e controllano le regole:
+
+- modificatori di caratteristica D&D 5e su 7 punteggi diversi;
+- vantaggio e svantaggio: due dadi tirati, tenuto il migliore/peggiore;
+- 100 tiri di d20 dentro l'intervallo, con i flag di critico coerenti;
+- ogni tipo di dado (d4…d20) entro le sue facce e non bloccato su un valore;
+- **integrità dei salvataggi**: modifica → salva → altera → ricarica →
+  lo stato torna quello salvato;
+- party creato, token sulla mappa, peso e capacità dell'inventario, griglia
+  senza valori NaN.
+
+Verificato che servano a qualcosa alterando `Math.floor` in `Math.round` nel
+calcolo dei modificatori — un bug che **non impedisce al gioco di caricarsi** e
+che uno smoke test non vedrebbe mai: i test lo hanno intercettato subito.
+
 ### Cosa resta davvero
 - **Collaudo del rig Blender** sulla tua macchina, con un modello TripoSR vero.
 - **Spezzare `js/12-patch-touch-events-per-mobile.js`** (3580 righe, un quarto
-  della codebase del gioco). Ora è meno rischioso: c'è un test che dice
-  subito se il gioco si rompe.
+  della codebase del gioco). È l'ultimo debito tecnico; adesso è molto meno
+  rischioso, perché i test dicono subito se una regola si rompe.
 - **Anteprima del token sulla mappa** del VTT, per valutare le proporzioni
   prima di importarlo.
 - **Collaudo sulla tua macchina** di ciò che qui non è verificabile: selettori

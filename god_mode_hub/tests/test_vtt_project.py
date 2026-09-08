@@ -133,33 +133,41 @@ def test_avvio_senza_script_solleva(tmp_path: Path) -> None:
 
 @pytestmark_node
 def test_anteprima_si_avvia_e_serve_il_gioco(tmp_path: Path) -> None:
-    """Avvia il vero dev-server e verifica che risponda con l'HTML del VTT."""
+    """Avvia il vero `dev-server.js` e verifica che serva l'index del progetto.
+
+    `dev-server.js` usa una porta fissa: se qualcosa la occupa già (un server
+    avviato a mano, un'altra sessione dell'Hub) il test salta invece di
+    interrogare per sbaglio quel server e dare un fallimento fuorviante.
+    """
     reale = Path(__file__).resolve().parents[2]
     if not (reale / "dev-server.js").is_file():
         pytest.skip("progetto VTT non disponibile")
+
+    porta = vtt_project.DEV_SERVER_PORT
+    if vtt_project.port_in_use(porta):
+        pytest.skip(f"porta {porta} già occupata da un altro server")
+
     progetto = tmp_path / "vtt"
     progetto.mkdir()
     shutil.copy2(reale / "dev-server.js", progetto / "dev-server.js")
-    (progetto / "index.html").write_text("<html><body>VTT di prova</body></html>", encoding="utf-8")
-    porta = 45991
+    (progetto / "index.html").write_text(
+        "<html><body>VTT di prova</body></html>", encoding="utf-8"
+    )
 
     try:
         url = vtt_project.start_dev_server(project_dir=progetto, port=porta)
-        assert url.endswith(str(porta)) or url.endswith("4599")
-        # dev-server.js usa una porta fissa: attendiamo che risponda dov'e' in ascolto.
+        assert url.endswith(str(porta))
+
         import urllib.request
+
         contenuto = ""
         for _ in range(40):
-            for tentativo in (porta, vtt_project.DEV_SERVER_PORT):
-                try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{tentativo}/", timeout=1) as r:
-                        contenuto = r.read().decode("utf-8", "replace")
-                        break
-                except Exception:  # noqa: BLE001
-                    continue
-            if contenuto:
-                break
-            time.sleep(0.25)
+            try:
+                with urllib.request.urlopen(url, timeout=1) as risposta:
+                    contenuto = risposta.read().decode("utf-8", "replace")
+                    break
+            except Exception:  # noqa: BLE001 — il server sta ancora salendo
+                time.sleep(0.25)
         assert "VTT di prova" in contenuto, "il server deve servire l'index.html del progetto"
     finally:
         vtt_project.stop_dev_server()

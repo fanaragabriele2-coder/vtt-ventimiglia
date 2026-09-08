@@ -213,3 +213,152 @@ def test_nome_pg_con_html_non_rompe_il_rendering(gioco_servito: str) -> None:
 
     assert reso["testo"] == "Aldrico <b>il Grande</b>", "il nome deve restare integro come testo"
     assert reso["grassetti"] == 0, "nessun tag deve essere interpretato"
+
+
+# ---------------------------------------------------------------------------
+# Regole di gioco: la protezione più profonda contro una risposta LLM difettosa
+# ---------------------------------------------------------------------------
+# I test qui sopra dicono se il gioco *si carica*. Questi dicono se *funziona
+# ancora*: un modulo può caricarsi senza errori e avere le regole rotte — è
+# esattamente ciò che succede quando un LLM riscrive una funzione "quasi bene".
+
+@pytest.fixture(scope="module")
+def partita_avviata(gioco_servito: str):
+    """Avvia una nuova partita e restituisce una funzione per interrogare il gioco."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as pw:
+        browser = sd_browser._launch_chromium(pw)
+        try:
+            page = browser.new_page()
+            page.goto(gioco_servito, wait_until="load", timeout=60_000)
+            page.wait_for_timeout(3000)
+            page.get_by_role("button", name="NUOVA PARTITA").click()
+            page.wait_for_timeout(2500)
+            yield page.evaluate
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize(
+    "punteggio,modificatore",
+    [(1, -5), (8, -1), (10, 0), (11, 0), (16, 3), (20, 5), (30, 10)],
+)
+def test_modificatori_di_caratteristica_5e(partita_avviata, punteggio: int, modificatore: int) -> None:
+    """Regola D&D 5e: modificatore = (punteggio − 10) / 2, arrotondato per difetto."""
+    risultato = partita_avviata(
+        f"() => window.UltimateVTTState.calculateAbilityModifier({punteggio})"
+    )
+    assert risultato == modificatore
+
+
+def test_formula_di_danno_interpretata(partita_avviata) -> None:
+    parti = partita_avviata("() => window.UltimateVTTCombat.parseDamageFormula('2d6+3')")
+    dadi = [p for p in parti if p["type"] == "dice"]
+    fissi = [p for p in parti if p["type"] == "flat"]
+    assert dadi and dadi[0]["count"] == 2 and dadi[0]["sides"] == 6
+    assert fissi and fissi[0]["value"] == 3
+
+
+def test_formula_di_danno_con_sottrazione(partita_avviata) -> None:
+    parti = partita_avviata("() => window.UltimateVTTCombat.parseDamageFormula('1d8-1')")
+    fissi = [p for p in parti if p["type"] == "flat"]
+    assert fissi, f"componente fissa non riconosciuta: {parti}"
+    assert fissi[0]["value"] * fissi[0].get("sign", 1) == -1 or fissi[0]["value"] == -1
+
+
+def test_tiro_d20_resta_nell_intervallo(partita_avviata) -> None:
+    """100 tiri: nessun valore fuori da 1-20, e il critico è coerente col dado."""
+    esiti = partita_avviata(
+        """() => Array.from({length: 100}, () =>
+               window.UltimateVTTCombat.rollD20WithMode('normal'))"""
+    )
+    for esito in esiti:
+        assert 1 <= esito["chosen"] <= 20, esito
+        assert esito["naturalTwenty"] == (esito["chosen"] == 20)
+        assert esito["naturalOne"] == (esito["chosen"] == 1)
+
+
+def test_vantaggio_tira_due_dadi_e_tiene_il_migliore(partita_avviata) -> None:
+    esiti = partita_avviata(
+        """() => Array.from({length: 40}, () =>
+               window.UltimateVTTCombat.rollD20WithMode('advantage'))"""
+    )
+    for esito in esiti:
+        assert len(esito["rolls"]) == 2, f"il vantaggio deve tirare 2 dadi: {esito}"
+        assert esito["chosen"] == max(esito["rolls"]), esito
+
+
+def test_svantaggio_tiene_il_peggiore(partita_avviata) -> None:
+    esiti = partita_avviata(
+        """() => Array.from({length: 40}, () =>
+               window.UltimateVTTCombat.rollD20WithMode('disadvantage'))"""
+    )
+    for esito in esiti:
+        assert len(esito["rolls"]) == 2
+        assert esito["chosen"] == min(esito["rolls"]), esito
+
+
+@pytest.mark.parametrize("facce", [4, 6, 8, 10, 12, 20])
+def test_dadi_3d_producono_valori_validi(partita_avviata, facce: int) -> None:
+    valori = partita_avviata(
+        f"""() => Array.from({{length: 60}}, () =>
+                window.UltimateVTTDice3D.rollDieValue({facce}))"""
+    )
+    assert all(1 <= v <= facce for v in valori), f"valori fuori intervallo: {sorted(set(valori))}"
+    assert len(set(valori)) > 1, "un dado che dà sempre lo stesso valore è rotto"
+
+
+def test_salvataggio_e_ricaricamento_conservano_lo_stato(partita_avviata) -> None:
+    """Integrità dei salvataggi: è il dato che un giocatore non può permettersi
+    di perdere. Modifica una caratteristica, salva, cambia, ricarica, verifica."""
+    esito = partita_avviata(
+        """() => {
+            const S = window.UltimateVTTState, A = window.UltimateVTTAIBridge;
+            const forza = () => S.getState().abilities.str.score;
+            S.setAbilityScore('str', 17);
+            const istantanea = JSON.parse(JSON.stringify(A.createSnapshot()));
+            S.setAbilityScore('str', 8);
+            const dopoModifica = forza();
+            A.applySnapshot(istantanea);
+            return { salvato: 17, intermedio: dopoModifica, ripristinato: forza() };
+        }"""
+    )
+    assert esito["intermedio"] == 8, "la modifica intermedia non è stata applicata"
+    assert esito["ripristinato"] == esito["salvato"], (
+        f"lo stato non è stato ripristinato: {esito}"
+    )
+
+
+def test_istantanea_contiene_tutti_i_sottosistemi(partita_avviata) -> None:
+    chiavi = partita_avviata("() => Object.keys(window.UltimateVTTAIBridge.createSnapshot())")
+    attesi = {"characterState", "inventoryState", "combatState", "tokenState"}
+    assert attesi <= set(chiavi), f"salvataggio incompleto: mancano {attesi - set(chiavi)}"
+
+
+def test_la_nuova_partita_crea_il_party(partita_avviata) -> None:
+    party = partita_avviata("() => (window.UltimateVTTCoreGameplay.getPartyData() || []).length")
+    assert party >= 1, "nessun personaggio creato all'avvio della partita"
+
+
+def test_i_token_sono_sulla_mappa(partita_avviata) -> None:
+    token = partita_avviata("() => (window.UltimateVTTTokenPhysics.getState().tokens || []).length")
+    assert token >= 1, "nessun token posizionato sulla mappa"
+
+
+def test_inventario_calcola_peso_e_capacita(partita_avviata) -> None:
+    esito = partita_avviata(
+        """() => {
+            const I = window.UltimateVTTInventory;
+            return { peso: I.calculateTotalWeightKg(), capacita: I.calculateCarryCapacityKg() };
+        }"""
+    )
+    assert isinstance(esito["peso"], (int, float)) and esito["peso"] >= 0
+    assert esito["capacita"] > 0, "la capacità di carico deve essere positiva"
+
+
+def test_griglia_ha_metriche_valide(partita_avviata) -> None:
+    metriche = partita_avviata("() => window.UltimateVTTCanvas.getGridMetrics()")
+    assert isinstance(metriche, dict) and metriche, "metriche della griglia assenti"
+    numeri = [v for v in metriche.values() if isinstance(v, (int, float))]
+    assert numeri and all(v == v for v in numeri), f"valori NaN nella griglia: {metriche}"
