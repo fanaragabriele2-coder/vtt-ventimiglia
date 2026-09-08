@@ -16,6 +16,13 @@ Pillow>=10.0
 # Dopo pip install serve anche: python -m playwright install chromium
 playwright>=1.40
 
+# Opzionale: estrae il testo dai PDF messi in raw/ quando li compili in pagine
+# wiki. Senza, i PDF diventano pagine stub con il solo riferimento al file.
+pypdf>=4.0
+
+# Test (TEST.bat / python -m pytest): non serve per usare l'Hub.
+pytest>=8.0
+
 # --- Backend esterni (NON pip, vedi README) -------------------------------
 # Stable Diffusion : Stability Matrix / A1111-Forge, con o senza --api
 #                    (senza --api: usa l'automazione browser, vedi sopra)

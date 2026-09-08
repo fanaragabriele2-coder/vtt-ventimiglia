@@ -26,7 +26,7 @@ st.caption(
     "Output in `asset_forge/characters/<slug>/`."
 )
 
-sd_url, sd_online = sd_api.find_webui()
+sd_url, sd_online = sd_api.find_webui_cached()
 backends = triposr_helpers.backend_status()
 playwright_ready = sd_browser.is_playwright_installed()
 browser_usable = sd_url is not None and playwright_ready

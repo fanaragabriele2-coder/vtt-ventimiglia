@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import os
+import time as _time
 from typing import Any
 
 import requests
@@ -191,6 +192,46 @@ def find_webui(timeout: float = 1.2) -> tuple[str | None, bool]:
     if url is None:
         return None, False
     return url, can_generate(url, timeout=max(timeout, 3.0))
+
+
+#: Memoizzazione a tempo di :func:`find_webui`. Streamlit riesegue l'intero
+#: script a ogni interazione (uno slider mosso, una casella spuntata): senza
+#: cache ogni rerun ri-sonderebbe la WebUI su tutte le porte candidate,
+#: sprecando richieste HTTP e rallentando l'interfaccia.
+_STATUS_CACHE: tuple[float, tuple[str | None, bool]] | None = None
+STATUS_TTL = 15.0
+
+
+def find_webui_cached(
+    ttl: float = STATUS_TTL,
+    force: bool = False,
+    timeout: float = 1.2,
+) -> tuple[str | None, bool]:
+    """:func:`find_webui` con cache a tempo, per le pagine Streamlit.
+
+    Args:
+        ttl: secondi di validità del risultato memorizzato.
+        force: ignora la cache e risonda subito (pulsante "Ricontrolla").
+        timeout: timeout per singola porta sondata.
+
+    Returns:
+        Come :func:`find_webui`: ``(url, can_generate)``.
+    """
+    global _STATUS_CACHE
+    now = _time.monotonic()
+    if not force and _STATUS_CACHE is not None:
+        stamp, value = _STATUS_CACHE
+        if now - stamp < ttl:
+            return value
+    value = find_webui(timeout=timeout)
+    _STATUS_CACHE = (now, value)
+    return value
+
+
+def clear_status_cache() -> None:
+    """Invalida la cache di :func:`find_webui_cached` (es. dopo un riavvio SD)."""
+    global _STATUS_CACHE
+    _STATUS_CACHE = None
 
 
 def list_models(base_url: str | None = None, timeout: float = 10.0) -> list[str]:

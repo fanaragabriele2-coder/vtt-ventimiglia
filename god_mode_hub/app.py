@@ -24,6 +24,7 @@ st.set_page_config(
 )
 
 from utils import ensure_dirs  # noqa: E402
+from utils import sd_api  # noqa: E402
 
 ensure_dirs()
 
@@ -31,9 +32,9 @@ ensure_dirs()
 @st.cache_data(ttl=30)
 def _component_status() -> dict[str, Any]:
     """Verifica lo stato dei componenti locali (cache 30s per non pesare)."""
-    from utils import chroma_rag, llm_wiki, sd_api, triposr_helpers
+    from utils import chroma_rag, llm_wiki, triposr_helpers
 
-    sd_url, sd_can_generate = sd_api.find_webui()
+    sd_url, sd_can_generate = sd_api.find_webui_cached()
     return {
         "chromadb": chroma_rag.is_available(),
         "sd_api": sd_can_generate,
@@ -118,4 +119,5 @@ with st.sidebar:
     st.caption("100% locale · RTX 5080 · zero API cloud")
     if st.button("🔄 Ricontrolla componenti", use_container_width=True):
         _component_status.clear()
+        sd_api.clear_status_cache()  # forza una nuova scansione delle porte
         st.rerun()

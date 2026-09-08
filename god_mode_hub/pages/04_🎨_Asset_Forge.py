@@ -26,7 +26,7 @@ st.caption(
     "`asset_forge/tokens/`."
 )
 
-sd_url, sd_online = sd_api.find_webui()
+sd_url, sd_online = sd_api.find_webui_cached()
 playwright_ready = sd_browser.is_playwright_installed()
 browser_usable = sd_url is not None and playwright_ready
 

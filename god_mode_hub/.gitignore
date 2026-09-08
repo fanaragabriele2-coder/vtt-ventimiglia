@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 chroma_index/
+.hub_backups/
+.pytest_cache/
 wiki/wiki_fts.db*
 .streamlit/secrets.toml
 

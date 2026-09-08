@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from utils import CODEBASE_DIR, VTT_PROJECT_DIR, WIKI_DIR, ensure_dirs
+from utils import safe_write
 
 FENCE_RE = re.compile(
     r"^(?P<fence>```+|~~~+)[ \t]*(?P<info>[^\n]*?)[ \t]*\n"
@@ -79,8 +80,9 @@ class SavedFile:
 
     path: Path
     kind: str
-    action: str  # "creato" | "sovrascritto"
+    action: str  # "creato" | "sovrascritto" | "invariato"
     bytes_written: int
+    backup_path: Path | None = None  # copia di sicurezza del file sostituito
 
 
 def _mdextractor_blocks(text: str) -> list[str] | None:
@@ -256,33 +258,67 @@ def resolve_destination(
     return target_root / rel
 
 
+def preview_blocks(
+    blocks: list[ParsedBlock],
+    codebase_dir: Path = CODEBASE_DIR,
+    wiki_dir: Path = WIKI_DIR,
+    vtt_project_dir: Path = VTT_PROJECT_DIR,
+) -> list[tuple[Path, safe_write.DiffSummary]]:
+    """Calcola cosa cambierebbe sul disco, **senza scrivere nulla**.
+
+    Permette alla Drop Zone di mostrare il diff (e l'eventuale allarme
+    troncatura) prima che l'utente accetti la sovrascrittura.
+
+    Returns:
+        Una coppia ``(destinazione, diff)`` per ogni blocco salvabile.
+    """
+    anteprime: list[tuple[Path, safe_write.DiffSummary]] = []
+    for index, block in enumerate(blocks):
+        destination = resolve_destination(block, index, codebase_dir, wiki_dir, vtt_project_dir)
+        if destination is None:
+            continue
+        anteprime.append(
+            (destination, safe_write.diff_against_existing(destination, block.content))
+        )
+    return anteprime
+
+
 def save_blocks(
     blocks: list[ParsedBlock],
     codebase_dir: Path = CODEBASE_DIR,
     wiki_dir: Path = WIKI_DIR,
     vtt_project_dir: Path = VTT_PROJECT_DIR,
+    backup_root: Path = safe_write.BACKUP_DIR,
+    make_backup: bool = True,
 ) -> list[SavedFile]:
-    """Salva su disco i blocchi ``code`` e ``wiki`` (gli ``other`` sono ignorati).
+    """Salva i blocchi ``code`` e ``wiki`` con backup automatico.
 
-    I blocchi ``.js``/``.html``/``.css`` finiscono in ``vtt_project_dir``
-    (il progetto VTT reale), gli altri blocchi codice in ``codebase_dir``.
+    Ogni sovrascrittura passa da :func:`utils.safe_write.safe_write`, che
+    copia il file esistente in ``.hub_backups/<timestamp>/`` prima di
+    rimpiazzarlo e rifiuta le aree protette (``.git/``, ``node_modules/``,
+    ``dist/``…). I blocchi diretti a un'area protetta vengono saltati invece
+    di far fallire l'intero salvataggio.
 
     Returns:
         Un :class:`SavedFile` per ogni blocco effettivamente scritto.
     """
     ensure_dirs()
     saved: list[SavedFile] = []
+    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")  # un'unica sessione di backup
     for index, block in enumerate(blocks):
         destination = resolve_destination(block, index, codebase_dir, wiki_dir, vtt_project_dir)
         if destination is None:
             continue
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        action = "sovrascritto" if destination.exists() else "creato"
-        data = block.content.encode("utf-8")
-        destination.write_bytes(data)
+        try:
+            result = safe_write.safe_write(
+                destination, block.content, make_backup=make_backup,
+                project_root=vtt_project_dir, backup_root=backup_root, stamp=stamp,
+            )
+        except safe_write.ProtectedPathError:
+            continue  # area protetta: saltata di proposito
         saved.append(
-            SavedFile(path=destination, kind=block.kind, action=action,
-                      bytes_written=len(data))
+            SavedFile(path=result.path, kind=block.kind, action=result.action,
+                      bytes_written=result.bytes_written, backup_path=result.backup_path)
         )
     return saved
 

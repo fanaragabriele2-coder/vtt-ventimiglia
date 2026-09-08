@@ -30,6 +30,36 @@ Dopo il primo setup, per riaprire l'Hub basta un doppio click su
 Puoi trascinare un collegamento a questo file sul Desktop per un accesso
 ancora più rapido.
 
+## 🛡️ Rete di sicurezza sulle scritture
+
+La Drop Zone salva codice generato da un LLM **sopra i file reali del progetto
+VTT**: è il punto in cui si rischia di perdere lavoro. Tre protezioni, sempre
+attive:
+
+- **Backup automatico** — prima di ogni sovrascrittura il file precedente
+  finisce in `.hub_backups/<data_ora>/`. Nell'Orchestratore, in fondo alla Drop
+  Zone, c'è *"↩️ Ripristina da backup"*: torni indietro anche senza git.
+- **Diff prima di salvare** — per ogni blocco vedi se crea o sovrascrive,
+  quante righe cambiano e il diff riga per riga.
+- **Allarme troncatura** — se la risposta contiene marcatori di codice omesso
+  (`// ... resto invariato`, `/* unchanged */`) o si riduce a meno della metà
+  del file esistente, l'Hub te lo dice in rosso: è il modo tipico in cui un LLM
+  ti sostituisce un modulo funzionante con uno stub.
+- **Aree protette** — `.git/`, `node_modules/`, `dist/`, `.venv/` non sono mai
+  scrivibili dalla Drop Zone.
+
+## ✅ Test
+
+Doppio click su **`TEST.bat`** (o `python -m pytest` da terminale): esegue la
+suite completa senza toccare i tuoi file reali, girando su cartelle temporanee.
+
+Nel risultato: `.` superato, `F` fallito, **`s` saltato** — quest'ultimo
+significa che manca un componente opzionale (Playwright, pypdf) e il test lo
+dichiara invece di fingere che tutto vada bene.
+
+Vedi **[ROADMAP.md](ROADMAP.md)** per lo stato verificato di ogni componente e
+i prossimi passi.
+
 ### Backend esterni
 
 | Backend | A cosa serve | Stato |

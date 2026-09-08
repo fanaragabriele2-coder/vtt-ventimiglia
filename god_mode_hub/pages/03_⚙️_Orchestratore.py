@@ -23,7 +23,7 @@ if str(_HUB_ROOT) not in sys.path:
 st.set_page_config(page_title="Orchestratore — God-Mode Hub", page_icon="⚙️", layout="wide")
 
 from utils import VTT_PROJECT_DIR, ensure_dirs  # noqa: E402
-from utils import chroma_rag, drop_zone_parser, llm_wiki  # noqa: E402
+from utils import chroma_rag, drop_zone_parser, llm_wiki, safe_write  # noqa: E402
 
 ensure_dirs()
 
@@ -213,8 +213,58 @@ with tab_drop:
                 block.suggested_path = new_path.strip()
                 # Il percorso può cambiare la classificazione (es. aggiungo .md).
                 block.kind = drop_zone_parser._classify(block.language, block.suggested_path)  # noqa: SLF001
-                include = st.checkbox("Salva questo blocco", value=block.kind != "other", key=f"inc_{i}")
-                if include and block.kind != "other":
+
+                # --- Anteprima dell'impatto sul disco (nessuna scrittura) ---
+                destinazione = drop_zone_parser.resolve_destination(block, i)
+                sicuro = True
+                if destinazione is not None:
+                    if safe_write.is_protected(destinazione):
+                        st.error(
+                            f"🚫 `{destinazione}` è in un'area protetta "
+                            "(.git/, node_modules/, dist/, .venv/): non verrà salvato.",
+                            icon="🛡️",
+                        )
+                        sicuro = False
+                    else:
+                        diff = safe_write.diff_against_existing(destinazione, block.content)
+                        if not diff.exists:
+                            st.success(f"🆕 Crea un file nuovo · {diff.new_bytes} B", icon="✅")
+                        elif diff.is_identical:
+                            st.caption("➖ Identico al file esistente: nessuna modifica.")
+                        else:
+                            st.warning(
+                                f"♻️ **Sovrascrive un file esistente**: "
+                                f"{diff.old_bytes} B → {diff.new_bytes} B "
+                                f"(+{diff.added_lines} / −{diff.removed_lines} righe). "
+                                "Verrà fatto un backup automatico.",
+                                icon="📝",
+                            )
+                        if diff.looks_truncated:
+                            motivi = []
+                            if diff.ellipsis_markers:
+                                motivi.append(
+                                    "contiene marcatori di codice omesso: "
+                                    + ", ".join(f"`{m}`" for m in diff.ellipsis_markers[:3])
+                                )
+                            if diff.exists and diff.shrink_ratio < safe_write.SHRINK_RATIO_THRESHOLD:
+                                motivi.append(
+                                    f"il file si riduce al {diff.shrink_ratio:.0%} "
+                                    "della dimensione originale"
+                                )
+                            st.error(
+                                "⚠️ **Risposta probabilmente TRONCATA** — "
+                                + "; ".join(motivi)
+                                + ". Salvando perderesti codice funzionante: chiedi all'LLM "
+                                "il file completo prima di procedere.",
+                                icon="✂️",
+                            )
+                        if diff.unified_diff:
+                            with st.expander("🔍 Vedi diff riga per riga"):
+                                st.code(diff.unified_diff[:20000], language="diff")
+
+                default_incluso = block.kind != "other" and sicuro
+                include = st.checkbox("Salva questo blocco", value=default_incluso, key=f"inc_{i}")
+                if include and block.kind != "other" and sicuro:
                     selected_indices.append(i)
                 preview = block.content if block.line_count <= 60 else (
                     "\n".join(block.content.splitlines()[:60]) + "\n… (troncato)"
@@ -233,12 +283,14 @@ with tab_drop:
                 st.success(f"Salvati {len(saved)} file:")
                 for item in saved:
                     rel = item.path.relative_to(VTT_PROJECT_DIR).as_posix()
-                    st.markdown(f"- `{rel}` ({item.action}, {item.bytes_written} B)")
+                    backup_nota = " · 💾 backup salvato" if item.backup_path else ""
+                    st.markdown(f"- `{rel}` ({item.action}, {item.bytes_written} B){backup_nota}")
                 wiki_saved = [s for s in saved if s.kind == "wiki"]
                 if wiki_saved:
                     llm_wiki.append_log(
                         f"Drop Zone: salvate {len(wiki_saved)} pagine wiki"
                     )
+                safe_write.prune_backups()  # tiene le 20 sessioni più recenti
                 if reindex_after:
                     with st.spinner("Reindicizzazione…"):
                         try:
@@ -248,6 +300,33 @@ with tab_drop:
                         except Exception as exc:  # noqa: BLE001
                             st.warning(f"Reindicizzazione parziale: {exc}")
                 st.session_state.pop("parsed_blocks", None)
+
+    # -----------------------------------------------------------------------
+    # Ripristino: annullare un salvataggio andato male
+    # -----------------------------------------------------------------------
+    st.divider()
+    with st.expander("↩️ Ripristina da backup (annulla un salvataggio)"):
+        st.caption(
+            "Ogni sovrascrittura crea una copia del file precedente in "
+            "`.hub_backups/<data_ora>/`. Se una risposta dell'LLM ha rovinato "
+            "un file, qui torni indietro senza git."
+        )
+        sessioni = safe_write.list_backup_sessions()
+        if not sessioni:
+            st.caption("Nessun backup ancora: comparirà dopo la prima sovrascrittura.")
+        else:
+            etichette = [f"{stamp} — {n} file" for stamp, n in sessioni]
+            scelta = st.selectbox("Sessione di backup", etichette, key="backup_choice")
+            stamp_scelto = sessioni[etichette.index(scelta)][0]
+            if st.button("↩️ Ripristina questa sessione", key="do_restore"):
+                try:
+                    ripristinati = safe_write.restore_backup_session(stamp_scelto)
+                except (FileNotFoundError, OSError) as exc:
+                    st.error(f"Ripristino fallito: {exc}")
+                else:
+                    st.success(f"Ripristinati {len(ripristinati)} file:")
+                    for path in ripristinati:
+                        st.markdown(f"- `{path.relative_to(VTT_PROJECT_DIR).as_posix()}`")
 
 with st.sidebar:
     st.header("⚙️ Orchestratore")

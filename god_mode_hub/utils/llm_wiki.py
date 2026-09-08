@@ -255,6 +255,27 @@ def _manual_snippet(content: str, tokens: Sequence[str], radius: int = 120) -> s
 # Compilazione fonti raw/ -> wiki/
 # --------------------------------------------------------------------------
 
+def extract_pdf_text(pdf_path: Path, max_pages: int = 30) -> str | None:
+    """Estrae il testo di un PDF con ``pypdf``, se installato.
+
+    Returns:
+        Il testo estratto, oppure ``None`` se ``pypdf`` non è disponibile o il
+        PDF non contiene testo selezionabile (es. scansione di immagini: lì
+        servirebbe un OCR, fuori portata per l'Hub).
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return None
+    try:
+        reader = PdfReader(str(pdf_path))
+        parti = [(page.extract_text() or "") for page in reader.pages[:max_pages]]
+    except Exception:  # noqa: BLE001 — PDF corrotto/protetto: nessun testo
+        return None
+    testo = "\n\n".join(parte.strip() for parte in parti if parte.strip())
+    return testo or None
+
+
 def compile_raw_source(
     raw_path: Path,
     wiki_dir: Path = WIKI_DIR,
@@ -281,6 +302,18 @@ def compile_raw_source(
         title = _extract_title(text) or raw_path.stem.replace("_", " ").title()
         excerpt = text.strip()[:excerpt_chars]
         body_section = f"## Estratto\n\n{excerpt}\n"
+    elif raw_path.suffix.lower() == ".pdf":
+        title = raw_path.stem.replace("_", " ").title()
+        pdf_text = extract_pdf_text(raw_path)
+        if pdf_text:
+            body_section = f"## Estratto\n\n{pdf_text.strip()[:excerpt_chars]}\n"
+        else:
+            body_section = (
+                "## Estratto\n\n"
+                "PDF senza testo estraibile (scansione di immagini) oppure "
+                "`pypdf` non installato (`pip install pypdf`). Aprire il file "
+                "originale per il contenuto.\n"
+            )
     else:
         title = raw_path.stem.replace("_", " ").title()
         body_section = (

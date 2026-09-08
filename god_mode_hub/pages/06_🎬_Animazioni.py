@@ -19,7 +19,7 @@ if str(_HUB_ROOT) not in sys.path:
 st.set_page_config(page_title="Animazioni — God-Mode Hub", page_icon="🎬", layout="wide")
 
 from utils import ANIMATIONS_DIR, ensure_dirs, human_size, slugify  # noqa: E402
-from utils import sd_api  # noqa: E402
+from utils import sd_api, sd_browser  # noqa: E402
 
 ensure_dirs()
 
@@ -38,17 +38,35 @@ tab_sprite, tab_rig, tab_export = st.tabs(
 # TAB 1 — Sprite sheet 2D
 # ---------------------------------------------------------------------------
 with tab_sprite:
-    sd_url, sd_online = sd_api.find_webui()
+    sd_url, sd_online = sd_api.find_webui_cached()
+    browser_usable = sd_url is not None and sd_browser.is_playwright_installed()
     if sd_online:
-        st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}`")
+        st.caption(f"🟢 Stable Diffusion pronto su `{sd_url}` (API attiva)")
     elif sd_url is not None:
         st.warning(
-            f"🟠 WebUI su `{sd_url}` ma senza `--api` (`/sdapi/v1/txt2img` "
-            "assente): aggiungi `--api` al launcher e riavvia.",
+            f"🟠 WebUI su `{sd_url}` senza `--api`. Puoi generare comunque con "
+            "**Automazione browser**, ma qui costa molto: ogni frame è un ciclo "
+            "completo di interazione con la pagina (secondi in più per frame).",
             icon="🎞️",
         )
     else:
         st.error("🔴 Stable Diffusion non raggiungibile.", icon="🎞️")
+
+    metodi = (["API (veloce)"] if sd_online else []) + (
+        ["Automazione browser (nessun --api)"] if sd_url is not None else []
+    )
+    metodo = st.radio(
+        "Metodo di generazione", options=metodi or ["Nessuno disponibile"],
+        horizontal=True, disabled=not metodi, key="anim_method",
+        help="Con l'automazione browser i parametri qui sotto (dimensione, steps) "
+             "non vengono inviati: valgono quelli impostati nella tua WebUI.",
+    ) if metodi else None
+    anim_browser = metodo == "Automazione browser (nessun --api)"
+    if anim_browser and not sd_browser.is_playwright_installed():
+        st.info(
+            "Serve Playwright: `python -m pip install playwright` poi "
+            "`python -m playwright install chromium`.", icon="🧩",
+        )
     subject = st.text_input(
         "Soggetto dell'animazione",
         placeholder="es. fiamma magica viola che pulsa, vista dall'alto",
@@ -63,8 +81,9 @@ with tab_sprite:
         "rigging 3D (tab successiva)."
     )
 
+    anim_pronto = (anim_browser and browser_usable) or (not anim_browser and sd_online)
     if st.button("🎞️ Genera sprite sheet", type="primary",
-                 disabled=not (subject.strip() and sd_online)):
+                 disabled=not (subject.strip() and anim_pronto)):
         from PIL import Image
 
         frames: list["Image.Image"] = []
@@ -76,17 +95,28 @@ with tab_sprite:
         error: str | None = None
         for i in range(frames_n):
             try:
-                png = sd_api.txt2img(
-                    base_prompt,
-                    steps=22,
-                    width=frame_size,
-                    height=frame_size,
-                    seed=1000 + i,  # seed deterministici -> rigenerabile
-                )
-            except sd_api.SDApiError as exc:
+                if anim_browser:
+                    # La UI non espone il seed per-frame: la variazione tra i
+                    # frame viene dal seed casuale gia' impostato nella WebUI.
+                    png = sd_browser.txt2img_via_browser(sd_url, base_prompt)
+                else:
+                    png = sd_api.txt2img(
+                        base_prompt,
+                        steps=22,
+                        width=frame_size,
+                        height=frame_size,
+                        seed=1000 + i,  # seed deterministici -> rigenerabile
+                    )
+            except (sd_api.SDApiError, sd_browser.SDBrowserError) as exc:
                 error = str(exc)
                 break
-            frames.append(Image.open(io.BytesIO(png)).convert("RGBA"))
+            frame_img = Image.open(io.BytesIO(png)).convert("RGBA")
+            if frame_img.size != (frame_size, frame_size):
+                # Con l'automazione browser la dimensione la decide la WebUI:
+                # normalizziamo, altrimenti lo sprite sheet a griglia fissa
+                # taglierebbe o disallineerebbe i frame.
+                frame_img = frame_img.resize((frame_size, frame_size), Image.LANCZOS)
+            frames.append(frame_img)
             progress.progress((i + 1) / frames_n, text=f"Frame {i + 1}/{frames_n}")
         progress.empty()
 
@@ -226,7 +256,7 @@ with tab_export:
 with st.sidebar:
     st.header("🎬 Animazioni")
     st.markdown(
-        "- Sprite sheet: SD frame-per-frame\n"
+        "- Sprite sheet: SD frame-per-frame (API o browser)\n"
         "- GIF: Pillow (locale)\n"
         "- MP4: ffmpeg (se installato)\n"
         "- Rigging 3D: roadmap UniRig/Blender\n"
