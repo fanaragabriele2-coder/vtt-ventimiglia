@@ -211,6 +211,20 @@ Nel codice c'era anche un'espressione ingannevole: `math.radians(ampiezza *
 (converte in gradi e torna subito indietro). Ora le ampiezze sono dichiarate in
 gradi e convertite una volta sola; comportamento verificato identico a prima.
 
+### Prestazioni misurate
+
+Il rigging non è l'operazione lenta che temevo di dover annunciare:
+
+| vertici | tempo | risultato |
+|---:|---:|---|
+| 1.376 | ~2 s | 0,1 MB |
+| 5.544 | 2,1 s | 0,3 MB |
+| 15.704 | 2,2 s | 0,9 MB |
+| 25.824 | 3,0 s | 1,4 MB |
+
+L'interfaccia diceva "può richiedere qualche minuto": un'attesa annunciata
+sbagliata fa pensare che qualcosa si sia bloccato. Ora riporta i tempi veri.
+
 ### Cosa resta davvero
 
 La suite gira ora **senza un solo test saltato**: ogni componente opzionale è

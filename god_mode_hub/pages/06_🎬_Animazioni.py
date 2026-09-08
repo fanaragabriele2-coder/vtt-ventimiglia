@@ -329,6 +329,10 @@ with tab_rig:
                     "le ossa finiranno nel posto sbagliato e andranno sistemate a "
                     "mano. Fa il lavoro noioso, non sostituisce un rigger."
                 )
+                st.caption(
+                    "⏱️ Tempi misurati: ~2 s fino a 15.000 vertici, ~3 s a 26.000. "
+                    "Un modello TripoSR tipico rientra in questo intervallo."
+                )
                 r1, r2 = st.columns(2)
                 con_idle = r1.checkbox("Aggiungi animazione idle (respiro)", value=True,
                                        key="rig_idle")
@@ -336,7 +340,7 @@ with tab_rig:
 
                 if st.button("🦴 Crea scheletro", type="primary",
                              disabled=not blender_ok, key="rig_blender_go"):
-                    with st.spinner("Blender al lavoro (può richiedere qualche minuto)…"):
+                    with st.spinner("Blender al lavoro (pochi secondi su modelli tipici)…"):
                         esito = rigging.autorig_glb(
                             dati_modello,
                             animation="idle" if con_idle else "none",
