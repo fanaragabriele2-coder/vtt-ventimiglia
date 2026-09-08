@@ -12,7 +12,10 @@ Ultimo aggiornamento: settembre 2026.
 
 | Componente | Stato | Come l'ho verificato |
 |---|---|---|
-| Apertura delle 7 pagine dell'Hub | ✅ | `AppTest` esegue ogni pagina: nessuna eccezione anche con SD spento e indici vuoti |
+| Apertura delle 8 pagine dell'Hub | ✅ | `AppTest` esegue ogni pagina: nessuna eccezione anche con SD spento e indici vuoti |
+| Il gioco VTT si carica senza errori | ✅ | servito dal suo `dev-server.js` e caricato in Chromium: zero eccezioni JS, 8 moduli registrati |
+| Anteprima, bundle, git, import asset | ✅ | dev-server interrogato via HTTP, `bundle.js` eseguito davvero, repository git creati al volo |
+| Token VTT (sfondo trasparente + cerchio) | ✅ | immagini costruite pixel per pixel, con controllo visivo dell'anteprima |
 | RAG codebase (Chroma + fallback full-text) | ✅ | Query reale senza indice: il fallback trova il file giusto e ordina per rilevanza |
 | LLM Wiki (FTS5 + RRF) | ✅ | Indicizzazione, ricerca, compilazione fonti, log: tutti testati |
 | Linting wiki (link orfani, contraddizioni) | ✅ | Rileva `[[pagina_inesistente]]` e le negazioni contraddittorie; 60 pagine / 1800 bullet in **0,06 s** |
@@ -40,7 +43,8 @@ Ultimo aggiornamento: settembre 2026.
 | **Rigging 3D**: la tab esiste ma è solo documentazione + coda di file. Nessun rigging avviene | 🟡 medio | aperto per scelta (Fase 3) |
 | **TripoSR/TRELLIS non verificabili da qui**: richiedono GPU e repo locali | 🟡 medio | aperto — solo tu puoi provarli |
 | `dist/ultimate-vtt.html` citato nel README ma inesistente | 🟢 basso | **risolto**: generato, e rigenerabile dall'Hub |
-| VTT: 22 usi di `innerHTML` — se un nome PG o un messaggio di chat ci finisce dentro, è iniezione HTML | 🟢 basso (app locale monoutente) | aperto (Fase 2) |
+| VTT: nome PG e messaggi inseriti in `innerHTML` senza escape — un personaggio chiamato `Aldrico <il Grande>` perdeva metà nome | 🟡 medio | **risolto**: `window.UltimateVTTUtils.escapeHtml` sui 3 punti con input dell'utente |
+| **Il VTT non aveva un solo test**: un modulo rotto salvato dalla Drop Zone si scopriva solo aprendo il browser a mano | 🔴 critico | **risolto**: 13 test che caricano il gioco vero in Chromium |
 | VTT: `js/12-patch-touch-events-per-mobile.js` è 3580 righe, un quarto dell'intera codebase | 🟢 basso | aperto (Fase 3) |
 | Selettori dell'automazione browser mai provati sulla **tua** installazione | 🟡 medio | da verificare con "Testa selettori browser" |
 
@@ -94,16 +98,30 @@ Ultimo aggiornamento: settembre 2026.
 
 ## 4. Prossimi passi, in ordine di valore
 
-### Fase 3 — Cosa resta
+### Fase 3 — completata in parte
+
+**Fatto: il gioco ora ha una rete di sicurezza.** `tests/test_vtt_gioco.py`
+serve il VTT con il suo `dev-server.js` e lo carica in Chromium:
+- nessuna eccezione JavaScript all'avvio;
+- tutti gli 8 moduli fondamentali registrati su `window`;
+- nessun file locale mancante (i 404 su CDN esterne sono esclusi: dipendono
+  dalla rete, non dal progetto);
+- verificato che il test **fallisca davvero** rompendo un modulo di proposito.
+
+**Fatto: escape HTML** su nome PG e messaggi di chat, tramite
+`window.UltimateVTTUtils.escapeHtml`. Durante il lavoro il primo tentativo
+avrebbe rotto il gioco (helper definito in una IIFE, usato in altre due →
+`ReferenceError` a runtime, invisibile a `node --check`): l'ha intercettato
+proprio il nuovo test nel browser.
+
+### Cosa resta davvero
 - **Rigging 3D reale** (UniRig o Blender headless): la tab è ancora un
   segnaposto documentato. È l'unico pezzo grosso rimasto.
-- **Igiene `innerHTML` nel VTT**: 22 occorrenze; dove entra testo scritto
-  dall'utente (nomi PG, chat) andrebbe `textContent`. Rischio basso su
-  un'app locale monoutente, ma è debito tecnico reale.
 - **Spezzare `js/12-patch-touch-events-per-mobile.js`** (3580 righe, un quarto
-  della codebase del gioco).
-- **Anteprima del token direttamente sulla mappa** del VTT, per vedere se le
-  proporzioni funzionano prima di importarlo.
+  della codebase del gioco). Ora è meno rischioso: c'è un test che dice
+  subito se il gioco si rompe.
+- **Anteprima del token sulla mappa** del VTT, per valutare le proporzioni
+  prima di importarlo.
 - **Collaudo sulla tua macchina** di ciò che qui non è verificabile: selettori
   browser sulla tua Forge, TripoSR/TRELLIS, estrazione PDF.
 

@@ -1,3 +1,24 @@
+    // --- UTILITY CONDIVISE DEI MODULI DI QUESTO FILE ---
+    // Ogni blocco qui sotto e' una IIFE separata: le funzioni comuni vanno
+    // esposte su window.UltimateVTT*, come fanno gli altri moduli del progetto.
+    (function initUltimateVTTUtils() {
+      "use strict";
+      var utils = window.UltimateVTTUtils || (window.UltimateVTTUtils = {});
+
+      // Neutralizza i caratteri HTML nei testi scritti dal giocatore (nomi PG,
+      // messaggi) prima di inserirli con innerHTML: senza, un personaggio
+      // chiamato "Aldrico <il Grande>" perde meta' nome, perche' il browser
+      // interpreta "<il" come l'inizio di un tag.
+      utils.escapeHtml = function (value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      };
+    })();
+
     // --- INIZIO CORE GAMEPLAY LOOP: CHAT MASTER, DICE LOCK, PARTY HOTSEAT ---
     (function initializeCoreGameplayLoop() {
       "use strict";
@@ -1976,7 +1997,7 @@
             if (log) {
               var div = document.createElement("div");
               div.className = "master-chat-message system";
-              div.innerHTML = '<span class="master-chat-speaker">Sistema</span><p>' + msg + '</p>';
+              div.innerHTML = '<span class="master-chat-speaker">Sistema</span><p>' + window.UltimateVTTUtils.escapeHtml(msg) + '</p>';
               log.appendChild(div);
               log.scrollTop = log.scrollHeight;
             }
@@ -2665,7 +2686,7 @@
             var c=["#5bb7c8","#c89b3c","#5d9f45","#7b59c4"][i%4];
             return '<button class="hub-pg-btn'+(i===0?" is-active":"")+'" data-idx="'+i+'">'+
                    '<span class="hub-pg-btn-dot" style="background:'+c+'"></span>'+
-                   (pg.name||"PG"+(i+1))+'</button>';
+                   window.UltimateVTTUtils.escapeHtml(pg.name||"PG"+(i+1))+'</button>';
           }).join("");
           sel.querySelectorAll(".hub-pg-btn").forEach(function(b){
             b.addEventListener("click",function(){
@@ -2692,7 +2713,7 @@
         }).join("");
         cont.innerHTML=
           '<div class="hub-hp-block">'+
-            '<div class="hub-hp-top"><span class="hub-hp-name">'+V.name+'</span>'+
+            '<div class="hub-hp-top"><span class="hub-hp-name">'+window.UltimateVTTUtils.escapeHtml(V.name)+'</span>'+
             '<span class="hub-hp-vals">❤️ '+hp+'/'+maxHp+' &nbsp;🛡 '+(V.ac!=null?V.ac:'—')+'</span></div>'+
             '<div class="hub-hp-bar-full"><div class="hub-hp-bar-fill" style="width:'+hpPct+'%;background:'+hpC+'"></div></div>'+
           '</div>'+
