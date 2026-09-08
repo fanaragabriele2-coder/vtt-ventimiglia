@@ -131,8 +131,15 @@ ho scritto io: un parser che rilegge il proprio output non dimostra nulla.
 
 **Il rigging Blender è stato eseguito davvero**, non solo simulato: installando
 `bpy` da PyPI ho fatto girare lo script su un umanoide di prova e verificato il
-risultato — 14 ossa create con i nomi previsti (bacino, spina, torace, collo,
-testa, braccia, gambe), animazione idle esportata, geometria invariata.
+risultato — 14 ossa con i nomi previsti, animazione idle esportata, geometria
+invariata.
+
+Poi l'ho **renderizzato e guardato**, ed è emerso un difetto che nessun test
+vedeva: le ossa delle braccia cadevano *dentro il torso* invece che negli arti,
+perché derivavano da una frazione fissa della larghezza. Con i pesi automatici
+le braccia si sarebbero deformate male. Ora le proporzioni vengono dall'analisi
+della nuvola di vertici, e un secondo render conferma che le ossa percorrono
+gli arti per tutta la loro lunghezza.
 Da qui è nato anche un miglioramento: l'Hub ora accetta **due backend**,
 l'applicazione Blender oppure il modulo `bpy` installato con pip, così il
 rigging funziona anche senza installare l'applicazione.

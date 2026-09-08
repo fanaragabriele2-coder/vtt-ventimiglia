@@ -286,3 +286,61 @@ def test_solo_scheletro_senza_animazione(tmp_path: Path) -> None:
     info = gltf_tools.inspect_glb(esito.glb)
     assert info.has_skeleton
     assert not info.is_animated, "con animation='none' non deve esserci animazione"
+
+
+@pytestmark_blender
+def test_le_ossa_cadono_dentro_gli_arti(tmp_path: Path) -> None:
+    """Regressione trovata **guardando un render**, non dai test.
+
+    Le ossa delle braccia finivano dentro il torso invece che negli arti (con
+    pesi automatici, deformazioni sbagliate), e un secondo tentativo le ha
+    ridotte a monconi di 2 cm perché il filtro verticale troncava la misura.
+    Qui si verifica numericamente che l'analisi riconosca gli arti dove sono.
+
+    Geometria nota del modello di prova: braccia centrate a |x| = 0.42 con z da
+    0.87 a 1.63; gambe centrate a |x| = 0.15.
+    """
+    _umanoide_glb(tmp_path)  # crea tmp_path/umanoide.glb
+
+    sonda = tmp_path / "sonda.py"
+    sonda.write_text(
+        "import bpy, json, sys\n"
+        f"sys.path.insert(0, {str(Path(rigging.AUTORIG_SCRIPT).parent)!r})\n"
+        "import blender_autorig as ar\n"
+        "bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()\n"
+        f"bpy.ops.import_scene.gltf(filepath={str(tmp_path / 'umanoide.glb')!r})\n"
+        "mesh = [o for o in bpy.context.scene.objects if o.type=='MESH'][0]\n"
+        "mi, ma = ar.world_bounds(mesh)\n"
+        "a = ar.limb_clusters(mesh, mi, ma)\n"
+        "a['altezza'] = ma.z - mi.z\n"
+        f"open({str(tmp_path / 'misure.json')!r}, 'w').write(json.dumps(a))\n",
+        encoding="utf-8",
+    )
+    tipo, eseguibile = rigging.blender_backend()
+    comando = ([eseguibile, "--background", "--python", str(sonda)] if tipo == "app"
+               else [eseguibile, str(sonda)])
+    subprocess.run(comando, capture_output=True, text=True, timeout=600, check=False)
+
+    misure_file = tmp_path / "misure.json"
+    if not misure_file.is_file():
+        pytest.skip("la sonda su Blender non ha prodotto misure")
+    import json
+    m = json.loads(misure_file.read_text(encoding="utf-8"))
+
+    lunghezza_braccio = m["braccio_alto"] - m["braccio_basso"]
+    assert lunghezza_braccio > m["altezza"] * 0.25, (
+        f"braccio riconosciuto troppo corto ({lunghezza_braccio:.2f} su "
+        f"{m['altezza']:.2f} di altezza): le ossa diventerebbero monconi"
+    )
+    # Verifica decisiva: l'osso deve stare DENTRO la mesh del braccio, che nel
+    # modello di prova occupa |x| tra 0.32 e 0.52. Il primo tentativo di questo
+    # test accettava da 0.28 e passava anche col bug: il valore di ripiego
+    # (0.286) cade nel vuoto tra torso e braccio, cioè fuori da entrambi.
+    assert 0.32 <= m["spalla_x"] <= 0.52, (
+        f"osso del braccio a |x|={m['spalla_x']:.2f}: fuori dalla mesh del "
+        "braccio, che occupa da 0.32 a 0.52. Con i pesi automatici il braccio "
+        "si deformerebbe male."
+    )
+    assert 0.08 <= m["anca_x"] <= 0.26, (
+        f"osso della gamba a |x|={m['anca_x']:.2f}: le gambe sono centrate a 0.15"
+    )

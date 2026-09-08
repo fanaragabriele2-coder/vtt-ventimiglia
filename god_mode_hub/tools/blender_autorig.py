@@ -8,17 +8,18 @@ Eseguito da ``utils/rigging.py`` come:
 Cosa fa, in ordine:
 
 1. importa il ``.glb`` in una scena vuota;
-2. misura il riquadro di ingombro della mesh e ne ricava le proporzioni di un
-   umanoide in posa A (quella che i prompt dell'Hub chiedono a Stable
-   Diffusion, ed è la posa su cui TripoSR ricostruisce meglio);
+2. **misura dove sono davvero gli arti**, analizzando la nuvola di vertici per
+   fasce di altezza invece di fidarsi del solo riquadro di ingombro: le braccia
+   di una posa A stanno vicino ai fianchi, e piazzare le ossa a una frazione
+   fissa della larghezza le lascia dentro il torso, con deformazioni sbagliate
+   (verificato guardando un rig renderizzato);
 3. crea un'armatura con le ossa principali (bacino, spina, torace, collo,
    testa, braccia, gambe) posizionate su quelle proporzioni;
 4. imparenta la mesh all'armatura con i **pesi automatici** di Blender;
 5. applica un'animazione di base e riesporta in ``.glb``.
 
-Limite dichiarato: le proporzioni vengono dal riquadro di ingombro, non da un
-riconoscimento della forma. Su un umanoide in posa A il risultato è
-utilizzabile; su una creatura molto diversa (quadrupede, ameba, drago) le ossa
+Limite dichiarato: l'analisi presuppone un **umanoide eretto** visto con Z in
+alto. Su una creatura molto diversa (quadrupede, ameba, drago) le ossa
 finiranno nel posto sbagliato e il rig andrà sistemato a mano in Blender.
 Questo script fa il 90% del lavoro noioso, non sostituisce un rigger.
 """
@@ -70,20 +71,97 @@ def world_bounds(obj) -> tuple[Vector, Vector]:
     return minimo, massimo
 
 
-def build_armature(minimo: Vector, massimo: Vector):
-    """Crea l'armatura umanoide proporzionata al riquadro di ingombro.
+def limb_clusters(obj, minimo: Vector, massimo: Vector) -> dict:
+    """Individua braccia e gambe analizzando la nuvola di vertici.
 
-    Le frazioni di altezza seguono il canone anatomico usato di norma nel
-    character rigging (bacino ~0.53, spalle ~0.82, testa ~0.93).
+    In una posa A le braccia sono il gruppo di vertici **più esterno nella metà
+    superiore**, le gambe quello nella metà inferiore. Misurare la loro
+    estensione reale evita l'errore in cui ero incorso al primo tentativo:
+    piazzare le ossa a una frazione fissa della larghezza le lascia dentro il
+    torso, e i pesi automatici deformano male gli arti.
+
+    Attenzione al filtro verticale: applicarlo *prima* di misurare l'estensione
+    del braccio la tronca (verificato: su una mesh a bassa densità restavano
+    solo i vertici della spalla, e le ossa diventavano monconi di 2 cm).
+
+    Returns:
+        ``spalla_x``, ``polso_x``, ``braccio_alto``, ``braccio_basso``,
+        ``anca_x`` in coordinate mondo.
+    """
+    matrice = obj.matrix_world
+    punti = [matrice @ v.co for v in obj.data.vertices]
+    altezza = massimo.z - minimo.z
+    meta_x = (massimo.x + minimo.x) / 2
+    estremo_x = max((abs(p.x - meta_x) for p in punti), default=0.0) or 1.0
+
+    # Proporzioni classiche, usate se l'analisi non riconosce arti sporgenti
+    # (creatura non umanoide, mesh molto irregolare).
+    ripiego = {
+        "spalla_x": estremo_x * 0.55,
+        "polso_x": estremo_x * 0.60,
+        "braccio_alto": minimo.z + altezza * 0.80,
+        "braccio_basso": minimo.z + altezza * 0.50,
+        "anca_x": estremo_x * 0.18,
+    }
+
+    # Braccia: vertici ben esterni e sopra il ginocchio. Il filtro verticale
+    # serve solo a escludere le gambe, non a delimitare il braccio.
+    braccia = [
+        p for p in punti
+        if abs(p.x - meta_x) > estremo_x * 0.50
+        and p.z > minimo.z + altezza * 0.35
+    ]
+    destri = [p for p in braccia if p.x > meta_x]
+    if len(destri) >= 4:
+        alto = max(p.z for p in destri)
+        basso = min(p.z for p in destri)
+        larghezza_braccio = sum(p.x - meta_x for p in destri) / len(destri)
+        # Un braccio deve avere una lunghezza sensata: sotto il 15% dell'altezza
+        # il riconoscimento ha preso solo una fetta e i valori non sono usabili.
+        if (alto - basso) >= altezza * 0.15:
+            spalla_x = larghezza_braccio
+        else:
+            alto, basso = ripiego["braccio_alto"], ripiego["braccio_basso"]
+            spalla_x = ripiego["spalla_x"]
+    else:
+        alto, basso = ripiego["braccio_alto"], ripiego["braccio_basso"]
+        spalla_x = ripiego["spalla_x"]
+
+    # Gambe: gruppo inferiore, ne prendo la distanza media dal centro.
+    gambe = [p for p in punti if p.z < minimo.z + altezza * 0.35 and p.x > meta_x]
+    if len(gambe) >= 4:
+        anca_x = sum(p.x - meta_x for p in gambe) / len(gambe)
+    else:
+        anca_x = ripiego["anca_x"]
+
+    return {
+        "spalla_x": max(spalla_x, estremo_x * 0.15),
+        "polso_x": max(spalla_x * 1.05, estremo_x * 0.20),
+        "braccio_alto": alto,
+        "braccio_basso": basso,
+        "anca_x": max(anca_x, estremo_x * 0.06),
+    }
+
+
+def build_armature(obj, minimo: Vector, massimo: Vector):
+    """Crea l'armatura umanoide, allineata agli arti trovati nella mesh.
+
+    La colonna centrale segue le frazioni di altezza del canone anatomico
+    (bacino ~0.53, spalle ~0.82, testa ~0.93); braccia e gambe vengono invece
+    posizionate sui gruppi di vertici reali, così le ossa cadono **dentro** gli
+    arti e i pesi automatici deformano nel modo giusto.
     """
     altezza = massimo.z - minimo.z
-    larghezza = massimo.x - minimo.x
     centro_x = (massimo.x + minimo.x) / 2
     centro_y = (massimo.y + minimo.y) / 2
     base_z = minimo.z
+    arti = limb_clusters(obj, minimo, massimo)
 
     def punto(frazione_altezza: float, scarto_x: float = 0.0) -> Vector:
         return Vector((centro_x + scarto_x, centro_y, base_z + altezza * frazione_altezza))
+
+    def punto_z(z_mondo: float, scarto_x: float = 0.0) -> Vector:
+        return Vector((centro_x + scarto_x, centro_y, z_mondo))
 
     bpy.ops.object.armature_add(enter_editmode=True, location=(centro_x, centro_y, base_z))
     armatura = bpy.context.object
@@ -108,14 +186,25 @@ def build_armature(minimo: Vector, massimo: Vector):
     collo = nuovo("collo", punto(0.82), punto(0.88), torace, True)
     nuovo("testa", punto(0.88), punto(1.00), collo, True)
 
-    # Arti, speculari sui due lati
-    spalla_x = larghezza * 0.18
-    anca_x = larghezza * 0.10
+    # Braccia: dal gruppo di vertici realmente individuato sui fianchi.
+    spalla_x, polso_x = arti["spalla_x"], arti["polso_x"]
+    alto, basso = arti["braccio_alto"], arti["braccio_basso"]
+    gomito_z = (alto + basso) / 2
+    anca_x = arti["anca_x"]
+
     for lato, segno in (("L", 1.0), ("R", -1.0)):
-        braccio = nuovo(f"braccio_{lato}", punto(0.80, segno * spalla_x),
-                        punto(0.68, segno * spalla_x * 1.7), torace)
-        nuovo(f"avambraccio_{lato}", punto(0.68, segno * spalla_x * 1.7),
-              punto(0.56, segno * spalla_x * 2.1), braccio, True)
+        braccio = nuovo(
+            f"braccio_{lato}",
+            punto_z(alto, segno * spalla_x * 0.75),
+            punto_z(gomito_z, segno * spalla_x),
+        )
+        braccio.parent = torace
+        nuovo(
+            f"avambraccio_{lato}",
+            punto_z(gomito_z, segno * spalla_x),
+            punto_z(basso, segno * polso_x),
+            braccio, True,
+        )
         coscia = nuovo(f"coscia_{lato}", punto(0.50, segno * anca_x),
                        punto(0.28, segno * anca_x), bacino)
         nuovo(f"gamba_{lato}", punto(0.28, segno * anca_x),
@@ -175,7 +264,7 @@ def main() -> None:
     if (massimo.z - minimo.z) <= 0:
         raise RuntimeError("Il modello ha altezza nulla: impossibile ricavare le proporzioni.")
 
-    armatura = build_armature(minimo, massimo)
+    armatura = build_armature(mesh, minimo, massimo)
     bind_mesh(mesh, armatura)
     if args.animation == "idle":
         animate_idle(armatura, args.frames)
