@@ -175,6 +175,28 @@ verificata **identica all'originale byte per byte** prima di scrivere i file,
 e i 37 test funzionali del gioco sono stati rieseguiti dopo — tutti verdi,
 con creazione del personaggio e bonus di razza controllati anche a vista.
 
+### Fatto: verificato che il rig *funzioni*, non solo che esista
+
+Ossa nel posto giusto non bastano: contano i **pesi**. Un test ruota l'osso di
+un braccio su una mesh densa e continua (1376 vertici, generata con metaball
+come una ricostruzione TripoSR) e misura cosa si muove davvero:
+
+- il braccio ruotato si sposta;
+- braccio opposto, testa e gambe restano **esattamente fermi**;
+- l'influenza sul torso decade allontanandosi dalla spalla e alla vita è
+  praticamente nulla — la firma di uno skinning fatto bene.
+
+Verificato che il test serva sostituendo i pesi automatici con un legame senza
+pesi: fallisce, come deve.
+
+**Lezione più utile di tutte**: al primo tentativo quel test *saltava* invece
+di fallire, perché il guard `pytest.skip` copriva anche il caso "il rig
+prodotto è inutilizzabile". Un salto al posto di un fallimento è peggio di
+nessun test: la suite resta verde e non hai verificato niente. Ho poi
+controllato tutti i 14 punti di skip della suite e corretto gli altri due che
+avevano lo stesso difetto — fra cui quello su `dev-server.js`, che è codice
+del progetto: ora se non parte il test lo dice, con il codice d'uscita di node.
+
 ### Cosa resta davvero
 
 La suite gira ora **senza un solo test saltato**: ogni componente opzionale è

@@ -231,8 +231,10 @@ def _umanoide_glb(tmp_path: Path) -> bytes:
                else [eseguibile, str(script)])
     esito = subprocess.run(comando, capture_output=True, text=True, timeout=600, check=False)
     modello = tmp_path / "umanoide.glb"
-    if not modello.is_file():
-        pytest.skip(f"impossibile costruire il modello di prova: {esito.stderr[-300:]}")
+    assert modello.is_file(), (
+        "costruzione del modello di prova fallita — senza di esso il test non "
+        f"verificherebbe nulla:\n{(esito.stderr or esito.stdout)[-600:]}"
+    )
     return modello.read_bytes()
 
 
@@ -319,11 +321,13 @@ def test_le_ossa_cadono_dentro_gli_arti(tmp_path: Path) -> None:
     tipo, eseguibile = rigging.blender_backend()
     comando = ([eseguibile, "--background", "--python", str(sonda)] if tipo == "app"
                else [eseguibile, str(sonda)])
-    subprocess.run(comando, capture_output=True, text=True, timeout=600, check=False)
+    esito_sonda = subprocess.run(comando, capture_output=True, text=True, timeout=600, check=False)
 
     misure_file = tmp_path / "misure.json"
-    if not misure_file.is_file():
-        pytest.skip("la sonda su Blender non ha prodotto misure")
+    assert misure_file.is_file(), (
+        "l'analisi degli arti non ha prodotto misure:\n"
+        + (esito_sonda.stderr or esito_sonda.stdout)[-800:]
+    )
     import json
     m = json.loads(misure_file.read_text(encoding="utf-8"))
 
@@ -343,4 +347,149 @@ def test_le_ossa_cadono_dentro_gli_arti(tmp_path: Path) -> None:
     )
     assert 0.08 <= m["anca_x"] <= 0.26, (
         f"osso della gamba a |x|={m['anca_x']:.2f}: le gambe sono centrate a 0.15"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Qualità della deformazione: il rig serve a qualcosa?
+# ---------------------------------------------------------------------------
+# Ossa nel posto giusto non bastano: contano i **pesi**. Se l'automatic weights
+# lega male, muovendo un braccio si trascina il torso o si deforma la testa.
+# Qui si ruota un osso e si misura cosa si muove davvero, su una mesh densa e
+# continua (metaball) simile a una ricostruzione TripoSR — non su cubi
+# separati, dove i pesi risulterebbero puliti per costruzione.
+
+_SCRIPT_UMANOIDE_ORGANICO = """
+import bpy
+bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
+bpy.ops.object.metaball_add(type='BALL', location=(0,0,1.25), radius=0.42)
+mb = bpy.context.object
+def palla(x, z, r):
+    e = mb.data.elements.new(type='BALL'); e.co = (x, 0, z-1.25); e.radius = r
+for z in (0.95, 1.10, 1.40): palla(0, z, 0.40)
+palla(0, 1.80, 0.30)
+for s in (1, -1):
+    for t, (z, r) in enumerate([(1.45,0.22),(1.25,0.20),(1.05,0.18),(0.90,0.16)]):
+        palla(s*(0.30+0.03*t), z, r)
+    for z, r in [(0.70,0.24),(0.50,0.22),(0.28,0.20),(0.08,0.18)]:
+        palla(s*0.17, z, r)
+mb.data.resolution = 0.06
+bpy.context.view_layer.update()
+bpy.ops.object.convert(target='MESH')
+bpy.ops.export_scene.gltf(filepath=USCITA, export_format='GLB')
+"""
+
+_SCRIPT_MISURA_DEFORMAZIONE = """
+import bpy, json, math
+bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
+bpy.ops.import_scene.gltf(filepath=INGRESSO)
+mesh = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
+arm = [o for o in bpy.context.scene.objects if o.type == 'ARMATURE'][0]
+
+def posizioni():
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = mesh.evaluated_get(dg)
+    m = ev.matrix_world
+    return [m @ v.co for v in ev.data.vertices]
+
+riposo = posizioni()
+meta = (max(p.x for p in riposo) + min(p.x for p in riposo)) / 2
+estremo = max(abs(p.x - meta) for p in riposo)
+
+zone = {
+    'braccio_ruotato': [i for i, p in enumerate(riposo) if p.x-meta >  estremo*0.55 and p.z > 0.85],
+    'braccio_opposto': [i for i, p in enumerate(riposo) if p.x-meta < -estremo*0.55 and p.z > 0.85],
+    'testa':           [i for i, p in enumerate(riposo) if p.z > 1.85],
+    'gambe':           [i for i, p in enumerate(riposo) if p.z < 0.55],
+    'vita':            [i for i, p in enumerate(riposo) if abs(p.x-meta) < estremo*0.25 and 0.85 <= p.z < 1.05],
+}
+
+bpy.context.view_layer.objects.active = arm
+bpy.ops.object.mode_set(mode='POSE')
+osso = arm.pose.bones['braccio_L']
+osso.rotation_mode = 'XYZ'
+osso.rotation_euler[1] = math.radians(50)
+bpy.context.view_layer.update()
+dopo = posizioni()
+bpy.ops.object.mode_set(mode='OBJECT')
+
+esito = {'vertici': len(riposo)}
+for nome, indici in zone.items():
+    esito[nome] = (sum((dopo[i]-riposo[i]).length for i in indici) / len(indici)) if indici else None
+    esito[nome + '_n'] = len(indici)
+open(RISULTATO, 'w').write(json.dumps(esito))
+"""
+
+
+def _esegui_in_blender(script: str, tmp_path: Path, **variabili) -> subprocess.CompletedProcess:
+    """Esegue uno script dentro Blender, iniettando le variabili come costanti.
+
+    Restituisce l'esito completo: se lo script fallisce, il test deve poter
+    **fallire con l'errore vero** invece di saltare. Un `skip` al posto di un
+    `fail` nasconde i guasti dietro una suite che sembra verde — verificato
+    sulla mia stessa pelle rompendo di proposito i pesi dell'armatura: il test
+    saltava invece di segnalare.
+    """
+    intestazione = "".join(f"{nome} = {valore!r}\n" for nome, valore in variabili.items())
+    percorso = tmp_path / f"script_blender_{abs(hash(script)) % 10000}.py"
+    percorso.write_text(intestazione + script, encoding="utf-8")
+    tipo, eseguibile = rigging.blender_backend()
+    comando = ([eseguibile, "--background", "--python", str(percorso)] if tipo == "app"
+               else [eseguibile, str(percorso)])
+    return subprocess.run(comando, capture_output=True, text=True, timeout=900, check=False)
+
+
+@pytestmark_blender
+def test_i_pesi_muovono_solo_l_arto_giusto(tmp_path: Path) -> None:
+    """Ruotando l'osso di un braccio, deve muoversi quel braccio e basta.
+
+    È la prova che il rig sia utilizzabile e non solo strutturalmente valido:
+    con pesi legati male, muovere un braccio trascinerebbe il torso o la testa.
+    """
+    import json
+
+    organico = tmp_path / "organico.glb"
+    esito = _esegui_in_blender(_SCRIPT_UMANOIDE_ORGANICO, tmp_path, USCITA=str(organico))
+    assert organico.is_file(), (
+        "costruzione del modello di prova fallita:\n" + (esito.stderr or esito.stdout)[-800:]
+    )
+    assert len(organico.read_bytes()) > 10_000, "la mesh di prova deve essere densa"
+
+    esito_rig = rigging.autorig_glb(organico.read_bytes(), animation="none")
+    assert esito_rig.ok, f"{esito_rig.message}\n{esito_rig.log_tail}"
+    riggato = tmp_path / "riggato.glb"
+    riggato.write_bytes(esito_rig.glb)
+
+    risultato = tmp_path / "deformazione.json"
+    esito = _esegui_in_blender(
+        _SCRIPT_MISURA_DEFORMAZIONE, tmp_path,
+        INGRESSO=str(riggato), RISULTATO=str(risultato),
+    )
+    # Niente skip qui: se la misura non riesce è perché il modello riggato è
+    # inutilizzabile (per esempio senza armatura), cioè proprio il guasto che
+    # questo test deve intercettare.
+    assert risultato.is_file(), (
+        "impossibile misurare la deformazione del modello riggato — il rig "
+        "prodotto non è utilizzabile:\n" + (esito.stderr or esito.stdout)[-800:]
+    )
+    m = json.loads(risultato.read_text(encoding="utf-8"))
+
+    assert m["vertici"] > 500, f"mesh troppo rada per essere significativa: {m['vertici']}"
+    assert m["braccio_ruotato"] and m["braccio_ruotato"] > 0.02, (
+        f"il braccio non segue il proprio osso (spostamento {m['braccio_ruotato']}): "
+        "i pesi non sono stati assegnati"
+    )
+    assert m["braccio_opposto"] is not None and m["braccio_opposto"] < 0.001, (
+        f"l'altro braccio si muove ({m['braccio_opposto']:.4f}): pesi sconfinati"
+    )
+    assert m["testa"] is not None and m["testa"] < 0.001, (
+        f"la testa si muove ({m['testa']:.4f}) ruotando un braccio"
+    )
+    assert m["gambe"] is not None and m["gambe"] < 0.001, (
+        f"le gambe si muovono ({m['gambe']:.4f}) ruotando un braccio"
+    )
+    # L'influenza deve svanire allontanandosi dalla spalla: alla vita, quasi nulla.
+    assert m["vita"] is not None and m["vita"] < m["braccio_ruotato"] * 0.15, (
+        f"l'influenza del braccio arriva fino alla vita ({m['vita']:.4f} contro "
+        f"{m['braccio_ruotato']:.4f} del braccio): i pesi sono troppo diffusi"
     )

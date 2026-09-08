@@ -76,7 +76,15 @@ def gioco_servito() -> str:
                 break
             time.sleep(0.2)
         else:
-            pytest.skip("dev-server.js non si è avviato")
+            # Niente skip: dev-server.js fa parte del progetto, quindi se non
+            # parte è un guasto da segnalare. Un salto qui renderebbe verde
+            # una suite che in realtà non ha provato nulla.
+            diagnostica = ""
+            if processo is not None and processo.poll() is not None:
+                diagnostica = f" (il processo node è uscito con codice {processo.returncode})"
+            raise AssertionError(
+                f"dev-server.js non è in ascolto sulla porta {porta} dopo 12s{diagnostica}"
+            )
         yield f"http://127.0.0.1:{porta}/"
     finally:
         if processo is not None:
