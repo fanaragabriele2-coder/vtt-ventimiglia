@@ -48,6 +48,23 @@ attive:
 - **Aree protette** — `.git/`, `node_modules/`, `dist/`, `.venv/` non sono mai
   scrivibili dalla Drop Zone.
 
+## 🌐 Dal generatore al gioco
+
+La pagina **🌐 Progetto VTT** chiude il ciclo di lavoro senza uscire dall'Hub:
+
+- **▶️ Anteprima** — avvia `node dev-server.js` e apri il gioco su
+  `localhost:4599`; da lì anche il pulsante per rigenerare il file unico
+  `dist/ultimate-vtt.html` da condividere.
+- **🔀 Modifiche (git)** — vedi il diff di quello che la Drop Zone ha appena
+  scritto (compresi i file nuovi, che `git diff` da solo non mostra) e committa
+  solo i file che hai verificato.
+- **📦 Import asset** — copia i token e i modelli generati in `assets/` dentro
+  il progetto, con il percorso pronto da incollare nel codice.
+
+In **🎨 Asset Forge**, dopo la generazione, la sezione *"Token per la mappa"*
+trasforma il PNG quadrato con sfondo pieno nel **token circolare trasparente**
+che il VTT si aspetta (rimozione sfondo locale, ritaglio, bordo).
+
 ## ✅ Test
 
 Doppio click su **`TEST.bat`** (o `python -m pytest` da terminale): esegue la

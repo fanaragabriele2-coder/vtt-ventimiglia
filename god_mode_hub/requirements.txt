@@ -16,6 +16,11 @@ Pillow>=10.0
 # Dopo pip install serve anche: python -m playwright install chromium
 playwright>=1.40
 
+# Opzionale: rimozione sfondo con rete neurale (U^2-Net locale) per i token.
+# Senza, l'Hub usa il riempimento dai bordi incluso in utils/image_tools.py,
+# che basta per gli sfondi uniformi prodotti dai prompt dell'Hub.
+rembg>=2.0
+
 # Opzionale: estrae il testo dai PDF messi in raw/ quando li compili in pagine
 # wiki. Senza, i PDF diventano pagine stub con il solo riferimento al file.
 pypdf>=4.0

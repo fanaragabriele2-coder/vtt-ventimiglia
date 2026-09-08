@@ -34,10 +34,12 @@ Ultimo aggiornamento: settembre 2026.
 | SD ri-sondata a ogni interazione dell'interfaccia | 🟡 medio | **risolto** (§3) |
 | Animazioni: nessun supporto all'automazione browser | 🟡 medio | **risolto** (§3) |
 | PDF in `raw/`: diventavano pagine wiki vuote | 🟡 medio | **risolto** (§3), ma non verificabile nel mio ambiente (vedi nota) |
-| **Sprite sheet non è una vera animazione**: ogni frame usa un seed diverso, quindi i frame non sono coerenti tra loro. Va bene per fuoco/fumo/aure, non per una camminata | 🟡 medio | aperto — serve img2img o ControlNet a seed fisso (Fase 2) |
+| Sprite sheet non coerenti (ogni frame un seed diverso) | 🟡 medio | **risolto**: modalità "frame coerenti" via img2img |
+| Token generati quadrati con sfondo pieno: inutilizzabili sulla mappa senza editing manuale | 🟠 alto | **risolto**: post-produzione sfondo trasparente + cerchio |
+| Nessun modo di vedere il gioco, il diff o committare senza uscire dall'Hub | 🟠 alto | **risolto**: pagina 🌐 Progetto VTT |
 | **Rigging 3D**: la tab esiste ma è solo documentazione + coda di file. Nessun rigging avviene | 🟡 medio | aperto per scelta (Fase 3) |
 | **TripoSR/TRELLIS non verificabili da qui**: richiedono GPU e repo locali | 🟡 medio | aperto — solo tu puoi provarli |
-| `dist/ultimate-vtt.html` citato nel README ma inesistente | 🟢 basso | aperto — basta `node tools/bundle.js` |
+| `dist/ultimate-vtt.html` citato nel README ma inesistente | 🟢 basso | **risolto**: generato, e rigenerabile dall'Hub |
 | VTT: 22 usi di `innerHTML` — se un nome PG o un messaggio di chat ci finisce dentro, è iniezione HTML | 🟢 basso (app locale monoutente) | aperto (Fase 2) |
 | VTT: `js/12-patch-touch-events-per-mobile.js` è 3580 righe, un quarto dell'intera codebase | 🟢 basso | aperto (Fase 3) |
 | Selettori dell'automazione browser mai provati sulla **tua** installazione | 🟡 medio | da verificare con "Testa selettori browser" |
@@ -66,34 +68,44 @@ Ultimo aggiornamento: settembre 2026.
 4. **Cache del rilevamento SD** (15 s): niente più sondaggi HTTP a ogni slider.
 5. **Estrazione testo dai PDF** per le fonti wiki.
 
+## 3bis. Fase 1 e 2 completate
+
+**Fase 1 — il ciclo di lavoro è chiuso.** Nuova pagina **🌐 Progetto VTT**:
+- **anteprima live**: avvia/ferma `node dev-server.js` dall'Hub e apre il gioco;
+- **modifiche (git)**: `git status` + diff riga per riga di quello che la Drop
+  Zone ha appena scritto — inclusi i **file nuovi**, che `git diff` normalmente
+  ignora — e commit selettivo dei soli file scelti;
+- **import asset**: copia i PNG/GLB generati in `assets/` del VTT e ti dà il
+  percorso da usare nel codice; non sovrascrive (aggiunge un suffisso).
+- `dist/ultimate-vtt.html` generato (625 KB) e rigenerabile con un pulsante.
+
+**Fase 2 — qualità della generazione:**
+- **Token VTT veri**: nuova post-produzione in Asset Forge — sfondo reso
+  trasparente (rembg se installato, altrimenti riempimento dai bordi incluso),
+  ritaglio sul soggetto, maschera circolare con bordo. Due bug trovati
+  *guardando l'anteprima*, non dai test: il cerchio tagliava il soggetto e il
+  ritaglio quadrato decapitava i personaggi verticali. Entrambi ora hanno un
+  test di regressione.
+- **Sprite sheet coerenti**: nuova modalità img2img, ogni frame nasce dal
+  precedente. La modalità indipendente resta, ma ora dichiara esplicitamente
+  che i frame non sono in continuità.
+- **Libreria prompt**: salva i prompt riusciti con i loro parametri, li riusa
+  con un click e conta quante volte li hai usati.
+
 ## 4. Prossimi passi, in ordine di valore
 
-### Fase 1 — Consolidare (prossima sessione)
-- **Collaudo sulla tua macchina**: `TEST.bat`, poi "Testa selettori browser" in
-  Asset Forge. Se qualche selettore risulta ❌, adattarli al tuo tema Forge.
-- **Anteprima del VTT dall'Hub**: pulsante che lancia `node dev-server.js` e
-  apre `http://localhost:4599` — oggi devi uscire dall'Hub per vedere l'effetto
-  delle modifiche che l'Orchestratore ha appena salvato.
-- **Integrazione git nell'Orchestratore**: mostrare `git diff`/`git status` del
-  progetto VTT dentro l'Hub e permettere un commit rapido dopo un salvataggio
-  andato bene. Chiude il ciclo "genera → salva → verifica → committa".
-- **Rigenerare `dist/ultimate-vtt.html`** (il README lo promette e non esiste).
-
-### Fase 2 — Qualità della generazione
-- **Sprite sheet coerenti**: stesso seed + img2img sul frame precedente, oppure
-  ControlNet OpenPose, così i frame appartengono alla stessa animazione.
-- **Libreria di prompt riutilizzabili**: salvare i prompt che hanno funzionato
-  con anteprima, invece di riscriverli ogni volta.
-- **Rimozione sfondo automatica** sui token (i VTT vogliono PNG trasparenti):
-  `rembg` locale, un passaggio dopo la generazione.
-- **Igiene `innerHTML` nel VTT**: sostituire con `textContent` dove entra input
-  dell'utente.
-
-### Fase 3 — Estensioni pesanti
-- **Rigging 3D reale** (UniRig o Blender headless): la tab oggi è un segnaposto.
-- **Import diretto degli asset nel VTT**: i `.png`/`.glb` generati finiscono in
-  `asset_forge/`, ma metterli nel gioco è ancora manuale.
-- **Spezzare `js/12-patch-touch-events-per-mobile.js`** (3580 righe) in moduli.
+### Fase 3 — Cosa resta
+- **Rigging 3D reale** (UniRig o Blender headless): la tab è ancora un
+  segnaposto documentato. È l'unico pezzo grosso rimasto.
+- **Igiene `innerHTML` nel VTT**: 22 occorrenze; dove entra testo scritto
+  dall'utente (nomi PG, chat) andrebbe `textContent`. Rischio basso su
+  un'app locale monoutente, ma è debito tecnico reale.
+- **Spezzare `js/12-patch-touch-events-per-mobile.js`** (3580 righe, un quarto
+  della codebase del gioco).
+- **Anteprima del token direttamente sulla mappa** del VTT, per vedere se le
+  proporzioni funzionano prima di importarlo.
+- **Collaudo sulla tua macchina** di ciò che qui non è verificabile: selettori
+  browser sulla tua Forge, TripoSR/TRELLIS, estrazione PDF.
 
 ---
 

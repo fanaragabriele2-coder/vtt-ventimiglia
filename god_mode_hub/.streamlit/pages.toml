@@ -38,3 +38,8 @@ icon = "👤"
 path = "pages/06_🎬_Animazioni.py"
 name = "Animazioni"
 icon = "🎬"
+
+[[pages]]
+path = "pages/07_🌐_Progetto_VTT.py"
+name = "Progetto VTT"
+icon = "🌐"

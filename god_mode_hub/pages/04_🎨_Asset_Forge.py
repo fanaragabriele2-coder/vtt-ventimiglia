@@ -15,7 +15,7 @@ if str(_HUB_ROOT) not in sys.path:
 st.set_page_config(page_title="Asset Forge — God-Mode Hub", page_icon="🎨", layout="wide")
 
 from utils import TOKENS_DIR, ensure_dirs, human_size, slugify  # noqa: E402
-from utils import sd_api, sd_browser, triposr_helpers  # noqa: E402
+from utils import image_tools, prompt_library, sd_api, sd_browser, triposr_helpers  # noqa: E402
 
 ensure_dirs()
 
@@ -143,6 +143,7 @@ st.subheader("1️⃣ Immagine 2D (top-down)")
 
 subject = st.text_input(
     "Soggetto del token",
+    value=st.session_state.pop("token_prefill", ""),
     placeholder="es. goblin sciamano con bastone di ossa, mantello verde",
 )
 with st.expander("⚙️ Parametri Stable Diffusion", expanded=False):
@@ -222,6 +223,125 @@ if png_bytes:
             mime="image/png",
             use_container_width=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Libreria prompt: riusa quello che ha funzionato
+# ---------------------------------------------------------------------------
+with st.expander("⭐ Libreria prompt (riusa quelli che hanno funzionato)"):
+    salvati = prompt_library.load_prompts("token")
+    if salvati:
+        etichette = [
+            f"{p.name} · usato {p.used_count}× — {p.subject[:60]}" for p in salvati
+        ]
+        scelto = st.selectbox("Prompt salvati", etichette, key="token_lib_sel")
+        prompt_scelto = salvati[etichette.index(scelto)]
+        usa_col, elimina_col = st.columns(2)
+        if usa_col.button("♻️ Riusa questo prompt", key="token_lib_use",
+                          use_container_width=True):
+            prompt_library.mark_used(prompt_scelto.id)
+            st.session_state["token_prefill"] = prompt_scelto.subject
+            st.rerun()
+        if elimina_col.button("🗑️ Elimina", key="token_lib_del", use_container_width=True):
+            prompt_library.delete_prompt(prompt_scelto.id)
+            st.rerun()
+        if prompt_scelto.params:
+            st.caption(f"Parametri salvati: `{prompt_scelto.params}`")
+    else:
+        st.caption("Nessun prompt salvato: generane uno e salvalo qui sotto.")
+
+    st.divider()
+    nome_nuovo = st.text_input(
+        "Salva il soggetto attuale come…", placeholder="es. Goblin sciamano riuscito",
+        key="token_lib_name",
+    )
+    if st.button("⭐ Salva nella libreria", key="token_lib_save",
+                 disabled=not (nome_nuovo.strip() and subject.strip())):
+        try:
+            prompt_library.save_prompt(
+                nome_nuovo, "token", subject, {"steps": steps, "size": size, "cfg": cfg}
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Salvato come «{nome_nuovo}».")
+            st.rerun()
+
+# ---------------------------------------------------------------------------
+# Step 1b — Post-produzione: da immagine quadrata a token VTT
+# ---------------------------------------------------------------------------
+if png_bytes:
+    st.divider()
+    st.subheader("✂️ Token per la mappa (sfondo trasparente + cerchio)")
+    st.caption(
+        "Stable Diffusion produce un PNG quadrato con lo sfondo pieno: sulla "
+        "mappa si vedrebbe il riquadro sopra il terreno. Qui lo trasformi nel "
+        "token circolare trasparente che il VTT si aspetta. Tutto in locale."
+    )
+
+    opt1, opt2, opt3 = st.columns(3)
+    tok_remove_bg = opt1.toggle("Rimuovi sfondo", value=True, key="tok_bg")
+    tok_circular = opt2.toggle("Ritaglio circolare", value=True, key="tok_circ")
+    tok_size = opt3.select_slider(
+        "Lato token (px)", options=[128, 256, 512, 1024], value=512, key="tok_size"
+    )
+    adv1, adv2, adv3 = st.columns(3)
+    tok_border = adv1.slider("Spessore bordo", 0, 20, 6, key="tok_border")
+    tok_tolerance = adv2.slider(
+        "Tolleranza sfondo", 5, 90, image_tools.DEFAULT_TOLERANCE, key="tok_tol",
+        help="Più alta = rimuove anche sfondi con più variazione di colore, ma "
+             "rischia di intaccare il soggetto.",
+    )
+    tok_scale = adv3.slider(
+        "Riempimento del cerchio", 0.5, 1.0, 0.86, 0.02, key="tok_scale",
+        help="Quanto il soggetto occupa del diametro. Sotto 1.0 evita che testa "
+             "e piedi tocchino (o superino) il bordo.",
+    )
+    if not image_tools.rembg_available():
+        st.caption(
+            "ℹ️ Rimozione sfondo con riempimento dai bordi (nessuna dipendenza "
+            "extra). Per sfondi complessi: `pip install rembg` — l'Hub lo usa "
+            "automaticamente se presente."
+        )
+
+    if st.button("✂️ Prepara token VTT", type="primary"):
+        with st.spinner("Post-produzione…"):
+            try:
+                token_png = image_tools.prepare_vtt_token(
+                    png_bytes, size=tok_size, remove_bg=tok_remove_bg,
+                    circular=tok_circular, border_width=tok_border,
+                    tolerance=tok_tolerance, content_scale=tok_scale,
+                )
+            except Exception as exc:  # noqa: BLE001 — mostrato all'utente
+                st.error(f"Post-produzione fallita: {exc}")
+            else:
+                nome = st.session_state.get("forge_name", "token")
+                out_token = TOKENS_DIR / f"{nome}_token.png"
+                out_token.write_bytes(token_png)
+                st.session_state["forge_token_png"] = token_png
+                st.success(
+                    f"Salvato `asset_forge/tokens/{out_token.name}` "
+                    f"({human_size(len(token_png))})."
+                )
+
+    token_png_state: bytes | None = st.session_state.get("forge_token_png")
+    if token_png_state:
+        prima, dopo, scarica = st.columns([1, 1, 1])
+        with prima:
+            st.caption("Originale")
+            st.image(png_bytes, width=220)
+        with dopo:
+            st.caption("Token VTT (lo sfondo a scacchi è trasparenza)")
+            st.image(token_png_state, width=220)
+        with scarica:
+            st.download_button(
+                "⬇️ Scarica token",
+                data=token_png_state,
+                file_name=f"{st.session_state.get('forge_name', 'token')}_token.png",
+                mime="image/png",
+                use_container_width=True,
+            )
+            st.caption("Portalo nel gioco dalla pagina 🌐 Progetto VTT → Import asset.")
 
 # ---------------------------------------------------------------------------
 # Step 2 — Conversione 3D

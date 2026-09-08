@@ -99,6 +99,7 @@ with right:
     st.page_link("pages/04_🎨_Asset_Forge.py", label="Asset Forge — token VTT 2D → 3D (.glb)", icon="🎨")
     st.page_link("pages/05_👤_Generatore_Personaggi.py", label="Generatore Personaggi — 2D → 3D", icon="👤")
     st.page_link("pages/06_🎬_Animazioni.py", label="Animazioni — sprite sheet, GIF/MP4, rigging", icon="🎬")
+    st.page_link("pages/07_🌐_Progetto_VTT.py", label="Progetto VTT — anteprima, git, import asset", icon="🌐")
 
 st.divider()
 st.markdown(
@@ -111,6 +112,9 @@ st.markdown(
    `codebase/`, le pagine `.md` in `wiki/`, automaticamente.
 4. 🎨 Genera token e personaggi 2D con Stable Diffusion locale e convertili in
    `.glb` con TripoSR per il VTT.
+5. 🌐 Apri **Progetto VTT**: avvia l'anteprima del gioco, controlla il `git diff`
+   di quello che la Drop Zone ha appena scritto, committa se funziona e importa
+   gli asset generati.
 """
 )
 

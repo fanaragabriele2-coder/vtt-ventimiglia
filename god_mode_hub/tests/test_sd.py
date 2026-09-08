@@ -190,3 +190,36 @@ def test_generazione_restituisce_immagine_nuova(pagina_finta: str) -> None:
 def test_url_irraggiungibile_da_errore_gestito() -> None:
     with pytest.raises(sd_browser.SDBrowserError):
         sd_browser.txt2img_via_browser("http://127.0.0.1:59999", "x", timeout_ms=4000)
+
+
+# ---------------------------------------------------------------------------
+# img2img (sprite sheet coerenti)
+# ---------------------------------------------------------------------------
+
+def test_img2img_invia_immagine_e_denoising(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Il frame precedente dev'essere inviato come init_image in base64."""
+    import base64
+    catturato: dict[str, Any] = {}
+    png_atteso = b"\x89PNG\r\n\x1a\nrisultato"
+
+    def finta_post(url: str, **kw: Any) -> _RispostaFinta:
+        catturato["url"] = url
+        catturato["payload"] = kw.get("json", {})
+        return _RispostaFinta(200, {"images": [base64.b64encode(png_atteso).decode()]})
+
+    monkeypatch.setattr(sd_api.requests, "post", finta_post)
+    monkeypatch.setattr(sd_api, "resolve_base_url", lambda **kw: "http://127.0.0.1:7860")
+
+    risultato = sd_api.img2img("fiamma", b"FRAME_PRECEDENTE", denoising_strength=0.35)
+
+    assert risultato == png_atteso
+    assert catturato["url"].endswith("/sdapi/v1/img2img")
+    assert base64.b64decode(catturato["payload"]["init_images"][0]) == b"FRAME_PRECEDENTE"
+    assert catturato["payload"]["denoising_strength"] == 0.35
+
+
+def test_img2img_404_spiega_che_serve_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sd_api.requests, "post", lambda url, **kw: _RispostaFinta(404))
+    monkeypatch.setattr(sd_api, "resolve_base_url", lambda **kw: "http://127.0.0.1:7860")
+    with pytest.raises(sd_api.SDApiError, match="img2img"):
+        sd_api.img2img("x", b"png")

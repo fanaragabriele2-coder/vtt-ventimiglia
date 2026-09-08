@@ -75,11 +75,32 @@ with tab_sprite:
     frames_n = col1.slider("Numero frame", 4, 16, 8)
     frame_size = col2.select_slider("Lato frame (px)", options=[256, 512, 768], value=512)
     duration_ms = col3.slider("Durata frame GIF (ms)", 50, 400, 120, 10)
-    st.caption(
-        "Ogni frame usa un seed diverso sulla stessa descrizione: perfetto per "
-        "effetti tipo fuoco/fumo/aure. Per animazioni di camminata serve il "
-        "rigging 3D (tab successiva)."
+    coerenza = st.toggle(
+        "Frame coerenti (ogni frame parte dal precedente)",
+        value=sd_online,
+        disabled=not sd_online,
+        help="Usa img2img: il frame N nasce dal frame N-1, quindi i fotogrammi "
+             "appartengono alla stessa animazione. Richiede --api "
+             "(l'automazione browser pilota solo txt2img).",
     )
+    if coerenza:
+        forza = st.slider(
+            "Quanto cambia tra un frame e l'altro", 0.15, 0.75, 0.40, 0.05,
+            help="Basso = animazione fluida ma quasi statica. Alto = più "
+                 "movimento ma i frame si somigliano meno.",
+        )
+        st.caption(
+            "🎞️ Modalità coerente: adatta ad animazioni vere (fiamma che "
+            "ondeggia, aura che pulsa)."
+        )
+    else:
+        forza = 0.4
+        st.caption(
+            "⚠️ Modalità indipendente: ogni frame ha un seed diverso, quindi i "
+            "fotogrammi **non** sono in continuità tra loro. Va bene per "
+            "variazioni casuali, non per un'animazione fluida. Per le "
+            "camminate serve il rigging 3D (tab successiva)."
+        )
 
     anim_pronto = (anim_browser and browser_usable) or (not anim_browser and sd_online)
     if st.button("🎞️ Genera sprite sheet", type="primary",
@@ -93,9 +114,20 @@ with tab_sprite:
             "plain dark background, game asset, high detail"
         )
         error: str | None = None
+        frame_precedente: bytes | None = None
         for i in range(frames_n):
             try:
-                if anim_browser:
+                if coerenza and frame_precedente is not None and not anim_browser:
+                    # Frame N derivato dal frame N-1: continuità visiva.
+                    png = sd_api.img2img(
+                        base_prompt,
+                        init_image=frame_precedente,
+                        denoising_strength=forza,
+                        steps=22,
+                        width=frame_size,
+                        height=frame_size,
+                    )
+                elif anim_browser:
                     # La UI non espone il seed per-frame: la variazione tra i
                     # frame viene dal seed casuale gia' impostato nella WebUI.
                     png = sd_browser.txt2img_via_browser(sd_url, base_prompt)
@@ -110,6 +142,7 @@ with tab_sprite:
             except (sd_api.SDApiError, sd_browser.SDBrowserError) as exc:
                 error = str(exc)
                 break
+            frame_precedente = png
             frame_img = Image.open(io.BytesIO(png)).convert("RGBA")
             if frame_img.size != (frame_size, frame_size):
                 # Con l'automazione browser la dimensione la decide la WebUI:

@@ -15,7 +15,7 @@ if str(_HUB_ROOT) not in sys.path:
 st.set_page_config(page_title="Generatore Personaggi — God-Mode Hub", page_icon="👤", layout="wide")
 
 from utils import CHARACTERS_DIR, ensure_dirs, human_size, slugify  # noqa: E402
-from utils import sd_api, sd_browser, triposr_helpers  # noqa: E402
+from utils import prompt_library, sd_api, sd_browser, triposr_helpers  # noqa: E402
 
 ensure_dirs()
 
@@ -77,6 +77,7 @@ engine = col_engine.radio(
 )
 description = st.text_area(
     "Descrizione",
+    value=st.session_state.pop("pg_prefill", ""),
     height=120,
     placeholder=(
         "es. cavaliere errante mezz'elfo, armatura a piastre incisa con motivi "
@@ -99,6 +100,49 @@ with st.expander("⚙️ Parametri generazione 2D"):
         "Il prompt forza posa A neutra, vista frontale e sfondo bianco: è ciò "
         "che dà i risultati migliori nella ricostruzione 3D."
     )
+
+
+# ---------------------------------------------------------------------------
+# Libreria prompt: riusa quello che ha funzionato
+# ---------------------------------------------------------------------------
+with st.expander("⭐ Libreria prompt (riusa quelli che hanno funzionato)"):
+    salvati = prompt_library.load_prompts("personaggio")
+    if salvati:
+        etichette = [
+            f"{p.name} · usato {p.used_count}× — {p.subject[:60]}" for p in salvati
+        ]
+        scelto = st.selectbox("Prompt salvati", etichette, key="pg_lib_sel")
+        prompt_scelto = salvati[etichette.index(scelto)]
+        usa_col, elimina_col = st.columns(2)
+        if usa_col.button("♻️ Riusa questo prompt", key="pg_lib_use",
+                          use_container_width=True):
+            prompt_library.mark_used(prompt_scelto.id)
+            st.session_state["pg_prefill"] = prompt_scelto.subject
+            st.rerun()
+        if elimina_col.button("🗑️ Elimina", key="pg_lib_del", use_container_width=True):
+            prompt_library.delete_prompt(prompt_scelto.id)
+            st.rerun()
+        if prompt_scelto.params:
+            st.caption(f"Parametri salvati: `{prompt_scelto.params}`")
+    else:
+        st.caption("Nessun prompt salvato: generane uno e salvalo qui sotto.")
+
+    st.divider()
+    nome_nuovo = st.text_input(
+        "Salva il soggetto attuale come…", placeholder="es. Goblin sciamano riuscito",
+        key="pg_lib_name",
+    )
+    if st.button("⭐ Salva nella libreria", key="pg_lib_save",
+                 disabled=not (nome_nuovo.strip() and description.strip())):
+        try:
+            prompt_library.save_prompt(
+                nome_nuovo, "personaggio", description, {"steps": steps, "cfg": cfg}
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Salvato come «{nome_nuovo}».")
+            st.rerun()
 
 # ---------------------------------------------------------------------------
 # Step 1 — 2D

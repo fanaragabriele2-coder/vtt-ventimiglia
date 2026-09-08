@@ -126,3 +126,24 @@ def test_drop_zone_blocca_aree_protette_nella_ui() -> None:
     assert not at.exception, [str(e.value) for e in at.exception]
     testo = " ".join(e.value for e in at.error)
     assert "protetta" in testo.lower(), f"nessun blocco area protetta: {testo[:300]}"
+
+
+def test_libreria_prompt_mostra_i_nomi_reali(tmp_path, monkeypatch) -> None:
+    """Regressione: le f-string della libreria mostravano il testo letterale
+    `{p.name}` invece del nome del prompt. Le pagine si caricavano lo stesso,
+    quindi solo un test sul contenuto renderizzato lo intercetta."""
+    from utils import prompt_library
+
+    # Archivio isolato: il test non tocca la libreria reale dell'utente.
+    monkeypatch.setattr(prompt_library, "LIBRARY_PATH", tmp_path / "prompts.json")
+    prompt_library.save_prompt(
+        "Prompt di prova automatica", "token", "soggetto di prova per il test"
+    )
+
+    at = _esegui(HUB_ROOT / "pages" / "04_🎨_Asset_Forge.py")
+
+    assert not at.exception, [str(e.value) for e in at.exception]
+    opzioni = [opt for sb in at.selectbox for opt in (sb.options or [])]
+    testo = " ".join(str(o) for o in opzioni)
+    assert "Prompt di prova automatica" in testo, "il nome reale non è renderizzato"
+    assert "{p.name}" not in testo, "f-string non interpolata: graffe doppie"

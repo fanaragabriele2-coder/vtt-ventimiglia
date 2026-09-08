@@ -393,3 +393,84 @@ def txt2img(
         return base64.b64decode(b64_payload)
     except (ValueError, TypeError) as exc:
         raise SDApiError("Immagine base64 non decodificabile.") from exc
+
+
+def img2img(
+    prompt: str,
+    init_image: bytes,
+    denoising_strength: float = 0.4,
+    negative_prompt: str = DEFAULT_NEGATIVE,
+    steps: int = 22,
+    width: int = 512,
+    height: int = 512,
+    cfg_scale: float = 7.0,
+    seed: int = -1,
+    sampler_name: str = "DPM++ 2M",
+    base_url: str | None = None,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> bytes:
+    """Genera una variazione di ``init_image`` guidata dal prompt.
+
+    Serve per gli sprite sheet **coerenti**: ogni frame parte dal precedente
+    invece di essere un'immagine indipendente, così i fotogrammi appartengono
+    alla stessa animazione. Con ``txt2img`` e seed diversi si ottengono invece
+    otto immagini scollegate.
+
+    Args:
+        init_image: PNG di partenza (il frame precedente).
+        denoising_strength: quanto allontanarsi dall'immagine di partenza.
+            0.2 ≈ variazione appena percettibile, 0.7 ≈ quasi un'immagine
+            nuova. Per un'animazione fluida: 0.3–0.5.
+
+    Raises:
+        SDApiError: endpoint assente (serve ``--api``), rete, o risposta
+            senza immagini.
+    """
+    url = base_url or resolve_base_url() or DEFAULT_BASE_URL
+    payload: dict[str, Any] = {
+        "init_images": [base64.b64encode(init_image).decode("ascii")],
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "denoising_strength": denoising_strength,
+        "steps": steps,
+        "width": width,
+        "height": height,
+        "cfg_scale": cfg_scale,
+        "seed": seed,
+        "sampler_name": sampler_name,
+        "batch_size": 1,
+        "n_iter": 1,
+    }
+    try:
+        response = requests.post(f"{url}/sdapi/v1/img2img", json=payload, timeout=timeout)
+    except requests.ConnectionError as exc:
+        raise SDApiError(
+            "Stable Diffusion non raggiungibile per img2img. Avvia la WebUI "
+            "con --api, oppure genera i frame in modalità indipendente."
+        ) from exc
+    except requests.RequestException as exc:
+        raise SDApiError(f"Errore di rete verso /sdapi/v1/img2img: {exc}") from exc
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        if response.status_code == 404:
+            raise SDApiError(
+                "L'endpoint /sdapi/v1/img2img non esiste su questa build: i "
+                "frame coerenti richiedono --api. Usa i frame indipendenti."
+            ) from exc
+        raise SDApiError(
+            f"img2img ha risposto HTTP {response.status_code}: {(response.text or '')[:200]}"
+        ) from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise SDApiError("Risposta non-JSON da /sdapi/v1/img2img.") from exc
+    images = data.get("images") or []
+    if not images:
+        raise SDApiError("img2img non ha restituito immagini.")
+    try:
+        return base64.b64decode(images[0].split(",", 1)[-1])
+    except (ValueError, TypeError) as exc:
+        raise SDApiError("Immagine base64 non decodificabile da img2img.") from exc
