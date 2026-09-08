@@ -45,7 +45,7 @@ Ultimo aggiornamento: settembre 2026.
 | `dist/ultimate-vtt.html` citato nel README ma inesistente | 🟢 basso | **risolto**: generato, e rigenerabile dall'Hub |
 | VTT: nome PG e messaggi inseriti in `innerHTML` senza escape — un personaggio chiamato `Aldrico <il Grande>` perdeva metà nome | 🟡 medio | **risolto**: `window.UltimateVTTUtils.escapeHtml` sui 3 punti con input dell'utente |
 | **Il VTT non aveva un solo test**: un modulo rotto salvato dalla Drop Zone si scopriva solo aprendo il browser a mano | 🔴 critico | **risolto**: 13 test che caricano il gioco vero in Chromium |
-| VTT: `js/12-patch-touch-events-per-mobile.js` è 3580 righe, un quarto dell'intera codebase | 🟢 basso | aperto (Fase 3) |
+| VTT: `js/12-patch-touch-events-per-mobile.js` era 3600 righe con sette moduli dentro, sotto un nome che ne descriveva uno solo | 🟢 basso | **risolto**: diviso in `12-1` … `12-8` |
 | Selettori dell'automazione browser mai provati sulla **tua** installazione | 🟡 medio | da verificare con "Testa selettori browser" |
 
 > **Nota sull'estrazione PDF**: il codice c'è ed è testato nel ramo di
@@ -152,11 +152,25 @@ Verificato che servano a qualcosa alterando `Math.floor` in `Math.round` nel
 calcolo dei modificatori — un bug che **non impedisce al gioco di caricarsi** e
 che uno smoke test non vedrebbe mai: i test lo hanno intercettato subito.
 
+### Fatto: il file da 3600 righe è stato diviso
+
+`js/12-patch-touch-events-per-mobile.js` conteneva **sette moduli
+indipendenti** — core gameplay, canvas, audio, touch mobile, mappa di
+Ventimiglia, hub mobile, campagna — sotto un nome che ne descriveva uno solo.
+Ora sono `12-1` … `12-8`, caricati nello stesso ordine.
+
+La divisione è stata fatta con due reti: la concatenazione dei pezzi è stata
+verificata **identica all'originale byte per byte** prima di scrivere i file,
+e i 37 test funzionali del gioco sono stati rieseguiti dopo — tutti verdi,
+con creazione del personaggio e bonus di razza controllati anche a vista.
+
 ### Cosa resta davvero
-- **Collaudo del rig Blender** sulla tua macchina, con un modello TripoSR vero.
-- **Spezzare `js/12-patch-touch-events-per-mobile.js`** (3580 righe, un quarto
-  della codebase del gioco). È l'ultimo debito tecnico; adesso è molto meno
-  rischioso, perché i test dicono subito se una regola si rompe.
+- **Collaudo del rig Blender** sulla tua macchina, con un modello TripoSR vero:
+  il codice `bpy` gira solo dentro Blender e qui non è installabile.
+- **Collaudo dei selettori dell'automazione browser** sulla tua installazione
+  Forge (pulsante "Testa selettori browser" in Asset Forge).
+- **Estrazione PDF**: implementata e testata nel ramo di fallback, ma `pypdf`
+  non è importabile nel mio ambiente, quindi il primo collaudo vero è sul tuo PC.
 - **Anteprima del token sulla mappa** del VTT, per valutare le proporzioni
   prima di importarlo.
 - **Collaudo sulla tua macchina** di ciò che qui non è verificabile: selettori

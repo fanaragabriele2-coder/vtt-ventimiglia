@@ -22,8 +22,16 @@ vttg2506/
 ├── js/             ← moduli JavaScript, un file per modulo (caricati in ordine)
 │   ├── 01-adattatore-party-...js
 │   ├── 02-...autodiagnosi...js
+│   ├── 12-1-utility-condivise.js      ← window.UltimateVTTUtils (escape HTML)
+│   ├── 12-2-core-gameplay-chat-dadi.js
+│   ├── 12-3-canvas-mappa.js
+│   ├── 12-4-audio.js
+│   ├── 12-5-touch-mobile-passa-turno.js
+│   ├── 12-6-mappa-ventimiglia.js
+│   ├── 12-7-hub-mobile.js
+│   ├── 12-8-campagna.js
 │   ├── ...
-│   └── 14-start-menu-creazione-personaggio.js
+│   └── 17-per-pg-inventory.js
 ├── dist/           ← build a file singolo (generata)
 │   └── ultimate-vtt.html
 ├── legacy/         ← monolite originale archiviato (non più usato)
@@ -35,7 +43,21 @@ vttg2506/
 ```
 
 L'ordine di caricamento conta: i file in `js/` sono numerati e vengono inclusi
-nello stesso ordine in cui appaiono in `index.html`. Ogni modulo è una IIFE che
+nello stesso ordine in cui appaiono in `index.html`. I file `12-1` … `12-8`
+vanno mantenuti in sequenza: erano un unico file da 3600 righe (sotto un nome
+che ne descriveva solo una parte) ed è stato diviso nei sette moduli che
+conteneva davvero.
+
+## Test
+
+La suite del God-Mode Hub include **test funzionali del gioco**: caricano il
+VTT in un browser vero e verificano le regole (modificatori 5e, vantaggio e
+svantaggio, intervalli dei dadi, integrità dei salvataggi). Dopo una modifica
+ai file `js/`, lanciarli conviene:
+
+```
+cd god_mode_hub && python -m pytest tests/test_vtt_gioco.py
+``` Ogni modulo è una IIFE che
 comunica con gli altri tramite `window.UltimateVTT*` (es. `UltimateVTTState`,
 `UltimateVTTInventory`, `UltimateVTTCombat`, `UltimateVTTAIBridge`,
 `UltimateVTTCoreGameplay`, `VTTCampagna`, `VentimigliaMap`, `VTTStartMenu`).
