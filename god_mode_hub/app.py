@@ -32,7 +32,7 @@ ensure_dirs()
 @st.cache_data(ttl=30)
 def _component_status() -> dict[str, Any]:
     """Verifica lo stato dei componenti locali (cache 30s per non pesare)."""
-    from utils import chroma_rag, llm_wiki, triposr_helpers
+    from utils import chroma_rag, llm_wiki, rigging, sd_browser, triposr_helpers, vtt_project
 
     sd_url, sd_can_generate = sd_api.find_webui_cached()
     return {
@@ -40,15 +40,19 @@ def _component_status() -> dict[str, Any]:
         "sd_api": sd_can_generate,
         "sd_found_no_api": sd_url is not None and not sd_can_generate,
         "sd_port": sd_url.rsplit(":", 1)[-1] if sd_url else None,
+        "sd_browser": sd_url is not None and sd_browser.is_playwright_installed(),
         "triposr": triposr_helpers.triposr_available(),
         "trellis": triposr_helpers.trellis_available(),
         "wiki_index": llm_wiki.index_size() > 0,
+        "node": vtt_project.node_available(),
+        "blender": rigging.blender_available(),
     }
 
 
 st.title("🚀 God-Mode Local AI Hub")
 st.caption(
-    "Hub 100% locale per il VTT Flutter: Secondo Cervello (RAG + LLM Wiki), "
+    "Hub 100% locale per il VTT (JavaScript/HTML/CSS): Secondo Cervello "
+    "(RAG + LLM Wiki), "
     "Orchestratore copy-paste per Claude/Gemini web, Asset Forge 2D→3D, "
     "personaggi e animazioni. Nessuna API cloud a pagamento."
 )
@@ -56,18 +60,69 @@ st.caption(
 status = _component_status()
 ICONS = {True: "🟢", False: "🔴"}
 
+# NB: le colonne tagliano i valori oltre ~10 caratteri con "…". Valori brevi,
+# spiegazione per esteso nel tooltip (?), che non viene mai troncato.
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("ChromaDB", ICONS[status["chromadb"]] + " installato" if status["chromadb"] else "🔴 assente")
+col1.metric(
+    "ChromaDB", "🟢 pronto" if status["chromadb"] else "🔴 assente",
+    help="RAG vettoriale sulla codebase. Senza, le ricerche usano il fallback "
+         "full-text: più grezzo ma sempre funzionante.",
+)
 if status["sd_api"]:
-    _sd_label = f"🟢 :{status['sd_port']}"
+    _sd_label, _sd_help = f"🟢 :{status['sd_port']}", "API di generazione attiva: tutto disponibile."
 elif status["sd_found_no_api"]:
-    _sd_label = "🟠 no --api"
+    _sd_label = "🟠 no api"
+    _sd_help = ("WebUI trovata ma senza --api. Genera lo stesso con "
+                "'Automazione browser' in Asset Forge.")
 else:
     _sd_label = "🔴 offline"
-col2.metric("Stable Diffusion", _sd_label)
-col3.metric("TripoSR", ICONS[status["triposr"]] + (" pronto" if status["triposr"] else " non trovato"))
-col4.metric("TRELLIS.2", ICONS[status["trellis"]] + (" configurato" if status["trellis"] else " opzionale"))
-col5.metric("Indice Wiki", ICONS[status["wiki_index"]] + (" attivo" if status["wiki_index"] else " da costruire"))
+    _sd_help = ("Nessuna WebUI sulle porte comuni (7860-7866, 8000, 8080). "
+                "Avviala, o imposta SD_API_URL se usa un'altra porta.")
+col2.metric("Stable Diffusion", _sd_label, help=_sd_help)
+col3.metric(
+    "TripoSR", "🟢 pronto" if status["triposr"] else "🔴 assente",
+    help="Conversione immagine → modello 3D .glb. Installalo con "
+         "tools/FIX_TRIPOSR.bat.",
+)
+col4.metric(
+    "TRELLIS.2", "🟢 pronto" if status["trellis"] else "⚪ assente",
+    help="Image-to-3D di qualità superiore, opzionale: serve un servizio "
+         "locale puntato da TRELLIS_URL. Senza, si usa TripoSR.",
+)
+col5.metric(
+    "Indice Wiki", "🟢 attivo" if status["wiki_index"] else "🔴 vuoto",
+    help="Ricerca FTS5 su wiki/ e raw/. Costruiscilo dal Secondo Cervello → "
+         "tab LLM Wiki.",
+)
+
+# Seconda riga: strumenti opzionali. Nessuno di questi blocca l'Hub — servono
+# a capire a colpo d'occhio quali funzioni sono disponibili adesso.
+opt1, opt2, opt3, opt4, opt5 = st.columns(5)
+opt1.metric(
+    "Automaz. browser", "🟢 pronta" if status["sd_browser"] else "⚪ assente",
+    help="Genera con Stable Diffusion SENZA --api, pilotando la WebUI già "
+         "aperta. Richiede Playwright installato e una WebUI in esecuzione.",
+)
+opt2.metric(
+    "Node.js", "🟢 pronto" if status["node"] else "⚪ assente",
+    help="Serve per l'anteprima del VTT e per rigenerare il file unico "
+         "dist/ultimate-vtt.html dalla pagina Progetto VTT.",
+)
+opt3.metric(
+    "Blender", "🟢 pronto" if status["blender"] else "⚪ assente",
+    help="Rigging scheletrico dei modelli 3D (ossa + pesi + idle). Senza, "
+         "resta comunque l'animazione procedurale, che funziona sempre.",
+)
+opt4.metric(
+    "Movimento 3D", "🟢 sempre",
+    help="Rotazione, fluttuazione e pulsazione dei .glb scritte direttamente "
+         "nel glTF: Python puro, nessuna installazione richiesta.",
+)
+opt5.metric(
+    "Rete sicurezza", "🟢 attiva",
+    help="Backup automatico, diff e allarme troncatura su ogni scrittura "
+         "della Drop Zone nei file reali del progetto.",
+)
 
 if status["sd_found_no_api"]:
     st.warning(

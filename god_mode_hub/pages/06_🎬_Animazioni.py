@@ -25,8 +25,8 @@ ensure_dirs()
 
 st.title("🎬 Animazioni per il VTT")
 st.caption(
-    "Sprite sheet 2D generati frame-per-frame con Stable Diffusion, "
-    "assemblaggio GIF/MP4 e area di parcheggio per il rigging 3D. "
+    "Sprite sheet 2D generati con Stable Diffusion, animazione dei modelli "
+    "3D (movimento procedurale o scheletro con Blender) ed export GIF/MP4. "
     "Output in `asset_forge/animations/`."
 )
 
