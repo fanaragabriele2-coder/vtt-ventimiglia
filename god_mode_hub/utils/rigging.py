@@ -8,8 +8,18 @@ Due livelli di animazione, con costi molto diversi:
   **Blender installato** (gratuito), che viene invocato in background su
   ``tools/blender_autorig.py``.
 
-Blender viene cercato nel PATH e nei percorsi d'installazione tipici di
-Windows; ``BLENDER_PATH`` ha sempre la precedenza se impostata.
+Blender può essere fornito in due modi, provati in quest'ordine:
+
+1. **applicazione Blender** — cercata in ``BLENDER_PATH``, nel PATH e nelle
+   cartelle d'installazione tipiche di Windows (dove Blender non si registra
+   nel PATH, quindi ``shutil.which`` da solo non basta);
+2. **modulo ``bpy``** installato con ``pip install bpy`` — stesso motore, senza
+   installare l'applicazione. Lo script viene eseguito con l'interprete Python
+   corrente invece che con l'eseguibile di Blender.
+
+In entrambi i casi gira lo stesso ``tools/blender_autorig.py``, sempre in un
+processo separato: ``bpy`` tiene stato globale e un crash non deve portarsi
+dietro l'interfaccia dell'Hub.
 """
 
 from __future__ import annotations
@@ -17,6 +27,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,15 +87,56 @@ def find_blender() -> str | None:
     return None
 
 
-def blender_available() -> bool:
-    """True se Blender è utilizzabile per il rigging."""
-    return find_blender() is not None
+def bpy_available() -> bool:
+    """True se il modulo ``bpy`` è importabile (``pip install bpy``).
+
+    Il controllo avviene in un sottoprocesso: importare ``bpy`` nel processo
+    dell'Hub inizializzerebbe l'intero motore di Blender in memoria a ogni
+    rerun di Streamlit.
+    """
+    try:
+        completato = subprocess.run(  # noqa: S603 — interprete corrente
+            [sys.executable, "-c", "import bpy"],
+            capture_output=True, timeout=120, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return completato.returncode == 0
 
 
-def blender_version(timeout: float = 30.0) -> str:
-    """Versione di Blender trovata (stringa vuota se non determinabile)."""
+def blender_backend() -> tuple[str, str]:
+    """Come verrà eseguito il rigging.
+
+    Returns:
+        ``(tipo, dettaglio)`` dove tipo è ``"app"`` (eseguibile Blender),
+        ``"bpy"`` (modulo pip) o ``""`` se nessuno dei due è disponibile.
+    """
     eseguibile = find_blender()
-    if not eseguibile:
+    if eseguibile:
+        return "app", eseguibile
+    if bpy_available():
+        return "bpy", sys.executable
+    return "", ""
+
+
+def blender_available() -> bool:
+    """True se il rigging scheletrico è possibile, in un modo o nell'altro."""
+    return blender_backend()[0] != ""
+
+
+def blender_version(timeout: float = 120.0) -> str:
+    """Versione di Blender in uso (stringa vuota se non determinabile)."""
+    tipo, eseguibile = blender_backend()
+    if tipo == "bpy":
+        try:
+            completato = subprocess.run(  # noqa: S603 — interprete corrente
+                [eseguibile, "-c", "import bpy; print('Blender ' + bpy.app.version_string + ' (modulo bpy)')"],
+                capture_output=True, text=True, timeout=timeout, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+        return (completato.stdout or "").strip()
+    if not tipo:
         return ""
     try:
         completato = subprocess.run(  # noqa: S603 — percorso risolto da find_blender
@@ -116,13 +168,16 @@ def autorig_glb(
         all'utente se Blender manca o l'operazione fallisce — non solleva per
         i casi prevedibili, così l'interfaccia può mostrarli con calma.
     """
-    eseguibile = find_blender()
-    if not eseguibile:
+    tipo, eseguibile = blender_backend()
+    if not tipo:
         return RiggingResult(
             False,
-            "Blender non trovato. Installalo (gratuito, blender.org) e riapri "
-            "l'Hub; se è già installato in una cartella non standard, imposta "
-            "la variabile d'ambiente BLENDER_PATH sul suo blender.exe.",
+            "Blender non disponibile. Due modi per abilitarlo:\n"
+            "• installa l'applicazione (gratuita, blender.org) — se è già "
+            "installata in una cartella non standard, imposta la variabile "
+            "d'ambiente BLENDER_PATH sul suo blender.exe;\n"
+            "• oppure, senza installare nulla: `pip install bpy` nel venv "
+            "dell'Hub (stesso motore, come modulo Python).",
         )
     if not AUTORIG_SCRIPT.is_file():
         return RiggingResult(False, f"Script di rigging non trovato: {AUTORIG_SCRIPT}")
@@ -135,8 +190,13 @@ def autorig_glb(
         uscita = cartella / "output.glb"
         ingresso.write_bytes(glb_bytes)
 
-        comando = [
-            eseguibile, "--background", "--python", str(AUTORIG_SCRIPT), "--",
+        # L'applicazione Blender vuole "--background --python script --",
+        # il modulo bpy si limita a eseguire lo script con l'interprete.
+        if tipo == "app":
+            comando = [eseguibile, "--background", "--python", str(AUTORIG_SCRIPT), "--"]
+        else:
+            comando = [eseguibile, str(AUTORIG_SCRIPT), "--"]
+        comando += [
             "--input", str(ingresso), "--output", str(uscita),
             "--animation", animation, "--frames", str(frames),
         ]

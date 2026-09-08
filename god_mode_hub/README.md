@@ -75,8 +75,10 @@ due strade, con costi diversi:
   `.glb`. Copre i casi tipici di un VTT: un forziere che gira, un token che
   levita, un'aura che pulsa.
 - **Scheletro con Blender** — armatura umanoide proporzionata al modello, pesi
-  automatici e animazione idle. Richiede **Blender** installato (gratuito,
-  blender.org); se non è nel PATH, imposta `BLENDER_PATH` sul suo `blender.exe`.
+  automatici e animazione idle. Serve il motore di Blender, in uno dei due modi:
+  l'**applicazione** (gratuita, blender.org; se non è nel PATH imposta
+  `BLENDER_PATH` sul suo `blender.exe`) **oppure** `pip install bpy` nel venv
+  dell'Hub, che installa lo stesso motore come modulo Python.
   Le proporzioni derivano dal riquadro di ingombro: su un personaggio in posa A
   funziona, su una creatura di forma molto diversa le ossa vanno sistemate a
   mano in Blender.

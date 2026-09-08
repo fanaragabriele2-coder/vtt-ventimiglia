@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -38,15 +39,34 @@ def test_blender_path_inesistente_non_viene_accettato(tmp_path, monkeypatch) -> 
 
 
 def test_senza_blender_messaggio_utile(monkeypatch) -> None:
-    monkeypatch.setattr(rigging, "find_blender", lambda: None)
+    """Senza NESSUN backend (né applicazione né modulo bpy) il messaggio deve
+    spiegare entrambe le strade per abilitarlo."""
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("", ""))
     esito = rigging.autorig_glb(gltf_tools.make_test_cube())
     assert not esito.ok
     assert "blender.org" in esito.message.lower()
     assert "BLENDER_PATH" in esito.message
+    assert "pip install bpy" in esito.message
+
+
+def test_backend_preferisce_l_applicazione_al_modulo(tmp_path, monkeypatch) -> None:
+    """Con entrambi disponibili si usa l'applicazione: è più veloce da avviare."""
+    finto = tmp_path / "blender_finto"
+    finto.write_text("", encoding="utf-8")
+    monkeypatch.setenv("BLENDER_PATH", str(finto))
+    monkeypatch.setattr(rigging, "bpy_available", lambda: True)
+    assert rigging.blender_backend() == ("app", str(finto))
+
+
+def test_backend_ricade_sul_modulo_bpy(monkeypatch) -> None:
+    monkeypatch.setattr(rigging, "find_blender", lambda: None)
+    monkeypatch.setattr(rigging, "bpy_available", lambda: True)
+    tipo, eseguibile = rigging.blender_backend()
+    assert tipo == "bpy" and eseguibile == sys.executable
 
 
 def test_modello_vuoto_rifiutato(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(tmp_path))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(tmp_path)))
     esito = rigging.autorig_glb(b"")
     assert not esito.ok and "Nessun modello" in esito.message
 
@@ -85,7 +105,7 @@ print("ANIMAZIONE", opzioni.get("--animation"), "FRAMES", opzioni.get("--frames"
 
 def test_rigging_completo_con_blender_finto(tmp_path, monkeypatch) -> None:
     finto = _crea_blender_finto(tmp_path, CORPO_OK)
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(finto))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(finto)))
     modello = gltf_tools.make_test_cube()
 
     esito = rigging.autorig_glb(modello, animation="idle", frames=48)
@@ -97,7 +117,7 @@ def test_rigging_completo_con_blender_finto(tmp_path, monkeypatch) -> None:
 
 def test_uscita_con_errore_riportata(tmp_path, monkeypatch) -> None:
     finto = _crea_blender_finto(tmp_path, 'import sys\nprint("errore interno", file=sys.stderr)\nsys.exit(3)\n')
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(finto))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(finto)))
 
     esito = rigging.autorig_glb(gltf_tools.make_test_cube())
 
@@ -109,7 +129,7 @@ def test_uscita_con_errore_riportata(tmp_path, monkeypatch) -> None:
 def test_nessun_file_prodotto_spiegato(tmp_path, monkeypatch) -> None:
     """Blender può uscire con successo senza scrivere nulla (mesh assente)."""
     finto = _crea_blender_finto(tmp_path, 'print("finito senza scrivere")\n')
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(finto))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(finto)))
 
     esito = rigging.autorig_glb(gltf_tools.make_test_cube())
 
@@ -125,7 +145,7 @@ def test_file_vuoto_rilevato(tmp_path, monkeypatch) -> None:
         'open(o["--output"], "wb").close()\n'
     )
     finto = _crea_blender_finto(tmp_path, corpo)
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(finto))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(finto)))
 
     esito = rigging.autorig_glb(gltf_tools.make_test_cube())
 
@@ -134,7 +154,7 @@ def test_file_vuoto_rilevato(tmp_path, monkeypatch) -> None:
 
 def test_timeout_gestito(tmp_path, monkeypatch) -> None:
     finto = _crea_blender_finto(tmp_path, "import time\ntime.sleep(30)\n")
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(finto))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(finto)))
 
     esito = rigging.autorig_glb(gltf_tools.make_test_cube(), timeout=1.5)
 
@@ -143,7 +163,7 @@ def test_timeout_gestito(tmp_path, monkeypatch) -> None:
 
 def test_i_file_temporanei_vengono_ripuliti(tmp_path, monkeypatch) -> None:
     finto = _crea_blender_finto(tmp_path, CORPO_OK)
-    monkeypatch.setattr(rigging, "find_blender", lambda: str(finto))
+    monkeypatch.setattr(rigging, "blender_backend", lambda: ("app", str(finto)))
     import tempfile
 
     prima = set(Path(tempfile.gettempdir()).glob("autorig_*"))
@@ -171,3 +191,98 @@ def test_script_blender_dichiara_le_ossa_attese() -> None:
     sorgente = rigging.AUTORIG_SCRIPT.read_text(encoding="utf-8")
     for osso in ("bacino", "spina", "torace", "collo", "testa", "braccio_", "coscia_"):
         assert osso in sorgente, f"osso mancante nello script: {osso}"
+
+
+# ---------------------------------------------------------------------------
+# Rigging REALE, quando Blender è davvero disponibile
+# ---------------------------------------------------------------------------
+# I test qui sopra usano un finto eseguibile e coprono l'orchestrazione. Questi
+# eseguono lo script dentro Blender vero: sono l'unica prova che le chiamate
+# bpy funzionino. Saltano se né l'applicazione né il modulo `bpy` ci sono.
+
+pytestmark_blender = pytest.mark.skipif(
+    not rigging.blender_available(),
+    reason="Blender non disponibile (né applicazione né modulo bpy)",
+)
+
+
+def _umanoide_glb(tmp_path: Path) -> bytes:
+    """Costruisce un umanoide grezzo con volume: un triangolo non si riggerebbe."""
+    script = tmp_path / "crea.py"
+    script.write_text(
+        "import bpy\n"
+        "bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()\n"
+        "def c(loc, s):\n"
+        "    bpy.ops.mesh.primitive_cube_add(location=loc)\n"
+        "    o = bpy.context.object; o.scale = s; return o\n"
+        "parti = [c((0,0,1.2),(0.28,0.16,0.45)), c((0,0,1.85),(0.17,0.17,0.19)),\n"
+        "         c((0.42,0,1.25),(0.10,0.10,0.38)), c((-0.42,0,1.25),(0.10,0.10,0.38)),\n"
+        "         c((0.15,0,0.4),(0.11,0.11,0.42)), c((-0.15,0,0.4),(0.11,0.11,0.42))]\n"
+        "bpy.ops.object.select_all(action='DESELECT')\n"
+        "for p in parti: p.select_set(True)\n"
+        "bpy.context.view_layer.objects.active = parti[0]\n"
+        "bpy.ops.object.join()\n"
+        "bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)\n"
+        f"bpy.ops.export_scene.gltf(filepath={str(tmp_path / 'umanoide.glb')!r}, export_format='GLB')\n",
+        encoding="utf-8",
+    )
+    tipo, eseguibile = rigging.blender_backend()
+    comando = ([eseguibile, "--background", "--python", str(script)] if tipo == "app"
+               else [eseguibile, str(script)])
+    esito = subprocess.run(comando, capture_output=True, text=True, timeout=600, check=False)
+    modello = tmp_path / "umanoide.glb"
+    if not modello.is_file():
+        pytest.skip(f"impossibile costruire il modello di prova: {esito.stderr[-300:]}")
+    return modello.read_bytes()
+
+
+@pytestmark_blender
+def test_rigging_reale_crea_scheletro_e_animazione(tmp_path: Path) -> None:
+    """Prova di fondo: lo script bpy produce davvero ossa, pesi e movimento."""
+    from utils import gltf_tools
+
+    partenza = _umanoide_glb(tmp_path)
+    assert not gltf_tools.inspect_glb(partenza).has_skeleton
+
+    esito = rigging.autorig_glb(partenza, animation="idle", frames=48)
+
+    assert esito.ok, f"{esito.message}\n{esito.log_tail}"
+    info = gltf_tools.inspect_glb(esito.glb)
+    assert info.has_skeleton, "il modello riggato deve avere uno scheletro"
+    assert info.is_animated, "l'animazione idle non è stata esportata"
+    assert info.vertex_count == gltf_tools.inspect_glb(partenza).vertex_count, \
+        "il rigging non deve alterare la geometria"
+
+
+@pytestmark_blender
+def test_ossa_hanno_i_nomi_previsti(tmp_path: Path) -> None:
+    """Le ossa devono corrispondere allo scheletro umanoide dichiarato."""
+    try:
+        from pygltflib import GLTF2
+    except BaseException as exc:  # noqa: BLE001
+        pytest.skip(f"pygltflib non disponibile: {type(exc).__name__}")
+
+    esito = rigging.autorig_glb(_umanoide_glb(tmp_path), animation="idle")
+    assert esito.ok, esito.message
+
+    percorso = tmp_path / "riggato.glb"
+    percorso.write_bytes(esito.glb)
+    modello = GLTF2().load(str(percorso))
+
+    assert modello.skins, "nessuno skin nel file esportato"
+    nomi = {modello.nodes[j].name for j in modello.skins[0].joints}
+    attese = {"bacino", "spina", "torace", "collo", "testa",
+              "braccio_L", "braccio_R", "coscia_L", "coscia_R"}
+    assert attese <= nomi, f"ossa mancanti: {attese - nomi}"
+
+
+@pytestmark_blender
+def test_solo_scheletro_senza_animazione(tmp_path: Path) -> None:
+    from utils import gltf_tools
+
+    esito = rigging.autorig_glb(_umanoide_glb(tmp_path), animation="none")
+
+    assert esito.ok, esito.message
+    info = gltf_tools.inspect_glb(esito.glb)
+    assert info.has_skeleton
+    assert not info.is_animated, "con animation='none' non deve esserci animazione"

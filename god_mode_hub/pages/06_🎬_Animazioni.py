@@ -303,16 +303,22 @@ with tab_rig:
 
             # --- Strada 2: rigging scheletrico con Blender -------------------
             else:
-                blender_ok = rigging.blender_available()
+                tipo_backend, _percorso = rigging.blender_backend()
+                blender_ok = bool(tipo_backend)
                 if blender_ok:
                     versione = rigging.blender_version()
-                    st.success(f"🟢 Blender trovato{': ' + versione if versione else ''}")
+                    provenienza = ("applicazione Blender" if tipo_backend == "app"
+                                   else "modulo `bpy` installato con pip")
+                    st.success(f"🟢 {versione or 'Blender'} — {provenienza}")
                 else:
                     st.warning(
-                        "🟠 **Blender non trovato.** È gratuito (blender.org): "
-                        "installalo e riapri l'Hub. Se è già installato in una "
-                        "cartella non standard, imposta la variabile d'ambiente "
-                        "`BLENDER_PATH` sul suo `blender.exe`.",
+                        "🟠 **Blender non disponibile.** Due modi per abilitarlo:\n\n"
+                        "1. installa l'**applicazione** (gratuita, blender.org); se è "
+                        "già installata in una cartella non standard, imposta la "
+                        "variabile d'ambiente `BLENDER_PATH` sul suo `blender.exe`;\n"
+                        "2. oppure, senza installare nulla fuori dall'Hub:\n"
+                        "```\npython -m pip install bpy\n```\n"
+                        "stesso motore, come modulo Python.",
                         icon="🦴",
                     )
                 st.caption(

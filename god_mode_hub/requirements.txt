@@ -21,6 +21,11 @@ playwright>=1.40
 # che basta per gli sfondi uniformi prodotti dai prompt dell'Hub.
 rembg>=2.0
 
+# Opzionale: motore Blender come modulo Python, per il rigging scheletrico dei
+# .glb senza installare l'applicazione (~1 GB di download). Se hai gia' Blender
+# installato non serve: l'Hub usa quello. Richiede Python 3.11.
+# bpy>=4.0
+
 # Opzionale: estrae il testo dai PDF messi in raw/ quando li compili in pagine
 # wiki. Senza, i PDF diventano pagine stub con il solo riferimento al file.
 pypdf>=4.0

@@ -42,16 +42,16 @@ Ultimo aggiornamento: settembre 2026.
 | Nessun modo di vedere il gioco, il diff o committare senza uscire dall'Hub | 🟠 alto | **risolto**: pagina 🌐 Progetto VTT |
 | **Rigging 3D**: la tab era solo documentazione, nessun rigging avveniva | 🟡 medio | **risolto**: animazione procedurale (sempre) + rig scheletrico via Blender |
 | **TripoSR/TRELLIS non verificabili da qui**: richiedono GPU e repo locali | 🟡 medio | aperto — solo tu puoi provarli |
+| Rigging Blender non verificabile senza Blender installato | 🟡 medio | **risolto**: `bpy` installato da PyPI, rigging eseguito davvero |
 | `dist/ultimate-vtt.html` citato nel README ma inesistente | 🟢 basso | **risolto**: generato, e rigenerabile dall'Hub |
 | VTT: nome PG e messaggi inseriti in `innerHTML` senza escape — un personaggio chiamato `Aldrico <il Grande>` perdeva metà nome | 🟡 medio | **risolto**: `window.UltimateVTTUtils.escapeHtml` sui 3 punti con input dell'utente |
 | **Il VTT non aveva un solo test**: un modulo rotto salvato dalla Drop Zone si scopriva solo aprendo il browser a mano | 🔴 critico | **risolto**: 13 test che caricano il gioco vero in Chromium |
 | VTT: `js/12-patch-touch-events-per-mobile.js` era 3600 righe con sette moduli dentro, sotto un nome che ne descriveva uno solo | 🟢 basso | **risolto**: diviso in `12-1` … `12-8` |
 | Selettori dell'automazione browser mai provati sulla **tua** installazione | 🟡 medio | da verificare con "Testa selettori browser" |
 
-> **Nota sull'estrazione PDF**: il codice c'è ed è testato nel ramo di
-> fallback, ma nel mio ambiente `pypdf` non è importabile (dipendenza nativa
-> rotta). Il test **salta** invece di dare un falso verde: il primo collaudo
-> vero avviene sul tuo PC.
+> **Estrazione PDF: ora verificata.** La dipendenza nativa rotta nel mio
+> ambiente è stata sistemata reinstallando `cryptography`: un PDF di due pagine
+> generato al volo viene letto e il suo testo compare nella pagina wiki.
 
 ## 3. Fatto in questa sessione
 
@@ -128,10 +128,14 @@ Il segnaposto è diventato funzionalità, su due livelli con costi diversi:
 
 I `.glb` prodotti sono verificati con **pygltflib**, una libreria glTF che non
 ho scritto io: un parser che rilegge il proprio output non dimostra nulla.
-Del rigging Blender ho potuto testare tutto l'intorno (rilevamento, argomenti,
-lettura risultato, errori, timeout, pulizia dei temporanei) con un finto
-eseguibile che rispetta lo stesso contratto CLI; **il codice `bpy` interno
-gira solo dentro Blender, quindi il primo collaudo vero è sul tuo PC.**
+
+**Il rigging Blender è stato eseguito davvero**, non solo simulato: installando
+`bpy` da PyPI ho fatto girare lo script su un umanoide di prova e verificato il
+risultato — 14 ossa create con i nomi previsti (bacino, spina, torace, collo,
+testa, braccia, gambe), animazione idle esportata, geometria invariata.
+Da qui è nato anche un miglioramento: l'Hub ora accetta **due backend**,
+l'applicazione Blender oppure il modulo `bpy` installato con pip, così il
+rigging funziona anche senza installare l'applicazione.
 
 ### Fatto: il gioco è protetto anche nelle regole
 
@@ -165,12 +169,21 @@ e i 37 test funzionali del gioco sono stati rieseguiti dopo — tutti verdi,
 con creazione del personaggio e bonus di razza controllati anche a vista.
 
 ### Cosa resta davvero
-- **Collaudo del rig Blender** sulla tua macchina, con un modello TripoSR vero:
-  il codice `bpy` gira solo dentro Blender e qui non è installabile.
-- **Collaudo dei selettori dell'automazione browser** sulla tua installazione
-  Forge (pulsante "Testa selettori browser" in Asset Forge).
-- **Estrazione PDF**: implementata e testata nel ramo di fallback, ma `pypdf`
-  non è importabile nel mio ambiente, quindi il primo collaudo vero è sul tuo PC.
+
+La suite gira ora **senza un solo test saltato**: ogni componente opzionale è
+stato installato e verificato per davvero. Restano solo le cose che dipendono
+dalla tua macchina specifica:
+
+- **Selettori dell'automazione browser sulla tua Forge**: gli `elem_id`
+  standard di A1111/Forge sono usati da tutto l'ecosistema di estensioni, ma il
+  tuo tema potrebbe differire. Il pulsante "Testa selettori browser" in Asset
+  Forge te lo dice in dieci secondi.
+- **TripoSR e TRELLIS**: richiedono la tua GPU e i repo installati localmente.
+- **Rigging su un modello TripoSR reale**: lo script è verificato su un
+  umanoide di prova; su una ricostruzione vera le proporzioni potrebbero
+  richiedere una regolazione a mano in Blender (limite dichiarato del metodo:
+  le ossa derivano dal riquadro di ingombro, non da un riconoscimento della
+  forma).
 - **Anteprima del token sulla mappa** del VTT, per valutare le proporzioni
   prima di importarlo.
 - **Collaudo sulla tua macchina** di ciò che qui non è verificabile: selettori
