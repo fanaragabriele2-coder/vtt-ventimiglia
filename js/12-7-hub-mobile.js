@@ -249,7 +249,12 @@
             var c=["#5bb7c8","#c89b3c","#5d9f45","#7b59c4"][i%4];
             return '<button class="hub-pg-btn'+(i===0?" is-active":"")+'" data-idx="'+i+'">'+
                    '<span class="hub-pg-btn-dot" style="background:'+c+'"></span>'+
-                   window.UltimateVTTUtils.escapeHtml(pg.name||"PG"+(i+1))+'</button>';
+                   /* Il nome sta in identity.name: leggerlo da pg.name faceva
+                      comparire "PG1" al posto del nome scelto dal giocatore.
+                      Stessa formula gia' usata in 01-adattatore-party. */
+                   window.UltimateVTTUtils.escapeHtml(
+                     (pg.identity && pg.identity.name) || pg.name || ("PG"+(i+1))
+                   )+'</button>';
           }).join("");
           sel.querySelectorAll(".hub-pg-btn").forEach(function(b){
             b.addEventListener("click",function(){

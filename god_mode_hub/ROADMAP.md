@@ -225,6 +225,26 @@ Il rigging non è l'operazione lenta che temevo di dover annunciare:
 L'interfaccia diceva "può richiedere qualche minuto": un'attesa annunciata
 sbagliata fa pensare che qualcosa si sia bloccato. Ora riporta i tempi veri.
 
+### Fatto: due bug trovati **giocando**
+
+Avevo testato il gioco senza mai giocarci. Provandolo come farebbe un
+giocatore — scrivere il nome, scegliere razza e classe, entrare in partita —
+sono usciti due difetti che nessun test vedeva:
+
+1. **Il nome del personaggio veniva perso.** Scrivevi "Ser Aldrico", cliccavi
+   la razza e il campo si riempiva di un nome casuale; cliccavi la classe e ne
+   arrivava un altro. `renderCreate()` ricostruisce la scheda a ogni click e
+   rigenerava il campo con `suggestName()`, senza conservare quanto digitato.
+   Succedeva nell'ordine di compilazione più naturale, quindi quasi sempre.
+   Ora il nome sta nello stato della selezione, insieme a razza e classe.
+2. **L'hub mobile mostrava "PG1"** al posto del nome, mentre la scheda sotto
+   mostrava quello giusto. Il nome dei membri del party sta in `identity.name`,
+   e quel punto leggeva `pg.name`. Corretto con la stessa formula già usata in
+   `js/01-adattatore-party`.
+
+Tre test coprono ora la creazione del personaggio, tutti confermati fallire coi
+bug reintrodotti.
+
 ### Cosa resta davvero
 
 La suite gira ora **senza un solo test saltato**: ogni componente opzionale è

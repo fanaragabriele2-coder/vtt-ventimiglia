@@ -46,7 +46,10 @@
       var reopenBtn = document.getElementById("vttMenuReopen");
       if(!overlay||!card) return;
 
-      var sel = { raceId:"umano", classId:"guerriero", base:{} };
+      // `name` sta nello stato insieme a razza e classe: renderCreate()
+      // ricostruisce la scheda a ogni click, e senza conservarlo qui il nome
+      // digitato dal giocatore veniva sostituito da uno casuale ogni volta.
+      var sel = { raceId:"umano", classId:"guerriero", base:{}, name:null };
       var party = [];
 
       function el(tag, cls, html){ var n=document.createElement(tag); if(cls)n.className=cls; if(html!=null)n.innerHTML=html; return n; }
@@ -104,7 +107,10 @@
         card.appendChild(el("p","vsm-sub","Scegli razza e classe: equipaggiamento e bonus si applicano da soli"));
 
         var nameWrap=el("div"); nameWrap.appendChild(el("label","vsm-label","Nome del personaggio"));
-        var nameIn=el("input","vsm-input"); nameIn.id="vsmName"; nameIn.placeholder="Es. Aldric il Coraggioso"; nameIn.value=suggestName();
+        var nameIn=el("input","vsm-input"); nameIn.id="vsmName"; nameIn.placeholder="Es. Aldric il Coraggioso";
+        if(sel.name===null) sel.name=suggestName();   // proposta iniziale, una volta sola
+        nameIn.value=sel.name;
+        nameIn.oninput=function(){ sel.name=nameIn.value; };
         nameWrap.appendChild(nameIn); card.appendChild(nameWrap);
 
         var row=el("div","vsm-row");
@@ -201,7 +207,7 @@
 
       function buildFromForm(){
         var nameEl=document.getElementById("vsmName");
-        var name=(nameEl&&nameEl.value.trim())||suggestName();
+        var name=((nameEl&&nameEl.value.trim())||(sel.name||"").trim())||suggestName();
         var cls=getClass(sel.classId), r=getRace(sel.raceId), fa=finalAbilities();
         var id="pc-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1000);
         return {

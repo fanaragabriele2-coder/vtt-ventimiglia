@@ -167,17 +167,13 @@ def test_i_moduli_del_gioco_si_registrano(pagina_caricata: dict, modulo: str) ->
     )
 
 
-def test_escape_html_disponibile_a_tutti_i_moduli(gioco_servito: str) -> None:
+def test_escape_html_disponibile_a_tutti_i_moduli(gioco_servito: str, browser_gioco) -> None:
     """Regressione: l'helper era definito dentro una sola IIFE, mentre i punti
     che lo usano vivono in IIFE diverse dello stesso file — a runtime sarebbe
     stato ReferenceError. `node --check` non lo rileva: serve caricarlo davvero.
     """
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as pw:
-        browser = sd_browser._launch_chromium(pw)
-        try:
-            page = browser.new_page()
+    page = browser_gioco.new_page()
+    try:
             page.goto(gioco_servito, wait_until="load", timeout=60_000)
             page.wait_for_timeout(2000)
 
@@ -189,22 +185,18 @@ def test_escape_html_disponibile_a_tutti_i_moduli(gioco_servito: str) -> None:
             risultato = page.evaluate(
                 "() => window.UltimateVTTUtils.escapeHtml('Aldrico <il Grande> & \\\"Ser\\\"')"
             )
-        finally:
-            browser.close()
+    finally:
+        page.close()
 
     assert "<il" not in risultato, "il nome verrebbe interpretato come tag HTML"
     assert "&lt;il Grande&gt;" in risultato
     assert "&amp;" in risultato and "&quot;" in risultato
 
 
-def test_nome_pg_con_html_non_rompe_il_rendering(gioco_servito: str) -> None:
+def test_nome_pg_con_html_non_rompe_il_rendering(gioco_servito: str, browser_gioco) -> None:
     """Un nome PG con caratteri HTML deve comparire come testo, non sparire."""
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as pw:
-        browser = sd_browser._launch_chromium(pw)
-        try:
-            page = browser.new_page()
+    page = browser_gioco.new_page()
+    try:
             page.goto(gioco_servito, wait_until="load", timeout=60_000)
             page.wait_for_timeout(2000)
             reso = page.evaluate(
@@ -216,8 +208,8 @@ def test_nome_pg_con_html_non_rompe_il_rendering(gioco_servito: str) -> None:
                     return { testo: div.textContent, grassetti: div.querySelectorAll('b').length };
                 }"""
             )
-        finally:
-            browser.close()
+    finally:
+        page.close()
 
     assert reso["testo"] == "Aldrico <b>il Grande</b>", "il nome deve restare integro come testo"
     assert reso["grassetti"] == 0, "nessun tag deve essere interpretato"
@@ -231,21 +223,34 @@ def test_nome_pg_con_html_non_rompe_il_rendering(gioco_servito: str) -> None:
 # esattamente ciò che succede quando un LLM riscrive una funzione "quasi bene".
 
 @pytest.fixture(scope="module")
-def partita_avviata(gioco_servito: str):
-    """Avvia una nuova partita e restituisce una funzione per interrogare il gioco."""
+def browser_gioco():
+    """Un solo browser (e una sola istanza Playwright) per tutto il modulo.
+
+    L'API sincrona di Playwright rifiuta di avviarsi se un'altra istanza è già
+    viva nello stesso thread ("Sync API inside the asyncio loop"): con una
+    fixture di modulo che resta aperta, ogni test deve prendere una **pagina**
+    da qui invece di aprire un secondo Playwright.
+    """
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
         browser = sd_browser._launch_chromium(pw)
         try:
-            page = browser.new_page()
-            page.goto(gioco_servito, wait_until="load", timeout=60_000)
-            page.wait_for_timeout(3000)
-            page.get_by_role("button", name="NUOVA PARTITA").click()
-            page.wait_for_timeout(2500)
-            yield page.evaluate
+            yield browser
         finally:
             browser.close()
+
+
+@pytest.fixture(scope="module")
+def partita_avviata(gioco_servito: str, browser_gioco):
+    """Avvia una nuova partita e restituisce una funzione per interrogare il gioco."""
+    page = browser_gioco.new_page()
+    page.goto(gioco_servito, wait_until="load", timeout=60_000)
+    page.wait_for_timeout(3000)
+    page.get_by_role("button", name="NUOVA PARTITA").click()
+    page.wait_for_timeout(2500)
+    yield page.evaluate
+    page.close()
 
 
 @pytest.mark.parametrize(
@@ -370,3 +375,115 @@ def test_griglia_ha_metriche_valide(partita_avviata) -> None:
     assert isinstance(metriche, dict) and metriche, "metriche della griglia assenti"
     numeri = [v for v in metriche.values() if isinstance(v, (int, float))]
     assert numeri and all(v == v for v in numeri), f"valori NaN nella griglia: {metriche}"
+
+
+# ---------------------------------------------------------------------------
+# Creazione del personaggio: difetti trovati GIOCANDO, non testando
+# ---------------------------------------------------------------------------
+
+def _gioca(browser, url: str, azione):
+    """Apre una pagina fresca del gioco, esegue `azione(pagina)` e la chiude.
+
+    Prende il browser dalla fixture di modulo: avviare un secondo Playwright
+    mentre il primo è vivo fa fallire tutto con "Sync API inside the asyncio
+    loop", e il messaggio non lascia intuire che la causa è un'altra fixture.
+    """
+    pagina = browser.new_page(viewport={"width": 1400, "height": 900})
+    try:
+        pagina.goto(url, wait_until="load", timeout=60_000)
+        pagina.wait_for_timeout(3000)
+        return azione(pagina)
+    finally:
+        pagina.close()
+
+
+def _crea_personaggio(pagina, nome: str, razza: str | None = None, classe: str | None = None):
+    """Percorso di creazione come lo farebbe un giocatore: nome, poi scelte."""
+    pagina.get_by_role("button", name="NUOVA PARTITA").click()
+    pagina.wait_for_timeout(1500)
+    campo = pagina.get_by_placeholder("Es. Aldric il Coraggioso")
+    campo.fill(nome)
+    if razza:
+        pagina.get_by_text(razza, exact=False).first.click()
+        pagina.wait_for_timeout(400)
+    if classe:
+        pagina.get_by_text(classe, exact=False).first.click()
+        pagina.wait_for_timeout(400)
+    return campo
+
+
+def _apri_scheda_pg(pagina) -> list[str]:
+    """Apre l'hub mobile sulla scheda PG e restituisce le etichette del selettore."""
+    pagina.get_by_role("button", name="📱 HUB").click()
+    pagina.wait_for_timeout(1200)
+    pagina.locator("#hubTabs button, .hub-tab").filter(has_text="PG").first.click()
+    pagina.wait_for_timeout(1200)
+    return pagina.evaluate(
+        "() => [...document.querySelectorAll('#hubPgSelect button')].map(b => b.innerText.trim())"
+    )
+
+
+def test_il_nome_scelto_sopravvive_alla_scelta_di_razza_e_classe(gioco_servito: str, browser_gioco) -> None:
+    """Regressione: scrivere il nome e poi scegliere razza o classe lo cancellava.
+
+    `renderCreate()` ricostruisce la scheda a ogni click e rigenerava il campo
+    nome con una proposta casuale, buttando via quanto digitato. Succedeva
+    nell'ordine più naturale di compilazione — prima il nome, poi razza e
+    classe — quindi praticamente sempre.
+    """
+    def azione(pagina):
+        campo = _crea_personaggio(pagina, "Ser Aldrico di Ventimiglia")
+        pagina.get_by_text("Nano", exact=False).first.click()
+        pagina.wait_for_timeout(400)
+        dopo_razza = campo.input_value()
+        pagina.get_by_text("Chierico", exact=False).first.click()
+        pagina.wait_for_timeout(400)
+        dopo_classe = campo.input_value()
+        pagina.get_by_role("button", name="INIZIA L'AVVENTURA").click()
+        pagina.wait_for_timeout(3000)
+        in_gioco = pagina.evaluate("() => window.UltimateVTTState.getState().identity")
+        return dopo_razza, dopo_classe, in_gioco["name"]
+
+    dopo_razza, dopo_classe, in_gioco = _gioca(browser_gioco, gioco_servito, azione)
+
+    atteso = "Ser Aldrico di Ventimiglia"
+    assert dopo_razza == atteso, "il nome è stato perso scegliendo la razza"
+    assert dopo_classe == atteso, "il nome è stato perso scegliendo la classe"
+    assert in_gioco == atteso, f"il personaggio è entrato in gioco come {in_gioco!r}"
+
+
+def test_il_selettore_pg_mostra_il_nome_non_un_segnaposto(gioco_servito: str, browser_gioco) -> None:
+    """Regressione: l'hub mobile mostrava "PG1" al posto del nome.
+
+    Il nome dei membri del party sta in `identity.name`; quel punto leggeva
+    `pg.name` e ricadeva sul segnaposto, mentre la scheda sotto mostrava il
+    nome giusto — contraddizione visibile a schermo.
+    """
+    def azione(pagina):
+        _crea_personaggio(pagina, "Ser Aldrico")
+        pagina.get_by_role("button", name="INIZIA L'AVVENTURA").click()
+        pagina.wait_for_timeout(3000)
+        return _apri_scheda_pg(pagina)
+
+    etichette = _gioca(browser_gioco, gioco_servito, azione)
+
+    assert etichette, "il selettore dei personaggi è vuoto"
+    assert "Ser Aldrico" in etichette[0], (
+        f"il selettore mostra {etichette[0]!r} invece del nome del personaggio"
+    )
+
+
+def test_nome_con_caratteri_html_resta_leggibile(gioco_servito: str, browser_gioco) -> None:
+    """Un nome come 'Lyra <la Rossa>' deve comparire per intero, non a metà."""
+    def azione(pagina):
+        _crea_personaggio(pagina, "Lyra <la Rossa>")
+        pagina.get_by_role("button", name="INIZIA L'AVVENTURA").click()
+        pagina.wait_for_timeout(3000)
+        return _apri_scheda_pg(pagina)
+
+    etichette = _gioca(browser_gioco, gioco_servito, azione)
+
+    assert etichette, "il selettore dei personaggi è vuoto"
+    assert etichette[0] == "Lyra <la Rossa>", (
+        f"il nome è stato troncato o interpretato come HTML: {etichette[0]!r}"
+    )
