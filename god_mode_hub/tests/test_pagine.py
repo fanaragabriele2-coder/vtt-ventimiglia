@@ -147,3 +147,27 @@ def test_libreria_prompt_mostra_i_nomi_reali(tmp_path, monkeypatch) -> None:
     testo = " ".join(str(o) for o in opzioni)
     assert "Prompt di prova automatica" in testo, "il nome reale non è renderizzato"
     assert "{p.name}" not in testo, "f-string non interpolata: graffe doppie"
+
+
+def test_tab_rigging_riconosce_un_modello_glb() -> None:
+    """Il flusso reale: un .glb sul disco dev'essere trovato e ispezionato
+    dalla pagina, non solo dai moduli."""
+    from utils import ANIMATIONS_DIR, gltf_tools
+
+    coda = ANIMATIONS_DIR / "to_rig"
+    coda.mkdir(parents=True, exist_ok=True)
+    modello = coda / "_prova_automatica.glb"
+    modello.write_bytes(gltf_tools.add_spin(gltf_tools.make_test_cube(), name="prova_rot"))
+    try:
+        at = _esegui(HUB_ROOT / "pages" / "06_🎬_Animazioni.py")
+        assert not at.exception, [str(e.value) for e in at.exception]
+
+        opzioni = [o for sb in at.selectbox for o in (sb.options or [])]
+        assert any("_prova_automatica.glb" in str(o) for o in opzioni), \
+            f"il modello non compare tra le scelte: {opzioni}"
+
+        # le metriche di ispezione devono essere calcolate davvero
+        etichette = {m.label for m in at.metric}
+        assert {"Mesh", "Vertici", "Scheletro", "Animazioni"} <= etichette, etichette
+    finally:
+        modello.unlink(missing_ok=True)

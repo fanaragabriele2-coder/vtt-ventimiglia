@@ -40,7 +40,7 @@ Ultimo aggiornamento: settembre 2026.
 | Sprite sheet non coerenti (ogni frame un seed diverso) | 🟡 medio | **risolto**: modalità "frame coerenti" via img2img |
 | Token generati quadrati con sfondo pieno: inutilizzabili sulla mappa senza editing manuale | 🟠 alto | **risolto**: post-produzione sfondo trasparente + cerchio |
 | Nessun modo di vedere il gioco, il diff o committare senza uscire dall'Hub | 🟠 alto | **risolto**: pagina 🌐 Progetto VTT |
-| **Rigging 3D**: la tab esiste ma è solo documentazione + coda di file. Nessun rigging avviene | 🟡 medio | aperto per scelta (Fase 3) |
+| **Rigging 3D**: la tab era solo documentazione, nessun rigging avveniva | 🟡 medio | **risolto**: animazione procedurale (sempre) + rig scheletrico via Blender |
 | **TripoSR/TRELLIS non verificabili da qui**: richiedono GPU e repo locali | 🟡 medio | aperto — solo tu puoi provarli |
 | `dist/ultimate-vtt.html` citato nel README ma inesistente | 🟢 basso | **risolto**: generato, e rigenerabile dall'Hub |
 | VTT: nome PG e messaggi inseriti in `innerHTML` senza escape — un personaggio chiamato `Aldrico <il Grande>` perdeva metà nome | 🟡 medio | **risolto**: `window.UltimateVTTUtils.escapeHtml` sui 3 punti con input dell'utente |
@@ -114,9 +114,27 @@ avrebbe rotto il gioco (helper definito in una IIFE, usato in altre due →
 `ReferenceError` a runtime, invisibile a `node --check`): l'ha intercettato
 proprio il nuovo test nel browser.
 
+### Fatto: i modelli 3D si muovono
+
+Il segnaposto è diventato funzionalità, su due livelli con costi diversi:
+
+- **Movimento dell'intero modello** (`utils/gltf_tools.py`) — rotazione,
+  fluttuazione, pulsazione scritte direttamente nel glTF. Python puro, nessuna
+  installazione, funziona su qualunque `.glb`. Copre i casi più comuni in un
+  VTT: forziere che gira, token che levita, aura che pulsa.
+- **Scheletro vero** (`utils/rigging.py` + `tools/blender_autorig.py`) —
+  armatura umanoide proporzionata al modello, pesi automatici e animazione
+  idle, tramite Blender in background.
+
+I `.glb` prodotti sono verificati con **pygltflib**, una libreria glTF che non
+ho scritto io: un parser che rilegge il proprio output non dimostra nulla.
+Del rigging Blender ho potuto testare tutto l'intorno (rilevamento, argomenti,
+lettura risultato, errori, timeout, pulizia dei temporanei) con un finto
+eseguibile che rispetta lo stesso contratto CLI; **il codice `bpy` interno
+gira solo dentro Blender, quindi il primo collaudo vero è sul tuo PC.**
+
 ### Cosa resta davvero
-- **Rigging 3D reale** (UniRig o Blender headless): la tab è ancora un
-  segnaposto documentato. È l'unico pezzo grosso rimasto.
+- **Collaudo del rig Blender** sulla tua macchina, con un modello TripoSR vero.
 - **Spezzare `js/12-patch-touch-events-per-mobile.js`** (3580 righe, un quarto
   della codebase del gioco). Ora è meno rischioso: c'è un test che dice
   subito se il gioco si rompe.

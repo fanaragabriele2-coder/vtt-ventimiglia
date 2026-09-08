@@ -25,8 +25,11 @@ rembg>=2.0
 # wiki. Senza, i PDF diventano pagine stub con il solo riferimento al file.
 pypdf>=4.0
 
-# Test (TEST.bat / python -m pytest): non serve per usare l'Hub.
+# Test (TEST.bat / python -m pytest): non servono per usare l'Hub.
+# pygltflib e' usato SOLO dai test, come validatore indipendente dei .glb
+# prodotti: un parser che rilegge il proprio output non dimostra nulla.
 pytest>=8.0
+pygltflib>=1.16
 
 # --- Backend esterni (NON pip, vedi README) -------------------------------
 # Stable Diffusion : Stability Matrix / A1111-Forge, con o senza --api
@@ -35,3 +38,7 @@ pytest>=8.0
 #                    (usa il suo venv: env var TRIPOSR_PYTHON)
 # TRELLIS.2        : servizio HTTP locale opzionale, env var TRELLIS_URL
 # ffmpeg           : opzionale, per l'export MP4 delle animazioni
+# Blender          : opzionale, per il rigging scheletrico dei .glb
+#                    (gratuito da blender.org; env var BLENDER_PATH se
+#                    installato in una cartella non standard)
+# Node.js          : opzionale, per l'anteprima del VTT e il file unico dist/

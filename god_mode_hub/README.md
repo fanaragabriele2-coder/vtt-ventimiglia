@@ -65,6 +65,22 @@ In **🎨 Asset Forge**, dopo la generazione, la sezione *"Token per la mappa"*
 trasforma il PNG quadrato con sfondo pieno nel **token circolare trasparente**
 che il VTT si aspetta (rimozione sfondo locale, ritaglio, bordo).
 
+## 🦴 Far muovere i modelli 3D
+
+TripoSR produce mesh **statiche**. La tab *Rigging 3D* (in 🎬 Animazioni) offre
+due strade, con costi diversi:
+
+- **Movimento dell'intero modello** — rotazione, fluttuazione o pulsazione
+  scritte direttamente nel glTF. Nessuna installazione, funziona su qualunque
+  `.glb`. Copre i casi tipici di un VTT: un forziere che gira, un token che
+  levita, un'aura che pulsa.
+- **Scheletro con Blender** — armatura umanoide proporzionata al modello, pesi
+  automatici e animazione idle. Richiede **Blender** installato (gratuito,
+  blender.org); se non è nel PATH, imposta `BLENDER_PATH` sul suo `blender.exe`.
+  Le proporzioni derivano dal riquadro di ingombro: su un personaggio in posa A
+  funziona, su una creatura di forma molto diversa le ossa vanno sistemate a
+  mano in Blender.
+
 ## ✅ Test
 
 Doppio click su **`TEST.bat`** (o `python -m pytest` da terminale): esegue la

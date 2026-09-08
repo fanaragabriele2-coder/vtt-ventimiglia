@@ -19,7 +19,7 @@ if str(_HUB_ROOT) not in sys.path:
 st.set_page_config(page_title="Animazioni — God-Mode Hub", page_icon="🎬", layout="wide")
 
 from utils import ANIMATIONS_DIR, ensure_dirs, human_size, slugify  # noqa: E402
-from utils import sd_api, sd_browser  # noqa: E402
+from utils import gltf_tools, rigging, sd_api, sd_browser  # noqa: E402
 
 ensure_dirs()
 
@@ -197,39 +197,185 @@ with tab_sprite:
             )
 
 # ---------------------------------------------------------------------------
-# TAB 2 — Rigging 3D (placeholder logico, pipeline documentata)
+# TAB 2 — Animazione dei modelli 3D
 # ---------------------------------------------------------------------------
 with tab_rig:
     st.markdown(
-        """
-### Pipeline rigging 3D (roadmap — tutto locale)
-
-Il rigging automatico dei `.glb` generati da TripoSR è **la prossima
-estensione** dell'Hub. Pipeline prevista, 100% locale:
-
-1. **Import** del `.glb` da `asset_forge/characters/` o `tokens/`;
-2. **Auto-rigging** con [UniRig](https://github.com/VAST-AI-Research/UniRig)
-   (VAST AI, gira su GPU locale) oppure Blender + Rigify via `bpy` headless;
-3. **Retarget** di animazioni base (idle, walk, attack) da libreria BVH locale;
-4. **Export** `.glb` animato pronto per il renderer 3D del VTT Flutter.
-
-Nel frattempo puoi **parcheggiare qui i modelli da riggare**: verranno
-raccolti in `asset_forge/animations/to_rig/`.
-"""
+        "TripoSR e TRELLIS producono **mesh statiche**: nessuno scheletro, "
+        "nessuna animazione. Qui ci sono due strade, con costi molto diversi."
     )
-    uploaded = st.file_uploader("Carica un .glb da riggare (coda locale)", type=["glb"])
-    if uploaded is not None:
-        to_rig = ANIMATIONS_DIR / "to_rig"
-        to_rig.mkdir(parents=True, exist_ok=True)
-        dest = to_rig / uploaded.name
-        dest.write_bytes(uploaded.getvalue())
-        st.success(f"In coda per il rigging: `{dest.relative_to(_HUB_ROOT).as_posix()}`")
 
-    queue = sorted((ANIMATIONS_DIR / "to_rig").glob("*.glb")) if (ANIMATIONS_DIR / "to_rig").exists() else []
-    if queue:
-        st.markdown("**Coda rigging:**")
-        for item in queue:
-            st.markdown(f"- `{item.name}` · {human_size(item.stat().st_size)}")
+    modelli = sorted(
+        [p for p in (ANIMATIONS_DIR / "to_rig").glob("*.glb")] +
+        [p for p in (_HUB_ROOT / "asset_forge").rglob("*.glb")],
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )
+    caricato = st.file_uploader("Carica un .glb", type=["glb"], key="rig_upload")
+    if caricato is not None:
+        coda = ANIMATIONS_DIR / "to_rig"
+        coda.mkdir(parents=True, exist_ok=True)
+        destinazione = coda / caricato.name
+        destinazione.write_bytes(caricato.getvalue())
+        st.success(f"Salvato in `{destinazione.relative_to(_HUB_ROOT).as_posix()}`")
+        st.rerun()
+
+    if not modelli:
+        st.info(
+            "Nessun modello `.glb` disponibile: generane uno in 🎨 Asset Forge o "
+            "👤 Generatore Personaggi, oppure caricalo qui sopra.",
+            icon="🦴",
+        )
+    else:
+        etichette = [
+            f"{p.name} · {human_size(p.stat().st_size)}" for p in dict.fromkeys(modelli)
+        ]
+        unici = list(dict.fromkeys(modelli))
+        scelta = st.selectbox("Modello", etichette, key="rig_model")
+        modello_path = unici[etichette.index(scelta)]
+        dati_modello = modello_path.read_bytes()
+
+        try:
+            info = gltf_tools.inspect_glb(dati_modello)
+        except gltf_tools.GLTFError as exc:
+            st.error(f"File non leggibile: {exc}")
+            info = None
+
+        if info is not None:
+            i1, i2, i3, i4 = st.columns(4)
+            i1.metric("Mesh", info.meshes)
+            i2.metric("Vertici", f"{info.vertex_count:,}")
+            i3.metric("Scheletro", "🦴 sì" if info.has_skeleton else "— no")
+            i4.metric("Animazioni", len(info.animations) or "—")
+            if info.animations:
+                st.caption("Già presenti: " + ", ".join(f"`{a}`" for a in info.animations))
+
+            metodo = st.radio(
+                "Come animarlo",
+                options=["Movimento dell'intero modello", "Scheletro con Blender"],
+                horizontal=True,
+                key="rig_method",
+                help="Il primo non richiede installazioni e funziona su qualsiasi "
+                     "modello. Il secondo crea ossa e pesi, ma richiede Blender.",
+            )
+
+            # --- Strada 1: animazione procedurale, sempre disponibile --------
+            if metodo == "Movimento dell'intero modello":
+                st.caption(
+                    "Ruota, fa fluttuare o pulsare il modello **intero**. Non serve "
+                    "uno scheletro: copre i casi più comuni in un VTT (un forziere "
+                    "che gira, un token che levita, un'aura che pulsa). Non produce "
+                    "una camminata: per quella serve il rig scheletrico."
+                )
+                c1, c2 = st.columns(2)
+                tipo = c1.selectbox(
+                    "Tipo di movimento", list(gltf_tools.PROCEDURAL_ANIMATIONS.keys()),
+                    key="rig_proc_type",
+                )
+                durata = c2.slider("Durata del ciclo (secondi)", 1.0, 10.0, 4.0, 0.5,
+                                   key="rig_proc_dur")
+                sostituisci = st.checkbox(
+                    "Rimuovi le animazioni già presenti", value=bool(info.animations),
+                    key="rig_proc_replace",
+                    help="Due animazioni sullo stesso nodo danno risultati "
+                         "imprevedibili nel visualizzatore.",
+                )
+
+                if st.button("✨ Applica movimento", type="primary", key="rig_proc_go"):
+                    try:
+                        sorgente = (
+                            gltf_tools.remove_animations(dati_modello)
+                            if sostituisci else dati_modello
+                        )
+                        animato = gltf_tools.PROCEDURAL_ANIMATIONS[tipo](
+                            sorgente, duration=durata
+                        )
+                    except gltf_tools.GLTFError as exc:
+                        st.error(str(exc))
+                    else:
+                        uscita = ANIMATIONS_DIR / f"{modello_path.stem}_animato.glb"
+                        uscita.write_bytes(animato)
+                        st.session_state["rig_result"] = animato
+                        st.session_state["rig_result_name"] = uscita.name
+                        st.success(
+                            f"Salvato `asset_forge/animations/{uscita.name}` "
+                            f"({human_size(len(animato))})."
+                        )
+
+            # --- Strada 2: rigging scheletrico con Blender -------------------
+            else:
+                blender_ok = rigging.blender_available()
+                if blender_ok:
+                    versione = rigging.blender_version()
+                    st.success(f"🟢 Blender trovato{': ' + versione if versione else ''}")
+                else:
+                    st.warning(
+                        "🟠 **Blender non trovato.** È gratuito (blender.org): "
+                        "installalo e riapri l'Hub. Se è già installato in una "
+                        "cartella non standard, imposta la variabile d'ambiente "
+                        "`BLENDER_PATH` sul suo `blender.exe`.",
+                        icon="🦴",
+                    )
+                st.caption(
+                    "Crea un'armatura umanoide proporzionata al modello e la lega "
+                    "alla mesh con i pesi automatici di Blender. Le proporzioni "
+                    "derivano dal riquadro di ingombro: su un personaggio in posa A "
+                    "funziona, su una creatura di forma diversa (quadrupede, drago) "
+                    "le ossa finiranno nel posto sbagliato e andranno sistemate a "
+                    "mano. Fa il lavoro noioso, non sostituisce un rigger."
+                )
+                r1, r2 = st.columns(2)
+                con_idle = r1.checkbox("Aggiungi animazione idle (respiro)", value=True,
+                                       key="rig_idle")
+                frames = r2.slider("Fotogrammi del ciclo", 24, 120, 60, key="rig_frames")
+
+                if st.button("🦴 Crea scheletro", type="primary",
+                             disabled=not blender_ok, key="rig_blender_go"):
+                    with st.spinner("Blender al lavoro (può richiedere qualche minuto)…"):
+                        esito = rigging.autorig_glb(
+                            dati_modello,
+                            animation="idle" if con_idle else "none",
+                            frames=frames,
+                        )
+                    if esito.ok:
+                        uscita = ANIMATIONS_DIR / f"{modello_path.stem}_riggato.glb"
+                        uscita.write_bytes(esito.glb)
+                        st.session_state["rig_result"] = esito.glb
+                        st.session_state["rig_result_name"] = uscita.name
+                        st.success(f"{esito.message} Salvato in `{uscita.name}`.")
+                    else:
+                        st.error(esito.message)
+                        if esito.log_tail:
+                            with st.expander("Log di Blender"):
+                                st.code(esito.log_tail)
+
+        # --- Risultato ---------------------------------------------------
+        risultato: bytes | None = st.session_state.get("rig_result")
+        if risultato:
+            st.divider()
+            nome_risultato = st.session_state.get("rig_result_name", "modello.glb")
+            try:
+                info_out = gltf_tools.inspect_glb(risultato)
+            except gltf_tools.GLTFError:
+                info_out = None
+            col_info, col_dl = st.columns([2, 1])
+            with col_info:
+                st.markdown(f"**Risultato:** `{nome_risultato}`")
+                if info_out:
+                    st.caption(
+                        f"{info_out.vertex_count:,} vertici · "
+                        f"scheletro: {'sì' if info_out.has_skeleton else 'no'} · "
+                        f"animazioni: {', '.join(info_out.animations) or 'nessuna'}"
+                    )
+            with col_dl:
+                st.download_button(
+                    "⬇️ Scarica .glb animato", data=risultato,
+                    file_name=nome_risultato, mime="model/gltf-binary",
+                    use_container_width=True,
+                )
+            st.caption(
+                "Per vederlo in movimento: aprilo in Blender, in un visualizzatore "
+                "glTF, oppure importalo nel VTT dalla pagina 🌐 Progetto VTT."
+            )
 
 # ---------------------------------------------------------------------------
 # TAB 3 — Export per il VTT
@@ -292,6 +438,7 @@ with st.sidebar:
         "- Sprite sheet: SD frame-per-frame (API o browser)\n"
         "- GIF: Pillow (locale)\n"
         "- MP4: ffmpeg (se installato)\n"
-        "- Rigging 3D: roadmap UniRig/Blender\n"
+        "- Movimento 3D: glTF procedurale (sempre)\n"
+        "- Rig scheletrico: Blender headless\n"
         f"- Output: `asset_forge/animations/`"
     )
