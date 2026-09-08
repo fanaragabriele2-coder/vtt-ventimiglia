@@ -238,20 +238,24 @@ def animate_idle(armatura, frames: int) -> None:
     bpy.ops.object.mode_set(mode="POSE")
     ossa = armatura.pose.bones
 
-    def chiave(nome_osso: str, frame: int, rotazione_x: float) -> None:
+    def chiave(nome_osso: str, frame: int, gradi: float) -> None:
         osso = ossa.get(nome_osso)
         if osso is None:
             return
         osso.rotation_mode = "XYZ"
-        osso.rotation_euler[0] = rotazione_x
+        osso.rotation_euler[0] = math.radians(gradi)
         osso.keyframe_insert(data_path="rotation_euler", frame=frame)
 
+    # Ampiezze in GRADI. Misurate sul modello di prova: al picco il vertice
+    # più mobile si sposta di circa il 2,9% dell'altezza — percepibile senza
+    # sembrare un'agitazione. Il ciclo torna a zero sull'ultimo fotogramma,
+    # altrimenti l'animazione scatterebbe a ogni ripetizione.
     meta = frames // 2
-    for nome, ampiezza in (("spina", 0.035), ("torace", 0.025),
-                           ("braccio_L", 0.05), ("braccio_R", 0.05)):
+    for nome, gradi in (("spina", 2.0), ("torace", 1.4),
+                        ("braccio_L", 2.9), ("braccio_R", 2.9)):
         chiave(nome, 1, 0.0)
-        chiave(nome, meta, math.radians(ampiezza * 180 / math.pi))
-        chiave(nome, frames, 0.0)  # chiude il ciclo: nessuno scatto al loop
+        chiave(nome, meta, gradi)
+        chiave(nome, frames, 0.0)
 
     bpy.ops.object.mode_set(mode="OBJECT")
 

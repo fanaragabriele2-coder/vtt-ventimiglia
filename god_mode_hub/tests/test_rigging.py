@@ -493,3 +493,91 @@ def test_i_pesi_muovono_solo_l_arto_giusto(tmp_path: Path) -> None:
         f"l'influenza del braccio arriva fino alla vita ({m['vita']:.4f} contro "
         f"{m['braccio_ruotato']:.4f} del braccio): i pesi sono troppo diffusi"
     )
+
+
+_SCRIPT_MISURA_IDLE = """
+import bpy, json
+bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
+bpy.ops.import_scene.gltf(filepath=INGRESSO)
+mesh = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
+
+def posizioni():
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = mesh.evaluated_get(dg)
+    m = ev.matrix_world
+    return [m @ v.co for v in ev.data.vertices]
+
+# La durata va letta dall'AZIONE importata: dopo un import glTF la scena
+# conserva il proprio frame_end di default (250), quindi usarlo farebbe
+# campionare fotogrammi oltre la fine dell'animazione, dove il modello e'
+# fermo sull'ultima posa — e l'animazione sembrerebbe inesistente.
+ultimo = 0
+for oggetto in bpy.context.scene.objects:
+    ad = oggetto.animation_data
+    if ad and ad.action:
+        inizio_azione, fine_azione = ad.action.frame_range
+        ultimo = max(ultimo, int(fine_azione))
+assert ultimo > 1, 'nessuna azione con fotogrammi trovata nel file importato'
+
+sc = bpy.context.scene
+sc.frame_set(1)
+base = posizioni()
+altezza = max(p.z for p in base) - min(p.z for p in base)
+
+per_frame = {}
+for f in (1, ultimo // 4, ultimo // 2, (3 * ultimo) // 4, ultimo):
+    sc.frame_set(f)
+    bpy.context.view_layer.update()
+    ora = posizioni()
+    per_frame[str(f)] = max((ora[i] - base[i]).length for i in range(len(base)))
+
+open(RISULTATO, 'w').write(json.dumps({
+    'altezza': altezza, 'frame_finale': ultimo, 'spostamenti': per_frame,
+}))
+"""
+
+
+@pytestmark_blender
+def test_animazione_idle_e_percepibile_e_chiude_il_ciclo(tmp_path: Path) -> None:
+    """L'idle deve vedersi, ma senza scattare quando riparte.
+
+    Due difetti opposti, entrambi realistici: un'ampiezza troppo piccola rende
+    l'animazione inutile (il modello sembra fermo), mentre un ciclo che non
+    torna alla posa iniziale produce uno scatto a ogni ripetizione — evidente
+    su un token che resta sulla mappa per tutta la sessione.
+    """
+    import json
+
+    organico = tmp_path / "organico.glb"
+    esito = _esegui_in_blender(_SCRIPT_UMANOIDE_ORGANICO, tmp_path, USCITA=str(organico))
+    assert organico.is_file(), (esito.stderr or esito.stdout)[-600:]
+
+    esito_rig = rigging.autorig_glb(organico.read_bytes(), animation="idle", frames=60)
+    assert esito_rig.ok, f"{esito_rig.message}\n{esito_rig.log_tail}"
+    riggato = tmp_path / "idle.glb"
+    riggato.write_bytes(esito_rig.glb)
+
+    risultato = tmp_path / "idle.json"
+    esito_misura = _esegui_in_blender(
+        _SCRIPT_MISURA_IDLE, tmp_path, INGRESSO=str(riggato), RISULTATO=str(risultato)
+    )
+    assert risultato.is_file(), (
+        "impossibile misurare l'animazione:\n"
+        + (esito_misura.stderr or esito_misura.stdout)[-600:]
+    )
+    m = json.loads(risultato.read_text(encoding="utf-8"))
+    altezza = m["altezza"]
+    spostamenti = {int(k): v for k, v in m["spostamenti"].items()}
+    picco = max(spostamenti.values())
+
+    assert picco / altezza > 0.008, (
+        f"animazione impercettibile: al massimo {picco / altezza:.2%} dell'altezza"
+    )
+    assert picco / altezza < 0.10, (
+        f"animazione troppo marcata per un idle: {picco / altezza:.2%} dell'altezza"
+    )
+    ultimo = spostamenti[m["frame_finale"]]
+    assert ultimo < altezza * 0.001, (
+        f"il ciclo non torna alla posa iniziale (scarto {ultimo:.4f}): "
+        "l'animazione scatterebbe a ogni ripetizione"
+    )

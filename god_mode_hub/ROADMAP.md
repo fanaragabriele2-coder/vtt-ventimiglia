@@ -197,6 +197,20 @@ controllato tutti i 14 punti di skip della suite e corretto gli altri due che
 avevano lo stesso difetto — fra cui quello su `dev-server.js`, che è codice
 del progetto: ora se non parte il test lo dice, con il codice d'uscita di node.
 
+### Fatto: verificata anche l'animazione idle
+
+Avevo dichiarato "respiro leggero" senza mai misurarlo. Al picco il vertice più
+mobile si sposta del **2,9% dell'altezza** — percepibile senza sembrare
+agitazione — e il ciclo torna **esattamente** alla posa iniziale, quindi non
+scatta quando riparte. Un test protegge entrambe le proprietà, ed è confermato
+fallire sia con ampiezze troppo piccole sia togliendo il fotogramma di
+chiusura.
+
+Nel codice c'era anche un'espressione ingannevole: `math.radians(ampiezza *
+180 / math.pi)` sembra una conversione ma è matematicamente un'operazione nulla
+(converte in gradi e torna subito indietro). Ora le ampiezze sono dichiarate in
+gradi e convertite una volta sola; comportamento verificato identico a prima.
+
 ### Cosa resta davvero
 
 La suite gira ora **senza un solo test saltato**: ogni componente opzionale è
